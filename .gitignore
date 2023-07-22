@@ -1,0 +1,5 @@
+
+androidtv_remote_cert.pem
+androidtv_remote_key.pem
+.DS_Store
+config.json

@@ -1,0 +1,39 @@
+{
+	"driver_id": "uc_androidtv_driver",
+	"version": "0.1.0",
+	"min_core_api": "0.7.0",
+	"name": { "en": "Android TV" },
+	"icon": "custom:androidtv.png",
+	"description": {
+		"en": "Control your Android TV with Remote Two."
+	},
+	"developer": {
+		"name": "Unfolded Circle ApS",
+		"email": "hello@unfoldedcircle.com",
+		"url": "https://www.unfoldedcircle.com"
+	},
+	"home_page": "https://www.unfoldedcircle.com",
+	"setup_data_schema": {
+		"title": {
+			"en": "Integration setup",
+			"de": "Integrationssetup"
+		},
+		"settings": [
+			{
+				"id": "info",
+				"label": {
+					"en": "Setup process",
+					"de": "Setup Fortschritt"
+				},
+				"field": {
+					"label": {
+						"value": {
+							"en": "The integration will discover your Android TV on your network. During the process, you might need to enter a PIN that are shown on your Android TV."
+						}
+					}
+				}
+			}
+		]
+	},
+	"release_date": "2023-07-21"
+}
