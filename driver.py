@@ -154,7 +154,7 @@ async def event_handler(websocket, id, data):
             }
         },
         'id': 'choice',
-        'label': { 'en': 'Please make sure the device is powered on before proceeding.' }
+        'label': { 'en': 'Choose your Android TV' }
         }
     ])
 
@@ -362,10 +362,9 @@ async def event_handler(websocket, id, entityId, entityType, cmdId, params):
     elif cmdId == entities.media_player.COMMANDS.CHANNEL_UP:
         res = androidTv.channelUp()
         await api.acknowledgeCommand(websocket, id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR)
-    # TODO implement source
-    # elif cmdId == entities.media_player.COMMANDS.SELECT_SOURCE:
-    #     res = androidTv.launchApp(params["source"])
-    #     await api.acknowledgeCommand(websocket, id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR)
+    elif cmdId == entities.media_player.COMMANDS.SELECT_SOURCE:
+        res = androidTv.launchApp(params["source"])
+        await api.acknowledgeCommand(websocket, id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR)
 
 
 async def handleConnected(identifier):
@@ -397,6 +396,9 @@ async def handleAndroidTvUpdate(entityId, update):
             attributes[entities.media_player.ATTRIBUTES.STATE] = entities.media_player.STATES.ON
         else:
             attributes[entities.media_player.ATTRIBUTES.STATE] = entities.media_player.STATES.OFF
+
+    if 'source_list' in update:
+        attributes[entities.media_player.ATTRIBUTES.SOURCE_LIST] = update['source_list']
 
     if 'source' in update:
         attributes[entities.media_player.ATTRIBUTES.SOURCE] = update['source']

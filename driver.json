@@ -1,6 +1,6 @@
 {
 	"driver_id": "uc_androidtv_driver",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"min_core_api": "0.7.0",
 	"name": { "en": "Android TV" },
 	"icon": "custom:androidtv.png",
@@ -28,12 +28,12 @@
 				"field": {
 					"label": {
 						"value": {
-							"en": "The integration will discover your Android TV on your network. During the process, you might need to enter a PIN that are shown on your Android TV."
+							"en": "The integration will discover your Android TV on your network. During the process, you might need to enter a PIN that are shown on your Android TV. Please make sure that your Android TV is powered on."
 						}
 					}
 				}
 			}
 		]
 	},
-	"release_date": "2023-07-21"
+	"release_date": "2023-07-23"
 }

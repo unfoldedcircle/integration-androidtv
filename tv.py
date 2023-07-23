@@ -14,6 +14,8 @@ from androidtvremote2 import (
     InvalidAuth,
 )
 
+import apps
+
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.DEBUG)
 
@@ -107,6 +109,8 @@ class AndroidTv(object):
         self._atv.add_volume_info_updated_callback(self.volume_info_updated)
         self._atv.add_is_available_updated_callback(self.is_available_updated)
 
+        self._updateAppList()
+
         self.events.emit(EVENTS.CONNECTED, self.identifier)
 
     def disconnect(self):
@@ -137,6 +141,15 @@ class AndroidTv(object):
         if is_available is False:
             self.events.emit(EVENTS.DISCONNECTED, self.identifier)
             _ = asyncio.ensure_future(self.connect())
+
+    def _updateAppList(self):
+        update = {}
+        list = []
+        for app in apps.Apps:
+            list.append(app)
+
+        update['source_list'] = list
+        self.events.emit(EVENTS.UPDATE, update)
 
     # Commands
     def _sendCommand(self, keyCode, direction = "SHORT"):
@@ -197,3 +210,11 @@ class AndroidTv(object):
     
     def channelDown(self):
         return self._sendCommand('CHANNEL_DOWN')
+    
+    def launchApp(self, app):
+        try:
+            self._atv.send_launch_app_command(apps.Apps[app]['url'])
+            return True
+        except ConnectionClosed:
+            LOG.error('Cannot send command, connection lost: %s', self.identifier)
+            return False
