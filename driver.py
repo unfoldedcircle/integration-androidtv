@@ -22,7 +22,7 @@ discoveredAndroidTvs = []
 pairingAndroidTv = None
 configuredAndroidTvs = {}
     
-async def clearConfig():
+async def clearConfig() -> None:
     global config
     config = []
 
@@ -35,7 +35,7 @@ async def clearConfig():
     if os.path.exists(dataPath + '/androidtv_remote_key.pem'):
         os.remove(dataPath + '/androidtv_remote_key.pem')
 
-async def storeCofig():
+async def storeCofig() -> None:
     global config
     f = None
     try:
@@ -48,7 +48,7 @@ async def storeCofig():
 
     f.close()
 
-async def loadConfig():
+async def loadConfig() -> bool:
     global config
     f = None
     try:
@@ -74,7 +74,7 @@ async def loadConfig():
     return True
 
 
-async def discoverAndroidTvs(timeout: int = 5):
+async def discoverAndroidTvs(timeout: int = 5) -> None:
     def _onServiceStateChanged(zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
         if state_change is not ServiceStateChange.Added:
             return
@@ -406,7 +406,7 @@ async def handleAndroidTvUpdate(entityId, update):
     if attributes:
         api.configuredEntities.updateEntityAttributes(entityId, attributes)
 
-def addAvailableAndroidTv(identifier, name):
+def addAvailableAndroidTv(identifier: str, name: str) -> None:
     entity = entities.media_player.MediaPlayer(identifier, name, [
         entities.media_player.FEATURES.ON_OFF,
         entities.media_player.FEATURES.VOLUME,

@@ -33,7 +33,7 @@ class EVENTS(IntEnum):
 
 
 class AndroidTv(object):
-    def __init__(self, loop, dataPath):
+    def __init__(self, loop: any, dataPath: str):
         self._loop = loop
         self._dataPath = dataPath
         self.events = AsyncIOEventEmitter(self._loop)
@@ -43,7 +43,7 @@ class AndroidTv(object):
         self.mac = None
         self.address = None
 
-    async def init(self, host, name = ""):
+    async def init(self, host: str, name: str = "") -> bool:
         self._atv = AndroidTVRemote(
             client_name="Remote Two",
             certfile=self._dataPath + '/androidtv_remote_cert.pem',
@@ -71,14 +71,14 @@ class AndroidTv(object):
         return True
 
 
-    def backoff(self):
+    def backoff(self) -> int:
         return self._connectionAttempts * BACKOFF_SEC
     
-    async def startPairing(self):
+    async def startPairing(self) -> None:
         await self._atv.async_start_pairing()
     
 
-    async def finishPairing(self, pin):
+    async def finishPairing(self, pin: str) -> bool:
         try:
             await self._atv.async_finish_pairing(pin)
             return True
@@ -89,7 +89,7 @@ class AndroidTv(object):
             LOG.error("Initialize pair again. Error: %s", exc)
             return False
 
-    async def connect(self):
+    async def connect(self) -> None:
         LOG.debug('Android TV connecting: %s', self.identifier)
 
         try:
@@ -113,7 +113,7 @@ class AndroidTv(object):
 
         self.events.emit(EVENTS.CONNECTED, self.identifier)
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         self._atv.disconnect()
         self.events.emit(EVENTS.DISCONNECTED, self.identifier)
 
@@ -140,9 +140,9 @@ class AndroidTv(object):
         LOG.info("Notified that is_available: %s", is_available)
         if is_available is False:
             self.events.emit(EVENTS.DISCONNECTED, self.identifier)
-            _ = asyncio.ensure_future(self.connect())
+            # _ = asyncio.ensure_future(self.connect())
 
-    def _updateAppList(self):
+    def _updateAppList(self) -> None:
         update = {}
         list = []
         for app in apps.Apps:
@@ -152,7 +152,7 @@ class AndroidTv(object):
         self.events.emit(EVENTS.UPDATE, update)
 
     # Commands
-    def _sendCommand(self, keyCode, direction = "SHORT"):
+    def _sendCommand(self, keyCode: str, direction: str = "SHORT") -> bool:
         try:
             self._atv.send_key_command(keyCode, direction)
             return True
@@ -160,58 +160,58 @@ class AndroidTv(object):
             LOG.error('Cannot send command, connection lost: %s', self.identifier)
             return False
         
-    def turnOn(self):
+    def turnOn(self) -> bool:
         return self._sendCommand('POWER')
     
-    def turnOff(self):
+    def turnOff(self) -> bool:
         return self._sendCommand('POWER')
     
-    def playPause(self):
+    def playPause(self) -> bool:
         return self._sendCommand('MEDIA_PLAY_PAUSE')
     
-    def next(self):
+    def next(self) -> bool:
         return self._sendCommand('MEDIA_NEXT')
     
-    def previous(self):
+    def previous(self) -> bool:
         return self._sendCommand('MEDIA_PREVIOUS')
     
-    def volumeUp(self):
+    def volumeUp(self) -> bool:
         return self._sendCommand('VOLUME_UP')
     
-    def volumeDown(self):
+    def volumeDown(self) -> bool:
         return self._sendCommand('VOLUME_DOWN')
     
-    def muteToggle(self):
+    def muteToggle(self) -> bool:
         return self._sendCommand('VOLUME_MUTE')
     
-    def cursorUp(self):
+    def cursorUp(self) -> bool:
         return self._sendCommand('DPAD_UP')
     
-    def cursorDown(self):
+    def cursorDown(self) -> bool:
         return self._sendCommand('DPAD_DOWN')
     
-    def cursorLeft(self):
+    def cursorLeft(self) -> bool:
         return self._sendCommand('DPAD_LEFT')
     
-    def cursorRight(self):
+    def cursorRight(self) -> bool:
         return self._sendCommand('DPAD_RIGHT')
     
-    def cursorEnter(self):
+    def cursorEnter(self) -> bool:
         return self._sendCommand('DPAD_CENTER')
     
-    def home(self):
+    def home(self) -> bool:
         return self._sendCommand('HOME')
     
-    def back(self):
+    def back(self) -> bool:
         return self._sendCommand('BACK')
     
-    def channelUp(self):
+    def channelUp(self) -> bool:
         return self._sendCommand('CHANNEL_UP')
     
-    def channelDown(self):
+    def channelDown(self) -> bool:
         return self._sendCommand('CHANNEL_DOWN')
     
-    def launchApp(self, app):
+    def launchApp(self, app) -> bool:
         try:
             self._atv.send_launch_app_command(apps.Apps[app]['url'])
             return True
