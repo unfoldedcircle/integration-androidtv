@@ -173,6 +173,10 @@ class AndroidTv(object):
 
     def volume_info_updated(self, volume_info):
         LOG.info("Notified that volume_info: %s", volume_info)
+        update = {}
+        update['volume'] = volume_info['level']
+        update['muted'] = volume_info['muted']
+        self.events.emit(EVENTS.UPDATE, update)
 
     def is_available_updated(self, is_available):
         LOG.info("Notified that is_available: %s", is_available)

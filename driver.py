@@ -402,6 +402,12 @@ async def handleAndroidTvUpdate(entityId, update):
     if 'title' in update:
         attributes[entities.media_player.ATTRIBUTES.MEDIA_TITLE] = update['title']
 
+    if 'volume' in update:
+        attributes[entities.media_player.ATTRIBUTES.VOLUME] = update['volume']
+
+    if 'muted' in update:
+        attributes[entities.media_player.ATTRIBUTES.MUTED] = update['muted']
+
     if 'source_list' in update:
         attributes[entities.media_player.ATTRIBUTES.SOURCE_LIST] = update['source_list']
 
