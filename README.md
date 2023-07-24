@@ -4,7 +4,7 @@ Using [androidtvremote2](https://github.com/tronikos/androidtvremote2) and [uc-i
 
 The integration currently supports almost all features that the library provides.
 Button control and ON/OFF states are supported. Unfortunately media image and playing information are not :(
-Source and source list is still a TODO.
+Source list is limited to predefined list as retrieving a list of installed apps is not possible.
 
 
 ## Build self-contained binary
