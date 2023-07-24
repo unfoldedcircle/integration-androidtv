@@ -16,6 +16,7 @@ LOOP = asyncio.get_event_loop()
 LOG.setLevel(logging.DEBUG)
 
 # Global variables
+config = []
 dataPath = None
 api = uc.IntegrationAPI(LOOP)
 discoveredAndroidTvs = []
@@ -119,44 +120,42 @@ async def discoverAndroidTvs(timeout: int = 5) -> None:
 # DRIVER SETUP
 @api.events.on(uc.uc.EVENTS.SETUP_DRIVER)
 async def event_handler(websocket, id, data):
-    global discoveredAndroidTvs
-
     LOG.debug('Starting driver setup')
-    await clearConfig()
     await api.acknowledgeCommand(websocket, id)
     await api.driverSetupProgress(websocket)
 
-    LOG.debug('Starting Android TV discovery')
-    await discoverAndroidTvs()
-    dropdownItems = []
-
-    for tv in discoveredAndroidTvs:
-        tvData = {
-            'id': tv['address'],
-            'label': {
-                'en': tv['name']
-            }
-        }
-
-        dropdownItems.append(tvData)
-
-    if not dropdownItems:
-        LOG.warning('No Android TVs found')
-        await api.driverSetupError(websocket)
-        return
-
-    await api.requestDriverSetupUserInput(websocket, 'Please choose your Android TV', [
+    await api.requestDriverSetupUserInput(websocket, "Please select how you'd like to continue", [
         { 
         'field': { 
             'dropdown': {
-                'value': dropdownItems[0]['id'],
-                'items': dropdownItems
+                'value': '1',
+                'items': [ 
+                    {
+                        'id': '1',
+                        'label': {
+                            'en': 'Add a new device'
+                        }
+                    },
+                    {
+                        'id': '2',
+                        'label': {
+                            'en': 'Remove a device'
+                        }
+                    },
+                    {
+                        'id': '3',
+                        'label': {
+                            'en': 'Remove all'
+                        }
+                    }
+                ]
             }
         },
-        'id': 'choice',
-        'label': { 'en': 'Choose your Android TV' }
+        'id': 'setup_choice',
+        'label': { 'en': '' }
         }
     ])
+
 
 @api.events.on(uc.uc.EVENTS.SETUP_DRIVER_USER_DATA)
 async def event_handler(websocket, id, data):
@@ -206,6 +205,12 @@ async def event_handler(websocket, id, data):
             await api.driverSetupError(websocket)
             return
         
+        for configItem in config:
+            if configItem['id'] == pairingAndroidTv.identifier:
+                LOG.error('This device is already setup: %s', pairingAndroidTv.identifier)
+            await api.driverSetupError(websocket)
+            return
+        
         LOG.debug('Pairing process begin')
 
         await api.requestDriverSetupUserInput(websocket, 'Please enter the PIN from your Android TV', [
@@ -219,6 +224,99 @@ async def event_handler(websocket, id, data):
         ])
 
         await pairingAndroidTv.startPairing()
+
+    elif "choice_remove" in data:
+            LOG.debug('Remove config entry: %s', data['choice_remove'])
+            if configuredAndroidTvs:
+                if data['choice_remove'] in configuredAndroidTvs:
+                    configuredAndroidTvs[data['choice_remove']].disconnect()
+                    configuredAndroidTvs.pop(data['choice_remove'])
+            
+            idToRemove = -1
+
+            for configItem in config:
+                idToRemove += 1
+                if configItem['id'] == data['choice_remove']:
+                    break;
+
+            if idToRemove != -1:
+                config.pop(idToRemove)
+                await storeCofig()
+                await api.driverSetupComplete(websocket)
+            else:
+                LOG.error('Cannot remove config item, not found %s', data['choice_remove'])
+                await api.driverSetupError(websocket)
+
+    elif "setup_choice" in data:
+        if data['setup_choice'] == '1':
+            LOG.debug('Starting Android TV discovery')
+            await discoverAndroidTvs()
+            dropdownItems = []
+
+            for tvItem in discoveredAndroidTvs:
+                tvData = {
+                    'id': tvItem['address'],
+                    'label': {
+                        'en': tvItem['name']
+                    }
+                }
+
+                dropdownItems.append(tvData)
+
+            if not dropdownItems:
+                LOG.warning('No Android TVs found')
+                await api.driverSetupError(websocket)
+                return
+
+            await api.requestDriverSetupUserInput(websocket, 'Please choose your Android TV', [
+                { 
+                'field': { 
+                    'dropdown': {
+                        'value': dropdownItems[0]['id'],
+                        'items': dropdownItems
+                    }
+                },
+                'id': 'choice',
+                'label': { 'en': 'Choose your Android TV' }
+                }
+            ])
+
+        elif data['setup_choice'] == '2':    
+            LOG.debug('Remove device')
+            removeItemsList = []
+
+            for configItem in config:
+                print(configItem)
+                removeItem = {
+                    'id': configItem['id'],
+                    'label': {
+                        'en': configItem['name']
+                    }
+                }
+
+                removeItemsList.append(removeItem)
+
+            if not removeItemsList:
+                LOG.warning('No Android TVs found for removal')
+                await api.driverSetupError(websocket)
+                return
+
+            await api.requestDriverSetupUserInput(websocket, 'Please choose your Android TV to remove', [
+                { 
+                'field': { 
+                    'dropdown': {
+                        'value': removeItemsList[0]['id'],
+                        'items': removeItemsList
+                    }
+                },
+                'id': 'choice_remove',
+                'label': { 'en': 'Choose your Android TV' }
+                }
+            ])
+
+        elif data['setup_choice'] == '3':    
+            await clearConfig();
+            await api.driverSetupComplete(websocket)
 
     else:
         LOG.error('No choice was received')
