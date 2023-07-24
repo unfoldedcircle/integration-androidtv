@@ -140,7 +140,35 @@ class AndroidTv(object):
     def current_app_updated(self, current_app):
         LOG.info("Notified that current_app: %s", current_app)
         update = {}
-        update['source'] = current_app
+
+        if 'netflix' in current_app:
+            update['source'] = 'Netflix'
+        elif 'youtube' in current_app:
+            update['source'] = 'Youtube'
+        elif 'amazonvideo' in current_app:
+            update['source'] = 'Prime Video'
+        elif 'hbomax' in current_app:
+            update['source'] = 'HBO Max'
+        elif 'disney' in current_app:
+            update['source'] = 'Disney+'
+        elif 'apple' in current_app:
+            update['source'] = 'Apple TV'
+        elif 'plex' in current_app:
+            update['source'] = 'Plex'
+        elif 'kodi' in current_app:
+            update['source'] = 'Kodi'
+        elif 'emby' in current_app:
+            update['source'] = 'Emby'
+        else:
+            update['source'] = current_app
+
+        if current_app == 'com.google.android.tvlauncher':
+            update['state'] = 'ON'
+            update['title'] = ''
+        else:
+            update['state'] = 'PLAYING'
+            update['title'] = update['source']
+
         self.events.emit(EVENTS.UPDATE, update)
 
     def volume_info_updated(self, volume_info):

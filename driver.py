@@ -394,8 +394,13 @@ async def handleAndroidTvUpdate(entityId, update):
     if 'state' in update:
         if update['state'] == 'ON':
             attributes[entities.media_player.ATTRIBUTES.STATE] = entities.media_player.STATES.ON
+        elif update['state'] == 'PLAYING':
+            attributes[entities.media_player.ATTRIBUTES.STATE] = entities.media_player.STATES.PLAYING
         else:
             attributes[entities.media_player.ATTRIBUTES.STATE] = entities.media_player.STATES.OFF
+
+    if 'title' in update:
+        attributes[entities.media_player.ATTRIBUTES.MEDIA_TITLE] = update['title']
 
     if 'source_list' in update:
         attributes[entities.media_player.ATTRIBUTES.SOURCE_LIST] = update['source_list']
@@ -419,10 +424,12 @@ def addAvailableAndroidTv(identifier: str, name: str) -> None:
         entities.media_player.FEATURES.CHANNEL_SWITCHER,                                                                     
         entities.media_player.FEATURES.DPAD,
         entities.media_player.FEATURES.SELECT_SOURCE,
+        entities.media_player.FEATURES.MEDIA_TITLE
     ], {
         entities.media_player.ATTRIBUTES.STATE: entities.media_player.STATES.UNAVAILABLE,
         entities.media_player.ATTRIBUTES.VOLUME: 0,
         entities.media_player.ATTRIBUTES.MUTED: False,
+        entities.media_player.ATTRIBUTES.MEDIA_TITLE: "",
     }, deviceClass = entities.media_player.DEVICECLASSES.TV)
 
     api.availableEntities.addEntity(entity)
