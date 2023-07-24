@@ -140,7 +140,6 @@ class AndroidTv(object):
         LOG.info("Notified that is_available: %s", is_available)
         if is_available is False:
             self.events.emit(EVENTS.DISCONNECTED, self.identifier)
-            # _ = asyncio.ensure_future(self.connect())
 
     def _updateAppList(self) -> None:
         update = {}
