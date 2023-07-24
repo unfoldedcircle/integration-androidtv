@@ -42,6 +42,7 @@ class AndroidTv(object):
         self.name = None
         self.mac = None
         self.address = None
+        self._connectionAttempts = 0
 
     async def init(self, host: str, name: str = "") -> bool:
         self._atv = AndroidTVRemote(
@@ -55,11 +56,17 @@ class AndroidTv(object):
         if await self._atv.async_generate_cert_if_missing():
             LOG.debug("Generated new certificate")
 
-        try:
-            self.name, self.mac = await self._atv.async_get_name_and_mac()
-        except (CannotConnect, ConnectionClosed):
-            LOG.error('Cannot connect')
-            return  False
+        success = False
+
+        while success == False:
+            try:
+                self.name, self.mac = await self._atv.async_get_name_and_mac()
+                success = True
+            except (CannotConnect, ConnectionClosed):
+                self._connectionAttempts += 1
+                backoff = self.backoff()
+                LOG.error('Cannot connect, trying again in %ss', backoff)
+                await asyncio.sleep(backoff)
 
         if name != "":
             self.name = name
@@ -72,6 +79,8 @@ class AndroidTv(object):
 
 
     def backoff(self) -> int:
+        if self._connectionAttempts * BACKOFF_SEC == BACKOFF_MAX:
+            return BACKOFF_MAX
         return self._connectionAttempts * BACKOFF_SEC
     
     async def startPairing(self) -> None:
