@@ -62,6 +62,7 @@ class AndroidTv(object):
             try:
                 self.name, self.mac = await self._atv.async_get_name_and_mac()
                 success = True
+                self._connectionAttempts = 0
             except (CannotConnect, ConnectionClosed):
                 self._connectionAttempts += 1
                 backoff = self.backoff()
