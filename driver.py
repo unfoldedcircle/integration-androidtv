@@ -186,6 +186,9 @@ async def event_handler(websocket, id, data):
 
         addAvailableAndroidTv(pairingAndroidTv.identifier, pairingAndroidTv.name)
 
+        pairingAndroidTv.disconnect()
+        pairingAndroidTv = None
+
         await asyncio.sleep(1)
         await api.driverSetupComplete(websocket)
 

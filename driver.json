@@ -1,6 +1,6 @@
 {
 	"driver_id": "uc_androidtv_driver",
-	"version": "0.1.6",
+	"version": "0.1.7",
 	"min_core_api": "0.7.0",
 	"name": { "en": "Android TV" },
 	"icon": "custom:androidtv.png",

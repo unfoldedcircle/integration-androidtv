@@ -80,7 +80,7 @@ class AndroidTv(object):
 
 
     def backoff(self) -> int:
-        if self._connectionAttempts * BACKOFF_SEC == BACKOFF_MAX:
+        if self._connectionAttempts * BACKOFF_SEC >= BACKOFF_MAX:
             return BACKOFF_MAX
         return self._connectionAttempts * BACKOFF_SEC
     
