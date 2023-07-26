@@ -252,7 +252,7 @@ async def event_handler():
     await asyncio.sleep(2)
 
     for androidTv in configuredAndroidTvs:
-        configuredAndroidTvs[androidTv].connect()
+        await configuredAndroidTvs[androidTv].connect()
 
 
 @api.events.on(uc.uc.EVENTS.SUBSCRIBE_ENTITIES)
