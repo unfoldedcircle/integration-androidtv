@@ -41,11 +41,15 @@ pip3 install -r requirements.txt
 
 Gather licenses:
 ```bash
-pip-licenses --with-description --with-urls \
+pip-licenses --python ./env/bin/python \
+  --with-description --with-urls \
   --with-license-file --no-license-path \
   --with-notice-file \
-  --format=json > licences.json
+  --format=json > licenses.json
 ```
 
-⚠️ if no license information is found, then most likely another Python installation (e.g. an old 2.7 version) interferes
-with the venv! Use parameter `--python .../env/bin/python` to use the python binary in venv.
+Transform:
+```bash
+cd tools
+node transform-pip-licenses.js ../licenses.json licenses.md
+```

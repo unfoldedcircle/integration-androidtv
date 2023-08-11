@@ -4,3 +4,5 @@ androidtv_remote_key.pem
 config.json
 __pycache__
 env
+licenses.json
+tools/licenses.md

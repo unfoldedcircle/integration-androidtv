@@ -4,7 +4,7 @@
 // pip-licenses --with-description --with-urls \
 //   --with-license-file --no-license-path \
 //   --with-notice-file \
-//   --format=json > licences.json
+//   --format=json > licenses.json
 // node transform-pip-licenses.js licenses.json licenses.md
 
 const fs = require("fs");
