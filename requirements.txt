@@ -17,7 +17,7 @@ miniaudio==1.56
 multidict==6.0.4
 mutagen==1.46.0
 protobuf==4.22.3
-androidtvremote2==0.0.14
+androidtvremote2==0.0.13
 pycparser==2.21
 pyee==9.0.4
 requests==2.29.0
