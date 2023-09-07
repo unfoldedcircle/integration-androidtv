@@ -74,7 +74,7 @@ async def loadConfig() -> bool:
     return True
 
 
-async def discoverAndroidTvs(timeout: int = 5) -> None:
+async def discoverAndroidTvs(timeout: int = 10) -> None:
     def _onServiceStateChanged(zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
         if state_change is not ServiceStateChange.Added:
             return
