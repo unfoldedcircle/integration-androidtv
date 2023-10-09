@@ -387,7 +387,7 @@ async def handleError(identifier):
     api.configuredEntities.updateEntityAttributes(identifier, {
         entities.media_player.ATTRIBUTES.STATE: entities.media_player.STATES.UNAVAILABLE
     })
-    api.setDeviceState(uc.uc.DEVICE_STATES.ERROR)
+    await api.setDeviceState(uc.uc.DEVICE_STATES.ERROR)
 
 async def handleAndroidTvUpdate(entityId, update):
     attributes = {}
