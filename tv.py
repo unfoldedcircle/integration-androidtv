@@ -102,14 +102,28 @@ class AndroidTv(object):
     async def connect(self) -> None:
         LOG.debug('Android TV connecting: %s', self.identifier)
 
-        try:
-            await self._atv.async_connect()
-        except InvalidAuth:
-            LOG.error('Invalid auth: %s', self.identifier)
-            self.events.emit(EVENTS.ERROR, self.identifier)
-        except (CannotConnect, ConnectionClosed, asyncio.TimeoutError):
-            LOG.error('Android TV device is unreachable on network: %s', self.identifier)
-            self.events.emit(EVENTS.ERROR, self.identifier)
+        success = False
+
+        while not success:
+            try:
+                await self._atv.async_connect()
+                success = True
+                self._connectionAttempts = 0
+            except InvalidAuth:
+                # TODO: In this case we need to re-authenticate
+                # How to handle this?
+                LOG.error('Invalid auth: %s', self.identifier)
+                self.events.emit(EVENTS.ERROR, self.identifier)
+                break
+            except (CannotConnect, ConnectionClosed):
+                LOG.error('Android TV device is unreachable on network: %s', self.identifier)
+                LOG.debug('Trying again in %s', backoff)
+                self._connectionAttempts += 1
+                backoff = self.backoff()
+                await asyncio.sleep(backoff)
+
+        if not success:
+            return
 
         self._atv.keep_reconnecting()
 
@@ -180,8 +194,8 @@ class AndroidTv(object):
 
     def is_available_updated(self, is_available):
         LOG.info("Notified that is_available: %s", is_available)
-        if is_available is False:
-            self.events.emit(EVENTS.DISCONNECTED, self.identifier)
+        # if is_available is False:
+        #     self.events.emit(EVENTS.DISCONNECTED, self.identifier)
 
     def _updateAppList(self) -> None:
         update = {}
