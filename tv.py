@@ -117,9 +117,9 @@ class AndroidTv(object):
                 break
             except (CannotConnect, ConnectionClosed):
                 LOG.error('Android TV device is unreachable on network: %s', self.identifier)
-                LOG.debug('Trying again in %s', backoff)
                 self._connectionAttempts += 1
                 backoff = self.backoff()
+                LOG.debug('Trying again in %s', backoff)
                 await asyncio.sleep(backoff)
 
         if not success:
