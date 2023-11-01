@@ -23,7 +23,7 @@ docker run --platform=aarch64 -v "$PWD:/io" -it ubuntu:focal
 cd /io
 apt-get update && apt-get install -y python3-pip
 pip3 install pyinstaller -r requirements.txt
-pyinstaller --clean --onefile driver.py
+pyinstaller --clean --onefile intg-androidtv/driver.py
 ```
 
 ## Licenses
