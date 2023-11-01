@@ -27,7 +27,7 @@ jobs:
       - name: Clone integrations library
         shell: bash
         run: |
-          git clone https://martonborzak:${{ secrets.PAT }}@github.com/aitatoi/integration-python-library.git
+          git clone --depth 1 --branch v0.0.10 https://martonborzak:${{ secrets.PAT }}@github.com/aitatoi/integration-python-library.git
           ls -lah
           
       - name: Prepare
