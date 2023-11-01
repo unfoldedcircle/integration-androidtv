@@ -1,7 +1,5 @@
 import asyncio
-import base64
 import logging
-import random
 
 from enum import IntEnum
 
@@ -17,13 +15,14 @@ from androidtvremote2 import (
 import apps
 
 LOG = logging.getLogger(__name__)
-LOG.setLevel(logging.DEBUG)
 
 BACKOFF_MAX = 30
 BACKOFF_SEC = 2
 
 
-class EVENTS(IntEnum):
+class Events(IntEnum):
+    """Internal driver events."""
+
     CONNECTING = 0
     CONNECTED = 1
     DISCONNECTED = 2
@@ -33,23 +32,25 @@ class EVENTS(IntEnum):
     VOLUME_CHANGED = 6
 
 
-class AndroidTv(object):
-    def __init__(self, loop: any, dataPath: str):
+class AndroidTv:
+    """Representing an Android TV device."""
+
+    def __init__(self, loop: any, data_path: str):
         self._loop = loop
-        self._dataPath = dataPath
+        self._data_path = data_path
         self.events = AsyncIOEventEmitter(self._loop)
         self._atv = None
         self.identifier = None
         self.name = None
         self.mac = None
         self.address = None
-        self._connectionAttempts = 0
+        self._connection_attempts = 0
 
     async def init(self, host: str, name: str = "") -> bool:
         self._atv = AndroidTVRemote(
             client_name="Remote Two",
-            certfile=self._dataPath + "/androidtv_remote_cert.pem",
-            keyfile=self._dataPath + "/androidtv_remote_key.pem",
+            certfile=self._data_path + "/androidtv_remote_cert.pem",
+            keyfile=self._data_path + "/androidtv_remote_key.pem",
             host=host,
             loop=self._loop,
         )
@@ -59,13 +60,13 @@ class AndroidTv(object):
 
         success = False
 
-        while success == False:
+        while not success:
             try:
                 self.name, self.mac = await self._atv.async_get_name_and_mac()
                 success = True
-                self._connectionAttempts = 0
+                self._connection_attempts = 0
             except (CannotConnect, ConnectionClosed):
-                self._connectionAttempts += 1
+                self._connection_attempts += 1
                 backoff = self.backoff()
                 LOG.error("Cannot connect, trying again in %ss", backoff)
                 await asyncio.sleep(backoff)
@@ -80,14 +81,14 @@ class AndroidTv(object):
         return True
 
     def backoff(self) -> int:
-        if self._connectionAttempts * BACKOFF_SEC >= BACKOFF_MAX:
+        if self._connection_attempts * BACKOFF_SEC >= BACKOFF_MAX:
             return BACKOFF_MAX
-        return self._connectionAttempts * BACKOFF_SEC
+        return self._connection_attempts * BACKOFF_SEC
 
-    async def startPairing(self) -> None:
+    async def start_pairing(self) -> None:
         await self._atv.async_start_pairing()
 
-    async def finishPairing(self, pin: str) -> bool:
+    async def finish_pairing(self, pin: str) -> bool:
         try:
             await self._atv.async_finish_pairing(pin)
             return True
@@ -107,16 +108,16 @@ class AndroidTv(object):
             try:
                 await self._atv.async_connect()
                 success = True
-                self._connectionAttempts = 0
+                self._connection_attempts = 0
             except InvalidAuth:
                 # TODO: In this case we need to re-authenticate
                 # How to handle this?
                 LOG.error("Invalid auth: %s", self.identifier)
-                self.events.emit(EVENTS.ERROR, self.identifier)
+                self.events.emit(Events.ERROR, self.identifier)
                 break
             except (CannotConnect, ConnectionClosed):
                 LOG.error("Android TV device is unreachable on network: %s", self.identifier)
-                self._connectionAttempts += 1
+                self._connection_attempts += 1
                 backoff = self.backoff()
                 LOG.debug("Trying again in %s", backoff)
                 await asyncio.sleep(backoff)
@@ -132,13 +133,13 @@ class AndroidTv(object):
         self._atv.add_volume_info_updated_callback(self.volume_info_updated)
         self._atv.add_is_available_updated_callback(self.is_available_updated)
 
-        self._updateAppList()
+        self._update_app_list()
 
-        self.events.emit(EVENTS.CONNECTED, self.identifier)
+        self.events.emit(Events.CONNECTED, self.identifier)
 
     def disconnect(self) -> None:
         self._atv.disconnect()
-        self.events.emit(EVENTS.DISCONNECTED, self.identifier)
+        self.events.emit(Events.DISCONNECTED, self.identifier)
 
     # Callbacks
     def is_on_updated(self, is_on):
@@ -148,7 +149,7 @@ class AndroidTv(object):
             update["state"] = "ON"
         else:
             update["state"] = "OFF"
-        self.events.emit(EVENTS.UPDATE, update)
+        self.events.emit(Events.UPDATE, self.identifier, update)
 
     def current_app_updated(self, current_app):
         LOG.info("Notified that current_app: %s", current_app)
@@ -182,90 +183,88 @@ class AndroidTv(object):
             update["state"] = "PLAYING"
             update["title"] = update["source"]
 
-        self.events.emit(EVENTS.UPDATE, update)
+        self.events.emit(Events.UPDATE, self.identifier, update)
 
     def volume_info_updated(self, volume_info):
         LOG.info("Notified that volume_info: %s", volume_info)
-        update = {}
-        update["volume"] = volume_info["level"]
-        update["muted"] = volume_info["muted"]
-        self.events.emit(EVENTS.UPDATE, update)
+        update = {"volume": volume_info["level"], "muted": volume_info["muted"]}
+        self.events.emit(Events.UPDATE, self.identifier, update)
 
     def is_available_updated(self, is_available):
         LOG.info("Notified that is_available: %s", is_available)
         # if is_available is False:
         #     self.events.emit(EVENTS.DISCONNECTED, self.identifier)
 
-    def _updateAppList(self) -> None:
+    def _update_app_list(self) -> None:
         update = {}
-        list = []
+        source_list = []
         for app in apps.Apps:
-            list.append(app)
+            source_list.append(app)
 
-        update["source_list"] = list
-        self.events.emit(EVENTS.UPDATE, update)
+        update["source_list"] = source_list
+        self.events.emit(Events.UPDATE, self.identifier, update)
 
     # Commands
-    def _sendCommand(self, keyCode: str, direction: str = "SHORT") -> bool:
+    def _send_command(self, key_code: str, direction: str = "SHORT") -> bool:
         try:
-            self._atv.send_key_command(keyCode, direction)
+            self._atv.send_key_command(key_code, direction)
             return True
         except ConnectionClosed:
             LOG.error("Cannot send command, connection lost: %s", self.identifier)
             return False
 
-    def turnOn(self) -> bool:
-        return self._sendCommand("POWER")
+    def turn_on(self) -> bool:
+        return self._send_command("POWER")
 
-    def turnOff(self) -> bool:
-        return self._sendCommand("POWER")
+    def turn_off(self) -> bool:
+        return self._send_command("POWER")
 
-    def playPause(self) -> bool:
-        return self._sendCommand("MEDIA_PLAY_PAUSE")
+    def play_pause(self) -> bool:
+        return self._send_command("MEDIA_PLAY_PAUSE")
 
     def next(self) -> bool:
-        return self._sendCommand("MEDIA_NEXT")
+        return self._send_command("MEDIA_NEXT")
 
     def previous(self) -> bool:
-        return self._sendCommand("MEDIA_PREVIOUS")
+        return self._send_command("MEDIA_PREVIOUS")
 
-    def volumeUp(self) -> bool:
-        return self._sendCommand("VOLUME_UP")
+    def volume_up(self) -> bool:
+        return self._send_command("VOLUME_UP")
 
-    def volumeDown(self) -> bool:
-        return self._sendCommand("VOLUME_DOWN")
+    def volume_down(self) -> bool:
+        return self._send_command("VOLUME_DOWN")
 
-    def muteToggle(self) -> bool:
-        return self._sendCommand("VOLUME_MUTE")
+    def mute_toggle(self) -> bool:
+        return self._send_command("VOLUME_MUTE")
 
-    def cursorUp(self) -> bool:
-        return self._sendCommand("DPAD_UP")
+    def cursor_up(self) -> bool:
+        return self._send_command("DPAD_UP")
 
-    def cursorDown(self) -> bool:
-        return self._sendCommand("DPAD_DOWN")
+    def cursor_down(self) -> bool:
+        return self._send_command("DPAD_DOWN")
 
-    def cursorLeft(self) -> bool:
-        return self._sendCommand("DPAD_LEFT")
+    def cursor_left(self) -> bool:
+        return self._send_command("DPAD_LEFT")
 
-    def cursorRight(self) -> bool:
-        return self._sendCommand("DPAD_RIGHT")
+    def cursor_right(self) -> bool:
+        return self._send_command("DPAD_RIGHT")
 
-    def cursorEnter(self) -> bool:
-        return self._sendCommand("DPAD_CENTER")
+    def cursor_enter(self) -> bool:
+        return self._send_command("DPAD_CENTER")
 
     def home(self) -> bool:
-        return self._sendCommand("HOME")
+        return self._send_command("HOME")
 
     def back(self) -> bool:
-        return self._sendCommand("BACK")
+        return self._send_command("BACK")
 
-    def channelUp(self) -> bool:
-        return self._sendCommand("CHANNEL_UP")
+    def channel_up(self) -> bool:
+        return self._send_command("CHANNEL_UP")
 
-    def channelDown(self) -> bool:
-        return self._sendCommand("CHANNEL_DOWN")
+    def channel_down(self) -> bool:
+        return self._send_command("CHANNEL_DOWN")
 
-    def launchApp(self, app) -> bool:
+    def launch_app(self, app) -> bool:
         try:
             self._atv.send_launch_app_command(apps.Apps[app]["url"])
             return True
