@@ -155,10 +155,12 @@ class AndroidTv:
         LOG.info("Notified that current_app: %s", current_app)
         update = {}
 
-        if "netflix" in current_app:
+        if current_app in apps.SourceMappings:
+            update["source"] = apps.SourceMappings[current_app]
+        elif "netflix" in current_app:
             update["source"] = "Netflix"
         elif "youtube" in current_app:
-            update["source"] = "Youtube"
+            update["source"] = "YouTube"
         elif "amazonvideo" in current_app:
             update["source"] = "Prime Video"
         elif "hbomax" in current_app:
