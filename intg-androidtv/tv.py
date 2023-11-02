@@ -179,7 +179,7 @@ class AndroidTv:
         else:
             update["source"] = current_app
 
-        if current_app == "com.google.android.tvlauncher":
+        if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update["state"] = "ON"
             update["title"] = ""
         else:
@@ -208,6 +208,7 @@ class AndroidTv:
         self.events.emit(Events.UPDATE, self.identifier, update)
 
     # Commands
+    # TODO change bool parameter to a StatusCode to return better errors
     def _send_command(self, key_code: int | str, direction: str = "SHORT") -> bool:
         try:
             self._atv.send_key_command(key_code, direction)
@@ -284,7 +285,7 @@ class AndroidTv:
             LOG.error("Cannot send command, connection lost: %s", self.identifier)
             return False
 
-    def switch_input(self, input: str) -> bool:
-        if input in inputs.KeyCode:
-            return self._send_command(inputs.KeyCode[input])
+    def switch_input(self, source: str) -> bool:
+        if source in inputs.KeyCode:
+            return self._send_command(inputs.KeyCode[source])
         return False

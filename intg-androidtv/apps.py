@@ -11,7 +11,9 @@ Apps = {
 
 SourceMappings = {
     "com.google.android.backdrop": "Backdrop Daydream",
-    "com.android.vending": "Play Store",
+    "com.google.android.katniss": "Google app",
+    "com.android.vending": "Google Play Store",
+    "com.android.tv.settings": "Settings",
     "com.spotify.tv.android": "Spotify",
     "com.cbs.ca": "Paramount+",
     "com.apple.android.music": "Apple Music",

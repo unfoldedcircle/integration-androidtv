@@ -390,7 +390,7 @@ async def on_entity_command(websocket, req_id, entity_id, _entity_type, cmd_id, 
             websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
         )
     elif cmd_id == entities.media_player.COMMANDS.SELECT_SOURCE:
-        if "source" not in params:
+        if params is None or "source" not in params:
             await api.acknowledgeCommand(websocket, req_id, uc.uc.STATUS_CODES.BAD_REQUEST)
             return
         res = android_tv.select_source(params["source"])
