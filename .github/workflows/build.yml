@@ -5,8 +5,6 @@ name: "Build & Release"
 on:
   workflow_dispatch:
   push:
-    # JUST FOR TESTING
-    branches: [cleanup]
     tags:
       - v[0-9]+.[0-9]+.[0-9]+*
 #   pull_request:
@@ -18,6 +16,7 @@ env:
   INTG_NAME: androidtv
   HASH_FILENAME: uc-intg-androidtv.hash
   INTG_LIB_VER: 0.0.10
+  # Python version to use in the builder image. See https://hub.docker.com/r/arm64v8/python for possible versions.
   PYTHON_VER: 3.10.13
 
 jobs:
@@ -34,22 +33,6 @@ jobs:
           git clone --depth 1 --branch v${INTG_LIB_VER} https://martonborzak:${{ secrets.PAT }}@github.com/aitatoi/integration-python-library.git
           ls -lah
           
-#      - name: Prepare
-#        run: |
-#          sudo apt-get update && sudo apt-get install -y qemu binfmt-support qemu-user-static
-#          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-#          docker run --name builder --platform=aarch64 -v ${GITHUB_WORKSPACE}:/io -d ubuntu:20.04 tail -f /dev/null
-#
-#          # install system Python first, this will also install required dev tools
-#          # software-properties-common is required for add-apt-repository
-#          docker exec builder bash -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip curl software-properties-common && add-apt-repository -y ppa:deadsnakes/ppa"
-#          # now we can install Python 3.10 from ppa:deadsnakes. python3.10-dev required for miniaudio dependency
-#          docker exec builder bash -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python3.10 python3.10-dev"
-#          docker exec builder bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10"
-#          docker exec builder bash -c "cd /io/integration-python-library && python3.10 setup.py bdist_wheel && python3.10 -m pip install -I dist/ucapi-${INTG_LIB_VER}-py3-none-any.whl"
-#          docker exec builder bash -c "python3.10 -m pip install pyinstaller -r /io/requirements.txt"
-#          docker exec builder bash -c "cd /io && pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
-
       - name: Prepare
         run: |
           sudo apt-get update && sudo apt-get install -y qemu binfmt-support qemu-user-static
