@@ -39,7 +39,7 @@ class AndroidTv:
         self._loop = loop
         self._data_path = data_path
         self.events = AsyncIOEventEmitter(self._loop)
-        self._atv = None
+        self._atv: AndroidTVRemote | None = None
         self.identifier = None
         self.name = None
         self.mac = None
@@ -76,6 +76,12 @@ class AndroidTv:
 
         self.identifier = self.mac.replace(":", "")
         self.address = host
+
+        # Hook up callbacks
+        self._atv.add_is_on_updated_callback(self.is_on_updated)
+        self._atv.add_current_app_updated_callback(self.current_app_updated)
+        self._atv.add_volume_info_updated_callback(self.volume_info_updated)
+        self._atv.add_is_available_updated_callback(self.is_available_updated)
 
         LOG.debug("Android TV initialised: %s, %s", self.identifier, self.name)
         return True
@@ -126,12 +132,6 @@ class AndroidTv:
             return
 
         self._atv.keep_reconnecting()
-
-        # Hook up callbacks
-        self._atv.add_is_on_updated_callback(self.is_on_updated)
-        self._atv.add_current_app_updated_callback(self.current_app_updated)
-        self._atv.add_volume_info_updated_callback(self.volume_info_updated)
-        self._atv.add_is_available_updated_callback(self.is_available_updated)
 
         self._update_app_list()
 

@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+from typing import Any
 
 import ucapi.api as uc
 from ucapi import entities
@@ -415,12 +416,22 @@ async def handle_error(identifier):
     await api.setDeviceState(uc.uc.DEVICE_STATES.ERROR)
 
 
-async def handle_android_tv_update(atv_id, update):
+async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
+    """
+    Update attributes of configured media-player entity if AndroidTV properties changed.
+
+    :param atv_id: AndroidTV identifier
+    :param update: dictionary containing the updated properties
+    """
+    LOG.debug("[%s] ATV update: %s", atv_id, update)
+
     attributes = {}
     # TODO AndroidTV identifier is currently identical to the one and only exposed media-player entity per device!
     entity_id = atv_id
 
-    # configured_entity = api.configuredEntities.getEntity(entity_id)
+    configured_entity = api.configuredEntities.getEntity(entity_id)
+    if configured_entity is None:
+        return
 
     if "state" in update:
         if update["state"] == "ON":
