@@ -21,7 +21,7 @@ api = uc.IntegrationAPI(LOOP)
 discovered_android_tvs = []
 pairing_android_tv = None
 _config: list[dict[str, any]] = []
-configured_android_tvs = {}
+configured_android_tvs: dict[str, tv.AndroidTv] = {}
 
 
 async def clear_config() -> None:
@@ -234,7 +234,7 @@ async def on_standby():
     Disconnect every Android TV instances.
     """
     for configured in configured_android_tvs.values():
-        await configured.disconnect()
+        configured.disconnect()
 
 
 @api.events.on(uc.uc.EVENTS.EXIT_STANDBY)
