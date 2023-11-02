@@ -18,6 +18,7 @@ env:
   INTG_NAME: androidtv
   HASH_FILENAME: uc-intg-androidtv.hash
   INTG_LIB_VER: 0.0.10
+  PYTHON_VER: 3.10.13
 
 jobs:
   build:
@@ -33,27 +34,35 @@ jobs:
           git clone --depth 1 --branch v${INTG_LIB_VER} https://martonborzak:${{ secrets.PAT }}@github.com/aitatoi/integration-python-library.git
           ls -lah
           
+#      - name: Prepare
+#        run: |
+#          sudo apt-get update && sudo apt-get install -y qemu binfmt-support qemu-user-static
+#          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+#          docker run --name builder --platform=aarch64 -v ${GITHUB_WORKSPACE}:/io -d ubuntu:20.04 tail -f /dev/null
+#
+#          # install system Python first, this will also install required dev tools
+#          # software-properties-common is required for add-apt-repository
+#          docker exec builder bash -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip curl software-properties-common && add-apt-repository -y ppa:deadsnakes/ppa"
+#          # now we can install Python 3.10 from ppa:deadsnakes. python3.10-dev required for miniaudio dependency
+#          docker exec builder bash -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python3.10 python3.10-dev"
+#          docker exec builder bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10"
+#          docker exec builder bash -c "cd /io/integration-python-library && python3.10 setup.py bdist_wheel && python3.10 -m pip install -I dist/ucapi-${INTG_LIB_VER}-py3-none-any.whl"
+#          docker exec builder bash -c "python3.10 -m pip install pyinstaller -r /io/requirements.txt"
+#          docker exec builder bash -c "cd /io && pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
+
       - name: Prepare
         run: |
           sudo apt-get update && sudo apt-get install -y qemu binfmt-support qemu-user-static
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-          docker run --name builder --platform=aarch64 -v ${GITHUB_WORKSPACE}:/io -d ubuntu:20.04 tail -f /dev/null
+          # do NOT update the Debian image! Bookworm contains a newer libc which is not available on UCR2
+          docker run --name builder --platform=aarch64 -v ${GITHUB_WORKSPACE}:/io -d arm64v8/python:${PYTHON_VER}-bullseye -f /dev/null
           
-          # install system Python first, this will also install required dev tools
-          # software-properties-common is required for add-apt-repository
-          docker exec builder bash -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip curl software-properties-common && add-apt-repository -y ppa:deadsnakes/ppa"
-          # now we can install Python 3.10 from ppa:deadsnakes. python3.10-dev required for miniaudio dependency
-          docker exec builder bash -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python3.10 python3.10-dev"
-          docker exec builder bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10"
-          docker exec builder bash -c "cd /io/integration-python-library && python3.10 setup.py bdist_wheel && python3.10 -m pip install -I dist/ucapi-${INTG_LIB_VER}-py3-none-any.whl"
-          docker exec builder bash -c "python3.10 -m pip install pyinstaller -r /io/requirements.txt"
+          echo "Building and installing integration-python-library"
+          docker exec builder bash -c "cd /io/integration-python-library && python3 setup.py bdist_wheel && python3 -m pip install -I dist/ucapi-${INTG_LIB_VER}-py3-none-any.whl"
+          echo "Installing pyinstaller"
+          docker exec builder bash -c "python -m pip install pyinstaller -r /io/requirements.txt"
+          echo "Running pyinstaller"
           docker exec builder bash -c "cd /io && pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
-
-#          docker exec builder bash -c "apt-get update && apt-get install -y python3-pip"
-#          docker exec builder bash -c "python3 -m pip install --upgrade pip"
-#          docker exec builder bash -c "cd /io/integration-python-library && python3 setup.py bdist_wheel && pip3 install -I dist/ucapi-0.0.10-py3-none-any.whl"
-#          docker exec builder bash -c "pip3 install x -r /io/requirements.txt"
-#          docker exec builder bash -c "cd /io && pyinstaller --clean --onefile --name intg-androidtv driver.py"
 
       - name: Fetch all tags to determine version
         run: |
