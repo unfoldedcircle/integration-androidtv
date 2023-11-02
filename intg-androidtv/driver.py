@@ -234,6 +234,7 @@ async def on_standby():
 
     Disconnect every Android TV instances.
     """
+    LOG.debug("Enter standby event: disconnecting device(s)")
     for configured in configured_android_tvs.values():
         configured.disconnect()
 
@@ -245,6 +246,7 @@ async def on_exit_standby():
 
     Connect all Denon AVR instances.
     """
+    LOG.debug("Exit standby event: connecting device(s)")
     # delay is only a temporary workaround, until the core verifies first that the network is up with an IP address
     await asyncio.sleep(2)
 
