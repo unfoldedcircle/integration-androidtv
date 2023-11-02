@@ -55,7 +55,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y qemu binfmt-support qemu-user-static
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
           # do NOT update the Debian image! Bookworm contains a newer libc which is not available on UCR2
-          docker run --name builder --platform=aarch64 -v ${GITHUB_WORKSPACE}:/io -d arm64v8/python:${PYTHON_VER}-bullseye -f /dev/null
+          docker run --name builder --platform=aarch64 -v ${GITHUB_WORKSPACE}:/io -d arm64v8/python:${PYTHON_VER}-bullseye tail -f /dev/null
           
           echo "Building and installing integration-python-library"
           docker exec builder bash -c "cd /io/integration-python-library && python3 setup.py bdist_wheel && python3 -m pip install -I dist/ucapi-${INTG_LIB_VER}-py3-none-any.whl"
