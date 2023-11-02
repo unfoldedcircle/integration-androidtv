@@ -26,5 +26,5 @@ SourceMappings = {
     "com.zdf.android.mediathek": "ZDFmediathek",
     "com.google.android.videos": "Google TV",
     "tv.wuaki": "Rakuten TV",
-    "homedia.sky.sport": "SKY"
+    "homedia.sky.sport": "SKY",
 }

@@ -13,6 +13,7 @@ from androidtvremote2 import (
 )
 
 import apps
+import inputs
 
 LOG = logging.getLogger(__name__)
 
@@ -207,7 +208,7 @@ class AndroidTv:
         self.events.emit(Events.UPDATE, self.identifier, update)
 
     # Commands
-    def _send_command(self, key_code: str, direction: str = "SHORT") -> bool:
+    def _send_command(self, key_code: int | str, direction: str = "SHORT") -> bool:
         try:
             self._atv.send_key_command(key_code, direction)
             return True
@@ -266,10 +267,24 @@ class AndroidTv:
     def channel_down(self) -> bool:
         return self._send_command("CHANNEL_DOWN")
 
-    def launch_app(self, app) -> bool:
+    def select_source(self, source: str) -> bool:
+        if source in apps.Apps:
+            return self.launch_app(source)
+        if source in inputs.KeyCode:
+            return self.switch_input(source)
+
+        LOG.warning("[%s] Unknown source parameter in select_source command: %s", self.identifier, source)
+        return False
+
+    def launch_app(self, app: str) -> bool:
         try:
             self._atv.send_launch_app_command(apps.Apps[app]["url"])
             return True
         except ConnectionClosed:
             LOG.error("Cannot send command, connection lost: %s", self.identifier)
             return False
+
+    def switch_input(self, input: str) -> bool:
+        if input in inputs.KeyCode:
+            return self._send_command(inputs.KeyCode[input])
+        return False
