@@ -16,7 +16,7 @@ env:
   INTG_NAME: androidtv
   HASH_FILENAME: uc-intg-androidtv.hash
   INTG_LIB_VER: 0.0.10
-  # Python version to use in the builder image. See https://hub.docker.com/r/arm64v8/python for possible versions.
+  # Python version to use in the builder image. See https://hub.docker.com/r/unfoldedcircle/r2-pyinstaller for possible versions.
   PYTHON_VER: 3.10.13
 
 jobs:
@@ -37,15 +37,23 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y qemu binfmt-support qemu-user-static
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-          # do NOT update the Debian image! Bookworm contains a newer libc which is not available on UCR2
-          docker run --name builder --platform=aarch64 -v ${GITHUB_WORKSPACE}:/io -d arm64v8/python:${PYTHON_VER}-bullseye tail -f /dev/null
+          echo "Starting build image"          
+          docker run --name builder \
+            --platform=aarch64 \
+            --user=$(id -u):$(id -g) \
+            -v ${GITHUB_WORKSPACE}:/workspace \
+            -d \
+            docker.io/unfoldedcircle/r2-pyinstaller:${PYTHON_VER} tail -f /dev/null
           
           echo "Building and installing integration-python-library"
-          docker exec builder bash -c "cd /io/integration-python-library && python3 setup.py bdist_wheel && python3 -m pip install -I dist/ucapi-${INTG_LIB_VER}-py3-none-any.whl"
-          echo "Installing pyinstaller"
-          docker exec builder bash -c "python -m pip install pyinstaller -r /io/requirements.txt"
+          docker exec builder bash -c \
+            "cd /workspace/integration-python-library && \
+            python3 setup.py bdist_wheel && \
+            python3 -m pip install -I dist/ucapi-${INTG_LIB_VER}-py3-none-any.whl"
+          echo "Installing dependencies"
+          docker exec builder bash -c "python -m pip install -r /workspace/requirements.txt"
           echo "Running pyinstaller"
-          docker exec builder bash -c "cd /io && pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
+          docker exec builder bash -c "cd /workspace && pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
 
       - name: Fetch all tags to determine version
         run: |

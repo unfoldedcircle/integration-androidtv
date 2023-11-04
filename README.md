@@ -13,17 +13,39 @@ After some tests, turns out python stuff on embedded is a nightmare. So we're be
 
 To do that, we need to compile it on the target architecture as `pyinstaller` does not support cross compilation.
 
-The following can be used on x86 Linux:
+### x86-64 Linux
 
+On x86-64 Linux we need Qemu to emulate the aarch64 target platform:
 ```bash
 sudo apt-get install qemu binfmt-support qemu-user-static
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-docker run --platform=aarch64 -v "$PWD:/io" -it ubuntu:focal
+```
 
-cd /io
-apt-get update && apt-get install -y python3-pip
-pip3 install pyinstaller -r requirements.txt
-pyinstaller --clean --onefile intg-androidtv/driver.py
+Run pyinstaller:
+```shell
+docker run --rm --name builder \
+    --platform=aarch64 \
+    --user=$(id -u):$(id -g) \
+    -v "$PWD":/workspace \
+    docker.io/unfoldedcircle/r2-pyinstaller:3.10.13  \
+    bash -c \
+      "cd /workspace && \
+      python -m pip install -r requirements.txt && \
+      pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
+```
+
+### aarch64 Linux / Mac
+
+On an aarch64 host platform, the build image can be run directly (and much faster):
+```shell
+docker run --rm --name builder \
+    --user=$(id -u):$(id -g) \
+    -v "$PWD":/workspace \
+    docker.io/unfoldedcircle/r2-pyinstaller:3.10.13  \
+    bash -c \
+      "cd /workspace && \
+      python -m pip install -r requirements.txt && \
+      pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
 ```
 
 ## Licenses
@@ -33,7 +55,7 @@ to extract the license information in JSON format. The output JSON is then trans
 custom script.
 
 Create a virtual environment for pip-licenses, since it operates on the packages installed with pip:
-```bash
+```shell
 python3 -m venv env
 source env/bin/activate
 pip3 install -r requirements.txt
@@ -41,7 +63,7 @@ pip3 install -r requirements.txt
 Exit `venv` with `deactivate`.
 
 Gather licenses:
-```bash
+```shell
 pip-licenses --python ./env/bin/python \
   --with-description --with-urls \
   --with-license-file --no-license-path \
@@ -50,7 +72,7 @@ pip-licenses --python ./env/bin/python \
 ```
 
 Transform:
-```bash
+```shell
 cd tools
 node transform-pip-licenses.js ../licenses.json licenses.md
 ```
