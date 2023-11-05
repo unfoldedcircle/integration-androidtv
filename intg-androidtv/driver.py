@@ -1,31 +1,50 @@
+#!/usr/bin/env python3
+"""
+This module implements a Remote Two integration driver for Android TV devices.
+
+:copyright: (c) 2023 by Unfolded Circle ApS.
+:license: Mozilla Public License Version 2.0, see LICENSE for more details.
+"""
+
 import asyncio
 import json
 import logging
 import os
 from typing import Any
 
-import ucapi.api as uc
-from ucapi import entities
+import tv
+import ucapi
+from ucapi import (
+    DriverSetupRequest,
+    IntegrationSetupError,
+    MediaPlayer,
+    RequestUserInput,
+    SetupAction,
+    SetupComplete,
+    SetupDriver,
+    SetupError,
+    UserDataResponse,
+    media_player,
+)
 from zeroconf import ServiceStateChange, Zeroconf
 from zeroconf.asyncio import AsyncServiceBrowser, AsyncServiceInfo, AsyncZeroconf
 
-import tv
-
-LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
-LOOP = asyncio.get_event_loop()
+_LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
+_LOOP = asyncio.get_event_loop()
 
 _CFG_FILENAME = "config.json"
 # Global variables
 _CFG_FILE_PATH: str | None = None
 _data_path: str | None = None
-api = uc.IntegrationAPI(LOOP)
-discovered_android_tvs = []
-pairing_android_tv = None
+api = ucapi.IntegrationAPI(_LOOP)
+_discovered_android_tvs: dict[str, str] = []
+_pairing_android_tv: tv.AndroidTv | None = None
 _config: list[dict[str, any]] = []
-configured_android_tvs: dict[str, tv.AndroidTv] = {}
+_configured_android_tvs: dict[str, tv.AndroidTv] = {}
 
 
 async def clear_config() -> None:
+    """Remove the configuration file and device certificates."""
     global _config
     _config = []
 
@@ -50,7 +69,7 @@ async def store_config() -> bool:
             json.dump(_config, f, ensure_ascii=False)
         return True
     except OSError:
-        LOG.error("Cannot write the config file")
+        _LOG.error("Cannot write the config file")
 
     return False
 
@@ -69,21 +88,21 @@ async def load_config() -> bool:
         _config = data
         return True
     except OSError:
-        LOG.error("Cannot open the config file")
+        _LOG.error("Cannot open the config file")
     except ValueError:
-        LOG.error("Empty or invalid config file")
+        _LOG.error("Empty or invalid config file")
 
     return False
 
 
-async def discover_android_tvs(timeout: int = 10) -> None:
+async def _discover_android_tvs(timeout: int = 10) -> None:
     def _on_service_state_changed(
         zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange
     ) -> None:
         if state_change is not ServiceStateChange.Added:
             return
 
-        LOG.debug("Found service: %s, %s", service_type, name)
+        _LOG.debug("Found service: %s, %s", service_type, name)
         _ = asyncio.ensure_future(display_service_info(zeroconf, service_type, name))
 
     async def display_service_info(zeroconf: Zeroconf, service_type: str, name: str) -> None:
@@ -101,164 +120,224 @@ async def discover_android_tvs(timeout: int = 10) -> None:
             addresses = info.parsed_scoped_addresses()
             if addresses:
                 discovered_tv["address"] = addresses[0]
-                discovered_android_tvs.append(discovered_tv)
+                _discovered_android_tvs.append(discovered_tv)
         else:
-            LOG.debug("No info for %s", name)
+            _LOG.debug("No info for %s", name)
 
     aiozc = AsyncZeroconf()
     services = ["_androidtvremote2._tcp.local."]
-    LOG.debug("Looking for Android TV services")
+    _LOG.debug("Looking for Android TV services")
 
     aiobrowser = AsyncServiceBrowser(aiozc.zeroconf, services, handlers=[_on_service_state_changed])
 
     await asyncio.sleep(timeout)
     await aiobrowser.async_cancel()
     await aiozc.async_close()
-    LOG.debug("Discovery finished")
+    _LOG.debug("Discovery finished")
 
 
 # DRIVER SETUP
-@api.events.on(uc.uc.EVENTS.SETUP_DRIVER)
-async def on_setup_driver(websocket, req_id, _data):
-    LOG.debug("Starting driver setup")
-    await clear_config()
-    await api.acknowledgeCommand(websocket, req_id)
-    await api.driverSetupProgress(websocket)
+async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
+    """
+    Dispatch driver setup requests to corresponding handlers.
 
-    LOG.debug("Starting Android TV discovery")
-    await discover_android_tvs()
+    Either start the setup process or handle the selected Android TV device.
+
+    :param msg: the setup driver request object, either DriverSetupRequest or UserDataResponse
+    :return: the setup action on how to continue
+    """
+    if isinstance(msg, DriverSetupRequest):
+        return await handle_driver_setup(msg)
+    if isinstance(msg, UserDataResponse):
+        # We pair with companion second
+        if "pin" in msg.input_values:
+            return await handle_user_data_pin(msg)
+        if "choice" in msg.input_values:
+            return await handle_user_data_choice(msg)
+        _LOG.error("No choice was received")
+
+    # user confirmation not used in setup process
+    # if isinstance(msg, UserConfirmationResponse):
+    #     return handle_user_confirmation(msg)
+
+    return SetupError()
+
+
+async def handle_driver_setup(_msg: DriverSetupRequest) -> RequestUserInput | SetupError:
+    """
+    Start driver setup.
+
+    Initiated by Remote Two to set up the driver.
+    Start Android TV discovery and present the found devices to the user to choose from.
+
+    :param _msg: not used, we don't have any input fields in the first setup screen.
+    :return: the setup action on how to continue
+    """
+    _LOG.debug("Starting driver setup with Android TV discovery")
+    await clear_config()
+    await _discover_android_tvs()
     dropdown_items = []
 
-    for discovered_tv in discovered_android_tvs:
+    for discovered_tv in _discovered_android_tvs:
         tv_data = {"id": discovered_tv["address"], "label": {"en": discovered_tv["name"]}}
 
         dropdown_items.append(tv_data)
 
     if not dropdown_items:
-        LOG.warning("No Android TVs found")
-        await api.driverSetupError(websocket)
-        return
+        _LOG.warning("No Android TVs found")
+        # TODO test NOT_FOUND error code.
+        return SetupError(error_type=IntegrationSetupError.NOT_FOUND)
 
-    await api.requestDriverSetupUserInput(
-        websocket,
+    return RequestUserInput(
         {"en": "Please choose your Android TV", "de": "Bitte Android TV auswählen"},
         [
             {
                 "field": {"dropdown": {"value": dropdown_items[0]["id"], "items": dropdown_items}},
                 "id": "choice",
-                "label": {"en": "Choose your Android TV", "de": "Wähle deinen Android TV"},
+                "label": {
+                    "en": "Choose your Android TV",
+                    "de": "Wähle deinen Android TV",
+                    "fr": "Choisir votre Android TV",
+                },
             }
         ],
     )
 
 
-@api.events.on(uc.uc.EVENTS.SETUP_DRIVER_USER_DATA)
-async def on_setup_driver_user_data(websocket, req_id, data):
-    global pairing_android_tv
+async def handle_user_data_choice(msg: UserDataResponse) -> RequestUserInput | SetupError:
+    """
+    Process user data device choice response in a setup process.
 
-    await api.acknowledgeCommand(websocket, req_id)
-    await api.driverSetupProgress(websocket)
+    Driver setup callback to provide requested user data during the setup process.
 
-    # We pair with companion second
-    if "pin" in data:
-        LOG.debug("User has entered the PIN")
+    :param msg: response data from the requested user data
+    :return: the setup action on how to continue.
+    """
+    global _pairing_android_tv
 
-        res = await pairing_android_tv.finish_pairing(data["pin"])
+    choice = msg.input_values["choice"]
+    _LOG.debug("Chosen Android TV: %s", choice)
 
-        if res is False:
-            await api.driverSetupError(websocket)
-            return
+    name = ""
 
-        _config.append(
+    for discovered_tv in _discovered_android_tvs:
+        if discovered_tv["address"] == choice:
+            name = discovered_tv["name"]
+
+    _pairing_android_tv = tv.AndroidTv(_LOOP, _data_path)
+    res = await _pairing_android_tv.init(choice, name, 30)
+    if res is False:
+        return SetupError(error_type=IntegrationSetupError.TIMEOUT)
+
+    _LOG.debug("Pairing process begin")
+
+    res = await _pairing_android_tv.start_pairing()
+    if res == ucapi.StatusCodes.OK:
+        return RequestUserInput(
             {
-                "id": pairing_android_tv.identifier,
-                "name": pairing_android_tv.name,
-                "address": pairing_android_tv.address,
-            }
-        )
-        await store_config()
-
-        add_available_android_tv(pairing_android_tv.identifier, pairing_android_tv.name)
-
-        pairing_android_tv.disconnect()
-        pairing_android_tv = None
-
-        await asyncio.sleep(1)
-        await api.driverSetupComplete(websocket)
-
-    elif "choice" in data:
-        choice = data["choice"]
-        LOG.debug("Chosen Android TV: %s", choice)
-
-        name = ""
-
-        for discovered_tv in discovered_android_tvs:
-            if discovered_tv["address"] == choice:
-                name = discovered_tv["name"]
-
-        pairing_android_tv = tv.AndroidTv(LOOP, _data_path)
-        res = await pairing_android_tv.init(choice, name)
-        if res is False:
-            await api.driverSetupError(websocket)
-            return
-
-        LOG.debug("Pairing process begin")
-
-        await api.requestDriverSetupUserInput(
-            websocket,
-            "Please enter the PIN from your Android TV",
+                "en": "Please enter the PIN shown on your Android TV",
+                "de": "Bitte gib die auf deinem Android-Fernseher angezeigte PIN ein",
+                "fr": "Veuillez saisir le code PIN affiché sur votre Android TV",
+            },
             [{"field": {"text": {"value": "000000"}}, "id": "pin", "label": {"en": "Android TV PIN"}}],
         )
 
-        await pairing_android_tv.start_pairing()
-
-    else:
-        LOG.error("No choice was received")
-        await api.driverSetupError(websocket)
+    # no better error code right now
+    return SetupError(error_type=IntegrationSetupError.CONNECTION_REFUSED)
 
 
-@api.events.on(uc.uc.EVENTS.CONNECT)
+async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupError:
+    """
+    Process user data pairing pin response in a setup process.
+
+    Driver setup callback to provide requested user data during the setup process.
+
+    :param msg: response data from the requested user data
+    :return: the setup action on how to continue: SetupComplete if a valid Android TV device was chosen.
+    """
+    global _pairing_android_tv
+
+    _LOG.debug("User has entered the PIN")
+
+    if _pairing_android_tv is None:
+        _LOG.error("Can't handle pairing pin: no device instance! Aborting setup")
+        return SetupError()
+
+    res = await _pairing_android_tv.finish_pairing(msg.input_values["pin"])
+
+    if res != ucapi.StatusCodes.OK:
+        _pairing_android_tv = None
+        if res == ucapi.StatusCodes.UNAUTHORIZED:
+            return SetupError(error_type=IntegrationSetupError.AUTHORIZATION_ERROR)
+        return SetupError(error_type=IntegrationSetupError.CONNECTION_REFUSED)
+
+    _config.append(
+        {
+            "id": _pairing_android_tv.identifier,
+            "name": _pairing_android_tv.name,
+            "address": _pairing_android_tv.address,
+        }
+    )
+    await store_config()
+
+    _add_available_android_tv(_pairing_android_tv.identifier, _pairing_android_tv.name)
+
+    _pairing_android_tv.disconnect()
+    _pairing_android_tv = None
+
+    await asyncio.sleep(1)
+    return SetupComplete()
+
+
+@api.listens_to(ucapi.Events.CONNECT)
 async def on_connect():
-    await api.setDeviceState(uc.uc.DEVICE_STATES.CONNECTED)
+    """When the remote connects, we just set the device state."""
+    await api.set_device_state(ucapi.DeviceStates.CONNECTED)
 
 
-@api.events.on(uc.uc.EVENTS.DISCONNECT)
+@api.listens_to(ucapi.Events.DISCONNECT)
 async def on_disconnect():
-    await api.setDeviceState(uc.uc.DEVICE_STATES.DISCONNECTED)
+    """UCR2 disconnect notification."""
+    await api.set_device_state(ucapi.DeviceStates.DISCONNECTED)
 
 
-@api.events.on(uc.uc.EVENTS.ENTER_STANDBY)
+@api.listens_to(ucapi.Events.ENTER_STANDBY)
 async def on_standby():
     """
     Enter standby notification.
 
     Disconnect every Android TV instances.
     """
-    LOG.debug("Enter standby event: disconnecting device(s)")
-    for configured in configured_android_tvs.values():
+    _LOG.debug("Enter standby event: disconnecting device(s)")
+    for configured in _configured_android_tvs.values():
         configured.disconnect()
 
 
-@api.events.on(uc.uc.EVENTS.EXIT_STANDBY)
+@api.listens_to(ucapi.Events.EXIT_STANDBY)
 async def on_exit_standby():
     """
     Exit standby notification.
 
     Connect all Denon AVR instances.
     """
-    LOG.debug("Exit standby event: connecting device(s)")
+    _LOG.debug("Exit standby event: connecting device(s)")
     # delay is only a temporary workaround, until the core verifies first that the network is up with an IP address
     await asyncio.sleep(2)
 
-    for configured in configured_android_tvs.values():
+    for configured in _configured_android_tvs.values():
         await configured.connect()
 
 
-@api.events.on(uc.uc.EVENTS.SUBSCRIBE_ENTITIES)
+@api.listens_to(ucapi.Events.SUBSCRIBE_ENTITIES)
 async def on_subscribe_entities(entity_ids):
+    """
+    Subscribe to given entities.
+
+    :param entity_ids: entity identifiers.
+    """
     for entity_id in entity_ids:
-        api.configuredEntities.updateEntityAttributes(
-            entity_id, {entities.media_player.ATTRIBUTES.STATE: entities.media_player.STATES.UNAVAILABLE}
+        api.configured_entities.update_attributes(
+            entity_id, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
         )
 
         host = None
@@ -271,11 +350,11 @@ async def on_subscribe_entities(entity_ids):
                 name = item["name"]
 
         if host is not None:
-            android_tv = tv.AndroidTv(LOOP, _data_path)
+            android_tv = tv.AndroidTv(_LOOP, _data_path)
             res = await android_tv.init(host, name)
 
             if res is False:
-                await api.setDeviceState(uc.uc.DEVICE_STATES.ERROR)
+                await api.set_device_state(ucapi.DeviceStates.ERROR)
                 return  # FIXME what about the other entities? Right now we only have one, but this might change!
 
             android_tv.events.on(tv.Events.CONNECTED, handle_connected)
@@ -284,141 +363,111 @@ async def on_subscribe_entities(entity_ids):
             android_tv.events.on(tv.Events.UPDATE, handle_android_tv_update)
 
             await android_tv.connect()
-            configured_android_tvs[entity_id] = android_tv
+            _configured_android_tvs[entity_id] = android_tv
         else:
-            LOG.error("Failed to create Android TV instance")
+            _LOG.error("Failed to create Android TV instance")
 
 
-@api.events.on(uc.uc.EVENTS.UNSUBSCRIBE_ENTITIES)
+@api.listens_to(ucapi.Events.UNSUBSCRIBE_ENTITIES)
 async def on_unsubscribe_entities(entity_ids):
+    """On unsubscribe, we disconnect the devices and remove listeners for events."""
     for entity_id in entity_ids:
-        configured_android_tvs[entity_id].disconnect()
-        configured_android_tvs[entity_id].events.remove_all_listeners()
+        _configured_android_tvs[entity_id].disconnect()
+        _configured_android_tvs[entity_id].events.remove_all_listeners()
 
 
-@api.events.on(uc.uc.EVENTS.ENTITY_COMMAND)
-async def on_entity_command(websocket, req_id, entity_id, _entity_type, cmd_id, params):
-    if entity_id not in configured_android_tvs:
-        await api.acknowledgeCommand(websocket, req_id, uc.uc.STATUS_CODES.NOT_FOUND)
-        return
+async def media_player_cmd_handler(
+    entity: MediaPlayer, cmd_id: str, params: dict[str, Any] | None
+) -> ucapi.StatusCodes:
+    """
+    Media-player entity command handler.
 
-    android_tv = configured_android_tvs[entity_id]
+    Called by the integration-API if a command is sent to a configured media-player entity.
 
-    if cmd_id == entities.media_player.COMMANDS.PLAY_PAUSE:
+    :param entity: media-player entity
+    :param cmd_id: command
+    :param params: optional command parameters
+    :return:
+    """
+    _LOG.info("Got %s command request: %s %s", entity.id, cmd_id, params)
+
+    # atv_id = _tv_from_entity_id(entity.id)
+    # if atv_id is None:
+    #     return ucapi.StatusCodes.NOT_FOUND
+    atv_id = entity.id
+
+    if atv_id not in _configured_android_tvs:
+        _LOG.warning("No Android TV device found for entity: %s", entity.id)
+        return ucapi.StatusCodes.SERVICE_UNAVAILABLE
+
+    android_tv = _configured_android_tvs[atv_id]
+    res = ucapi.StatusCodes.NOT_IMPLEMENTED
+
+    if cmd_id == media_player.Commands.PLAY_PAUSE:
         res = android_tv.play_pause()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.NEXT:
+    elif cmd_id == media_player.Commands.NEXT:
         res = android_tv.next()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.PREVIOUS:
+    elif cmd_id == media_player.Commands.PREVIOUS:
         res = android_tv.previous()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.VOLUME_UP:
+    elif cmd_id == media_player.Commands.VOLUME_UP:
         res = android_tv.volume_up()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.VOLUME_DOWN:
+    elif cmd_id == media_player.Commands.VOLUME_DOWN:
         res = android_tv.volume_down()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.MUTE_TOGGLE:
+    elif cmd_id == media_player.Commands.MUTE_TOGGLE:
         res = android_tv.mute_toggle()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.ON:
+    elif cmd_id == media_player.Commands.ON:
         res = android_tv.turn_on()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.OFF:
+    elif cmd_id == media_player.Commands.OFF:
         res = android_tv.turn_off()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.CURSOR_UP:
+    elif cmd_id == media_player.Commands.CURSOR_UP:
         res = android_tv.cursor_up()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.CURSOR_DOWN:
+    elif cmd_id == media_player.Commands.CURSOR_DOWN:
         res = android_tv.cursor_down()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.CURSOR_LEFT:
+    elif cmd_id == media_player.Commands.CURSOR_LEFT:
         res = android_tv.cursor_left()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.CURSOR_RIGHT:
+    elif cmd_id == media_player.Commands.CURSOR_RIGHT:
         res = android_tv.cursor_right()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.CURSOR_ENTER:
+    elif cmd_id == media_player.Commands.CURSOR_ENTER:
         res = android_tv.cursor_enter()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.HOME:
+    elif cmd_id == media_player.Commands.HOME:
         res = android_tv.home()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.BACK:
+    elif cmd_id == media_player.Commands.BACK:
         res = android_tv.back()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.CHANNEL_DOWN:
+    elif cmd_id == media_player.Commands.CHANNEL_DOWN:
         res = android_tv.channel_down()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.CHANNEL_UP:
+    elif cmd_id == media_player.Commands.CHANNEL_UP:
         res = android_tv.channel_up()
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
-    elif cmd_id == entities.media_player.COMMANDS.SELECT_SOURCE:
+    elif cmd_id == media_player.Commands.SELECT_SOURCE:
         if params is None or "source" not in params:
-            await api.acknowledgeCommand(websocket, req_id, uc.uc.STATUS_CODES.BAD_REQUEST)
-            return
-        res = android_tv.select_source(params["source"])
-        await api.acknowledgeCommand(
-            websocket, req_id, uc.uc.STATUS_CODES.OK if res is True else uc.uc.STATUS_CODES.SERVER_ERROR
-        )
+            res = ucapi.StatusCodes.BAD_REQUEST
+        else:
+            res = android_tv.select_source(params["source"])
+
+    return res
 
 
-async def handle_connected(identifier):
-    LOG.debug("Android TV connected: %s", identifier)
-    api.configuredEntities.updateEntityAttributes(
-        identifier, {entities.media_player.ATTRIBUTES.STATE: entities.media_player.STATES.STANDBY}
+async def handle_connected(identifier: str):
+    """Handle Android TV connection."""
+    _LOG.debug("Android TV connected: %s", identifier)
+    # TODO is this the correct state?
+    api.configured_entities.update_attributes(identifier, {media_player.Attributes.STATE: media_player.States.STANDBY})
+
+
+async def handle_disconnected(identifier: str):
+    """Handle Android TV disconnection."""
+    _LOG.debug("Android TV disconnected: %s", identifier)
+    api.configured_entities.update_attributes(
+        identifier, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
     )
 
 
-async def handle_disconnected(identifier):
-    LOG.debug("Android TV disconnected: %s", identifier)
-    api.configuredEntities.updateEntityAttributes(
-        identifier, {entities.media_player.ATTRIBUTES.STATE: entities.media_player.STATES.UNAVAILABLE}
+async def handle_error(identifier: str):
+    """Set entities of Android TV to state UNAVAILABLE if connection error occurred."""
+    _LOG.debug("Android TV error: %s", identifier)
+    api.configured_entities.update_attributes(
+        identifier, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
     )
-
-
-async def handle_error(identifier):
-    LOG.debug("Android TV error: %s", identifier)
-    api.configuredEntities.updateEntityAttributes(
-        identifier, {entities.media_player.ATTRIBUTES.STATE: entities.media_player.STATES.UNAVAILABLE}
-    )
-    await api.setDeviceState(uc.uc.DEVICE_STATES.ERROR)
+    await api.set_device_state(ucapi.DeviceStates.ERROR)
 
 
 async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
@@ -428,71 +477,72 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
     :param atv_id: AndroidTV identifier
     :param update: dictionary containing the updated properties
     """
-    LOG.debug("[%s] ATV update: %s", atv_id, update)
+    _LOG.debug("[%s] ATV update: %s", atv_id, update)
 
     attributes = {}
     # TODO AndroidTV identifier is currently identical to the one and only exposed media-player entity per device!
     entity_id = atv_id
 
-    configured_entity = api.configuredEntities.getEntity(entity_id)
+    configured_entity = api.configured_entities.get(entity_id)
     if configured_entity is None:
         return
 
     if "state" in update:
         if update["state"] == "ON":
-            attributes[entities.media_player.ATTRIBUTES.STATE] = entities.media_player.STATES.ON
+            attributes[media_player.Attributes.STATE] = media_player.States.ON
         elif update["state"] == "PLAYING":
-            attributes[entities.media_player.ATTRIBUTES.STATE] = entities.media_player.STATES.PLAYING
+            attributes[media_player.Attributes.STATE] = media_player.States.PLAYING
         else:
-            attributes[entities.media_player.ATTRIBUTES.STATE] = entities.media_player.STATES.OFF
+            attributes[media_player.Attributes.STATE] = media_player.States.OFF
 
     if "title" in update:
-        attributes[entities.media_player.ATTRIBUTES.MEDIA_TITLE] = update["title"]
+        attributes[media_player.Attributes.MEDIA_TITLE] = update["title"]
 
     if "volume" in update:
-        attributes[entities.media_player.ATTRIBUTES.VOLUME] = update["volume"]
+        attributes[media_player.Attributes.VOLUME] = update["volume"]
 
     if "muted" in update:
-        attributes[entities.media_player.ATTRIBUTES.MUTED] = update["muted"]
+        attributes[media_player.Attributes.MUTED] = update["muted"]
 
     if "source_list" in update:
-        attributes[entities.media_player.ATTRIBUTES.SOURCE_LIST] = update["source_list"]
+        attributes[media_player.Attributes.SOURCE_LIST] = update["source_list"]
 
     if "source" in update:
-        attributes[entities.media_player.ATTRIBUTES.SOURCE] = update["source"]
+        attributes[media_player.Attributes.SOURCE] = update["source"]
 
     if attributes:
-        api.configuredEntities.updateEntityAttributes(entity_id, attributes)
+        api.configured_entities.update_attributes(entity_id, attributes)
 
 
-def add_available_android_tv(identifier: str, name: str) -> None:
-    entity = entities.media_player.MediaPlayer(
+def _add_available_android_tv(identifier: str, name: str) -> None:
+    entity = media_player.MediaPlayer(
         identifier,
         name,
         [
-            entities.media_player.FEATURES.ON_OFF,
-            entities.media_player.FEATURES.VOLUME,
-            entities.media_player.FEATURES.VOLUME_UP_DOWN,
-            entities.media_player.FEATURES.MUTE_TOGGLE,
-            entities.media_player.FEATURES.PLAY_PAUSE,
-            entities.media_player.FEATURES.NEXT,
-            entities.media_player.FEATURES.PREVIOUS,
-            entities.media_player.FEATURES.HOME,
-            entities.media_player.FEATURES.CHANNEL_SWITCHER,
-            entities.media_player.FEATURES.DPAD,
-            entities.media_player.FEATURES.SELECT_SOURCE,
-            entities.media_player.FEATURES.MEDIA_TITLE,
+            media_player.Features.ON_OFF,
+            media_player.Features.VOLUME,
+            media_player.Features.VOLUME_UP_DOWN,
+            media_player.Features.MUTE_TOGGLE,
+            media_player.Features.PLAY_PAUSE,
+            media_player.Features.NEXT,
+            media_player.Features.PREVIOUS,
+            media_player.Features.HOME,
+            media_player.Features.CHANNEL_SWITCHER,
+            media_player.Features.DPAD,
+            media_player.Features.SELECT_SOURCE,
+            media_player.Features.MEDIA_TITLE,
         ],
         {
-            entities.media_player.ATTRIBUTES.STATE: entities.media_player.STATES.UNAVAILABLE,
-            entities.media_player.ATTRIBUTES.VOLUME: 0,
-            entities.media_player.ATTRIBUTES.MUTED: False,
-            entities.media_player.ATTRIBUTES.MEDIA_TITLE: "",
+            media_player.Attributes.STATE: media_player.States.UNAVAILABLE,
+            media_player.Attributes.VOLUME: 0,
+            media_player.Attributes.MUTED: False,
+            media_player.Attributes.MEDIA_TITLE: "",
         },
-        deviceClass=entities.media_player.DEVICECLASSES.TV,
+        device_class=media_player.DeviceClasses.TV,
+        cmd_handler=media_player_cmd_handler,
     )
 
-    api.availableEntities.addEntity(entity)
+    api.available_entities.add(entity)
 
 
 async def main():
@@ -506,16 +556,16 @@ async def main():
     logging.getLogger("tv").setLevel(level)
     logging.getLogger("driver").setLevel(level)
 
-    _data_path = api.configDirPath
+    _data_path = api.config_dir_path
     _CFG_FILE_PATH = os.path.join(_data_path, _CFG_FILENAME)
 
     if await load_config():
         for item in _config:
-            add_available_android_tv(item["id"], item["name"])
+            _add_available_android_tv(item["id"], item["name"])
 
-    await api.init("driver.json")
+    await api.init("driver.json", driver_setup_handler)
 
 
 if __name__ == "__main__":
-    LOOP.run_until_complete(main())
-    LOOP.run_forever()
+    _LOOP.run_until_complete(main())
+    _LOOP.run_forever()

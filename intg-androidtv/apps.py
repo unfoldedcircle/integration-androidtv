@@ -1,3 +1,4 @@
+"""Application link and identifier mappings."""
 Apps = {
     "Youtube": {"url": "https://www.youtube.com"},
     "Prime Video": {"url": "https://app.primevideo.com"},
