@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+from enum import IntEnum
 from typing import Any
 
 import tv
@@ -41,6 +42,17 @@ _discovered_android_tvs: dict[str, str] = []
 _pairing_android_tv: tv.AndroidTv | None = None
 _config: list[dict[str, any]] = []
 _configured_android_tvs: dict[str, tv.AndroidTv] = {}
+
+
+class SetupSteps(IntEnum):
+    """Enumeration of setup steps to keep track of user data responses."""
+
+    INIT = 0
+    DEVICE_CHOICE = 1
+    PAIRING_PIN = 2
+
+
+_setup_step = SetupSteps.INIT
 
 
 async def clear_config() -> None:
@@ -146,15 +158,18 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
     :param msg: the setup driver request object, either DriverSetupRequest or UserDataResponse
     :return: the setup action on how to continue
     """
+    global _setup_step
+
     if isinstance(msg, DriverSetupRequest):
+        _setup_step = SetupSteps.INIT
         return await handle_driver_setup(msg)
     if isinstance(msg, UserDataResponse):
-        # We pair with companion second
-        if "pin" in msg.input_values:
-            return await handle_user_data_pin(msg)
-        if "choice" in msg.input_values:
+        _LOG.debug("UserDataResponse: %s", msg)
+        if _setup_step == SetupSteps.DEVICE_CHOICE and "choice" in msg.input_values:
             return await handle_user_data_choice(msg)
-        _LOG.error("No choice was received")
+        if _setup_step == SetupSteps.PAIRING_PIN and "pin" in msg.input_values:
+            return await handle_user_data_pin(msg)
+        _LOG.error("No or invalid user response was received: %s", msg)
 
     # user confirmation not used in setup process
     # if isinstance(msg, UserConfirmationResponse):
@@ -173,7 +188,14 @@ async def handle_driver_setup(_msg: DriverSetupRequest) -> RequestUserInput | Se
     :param _msg: not used, we don't have any input fields in the first setup screen.
     :return: the setup action on how to continue
     """
+    global _pairing_android_tv
+    global _setup_step
+
     _LOG.debug("Starting driver setup with Android TV discovery")
+
+    if _pairing_android_tv:
+        _pairing_android_tv.disconnect()
+        _pairing_android_tv = None
     await clear_config()
     await _discover_android_tvs()
     dropdown_items = []
@@ -185,9 +207,9 @@ async def handle_driver_setup(_msg: DriverSetupRequest) -> RequestUserInput | Se
 
     if not dropdown_items:
         _LOG.warning("No Android TVs found")
-        # TODO test NOT_FOUND error code.
         return SetupError(error_type=IntegrationSetupError.NOT_FOUND)
 
+    _setup_step = SetupSteps.DEVICE_CHOICE
     return RequestUserInput(
         {"en": "Please choose your Android TV", "de": "Bitte Android TV auswählen"},
         [
@@ -214,6 +236,7 @@ async def handle_user_data_choice(msg: UserDataResponse) -> RequestUserInput | S
     :return: the setup action on how to continue.
     """
     global _pairing_android_tv
+    global _setup_step
 
     choice = msg.input_values["choice"]
     _LOG.debug("Chosen Android TV: %s", choice)
@@ -225,6 +248,8 @@ async def handle_user_data_choice(msg: UserDataResponse) -> RequestUserInput | S
             name = discovered_tv["name"]
 
     _pairing_android_tv = tv.AndroidTv(_LOOP, _data_path)
+    _LOG.debug("Created new _pairing_android_tv instance")
+
     res = await _pairing_android_tv.init(choice, name, 30)
     if res is False:
         return SetupError(error_type=IntegrationSetupError.TIMEOUT)
@@ -233,6 +258,7 @@ async def handle_user_data_choice(msg: UserDataResponse) -> RequestUserInput | S
 
     res = await _pairing_android_tv.start_pairing()
     if res == ucapi.StatusCodes.OK:
+        _setup_step = SetupSteps.PAIRING_PIN
         return RequestUserInput(
             {
                 "en": "Please enter the PIN shown on your Android TV",

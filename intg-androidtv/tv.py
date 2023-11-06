@@ -50,6 +50,11 @@ class AndroidTv:
         self._address: str | None = None
         self._connection_attempts: int = 0
 
+    def __del__(self):
+        """Destructs instance, disconnect AndroidTVRemote."""
+        if self._atv:
+            self._atv.disconnect()
+
     async def init(self, host: str, name: str, timeout: int | None = None) -> bool:
         """
         Initialize Android TV instance.
@@ -78,6 +83,9 @@ class AndroidTv:
 
         while not success:
             try:
+                LOG.debug("Retrieving device information")
+                # FIXME async_get_name_and_mac() call hangs for a long time if the device still
+                #       shows the previous pairing pin!
                 self._name, self._mac = await self._atv.async_get_name_and_mac()
                 success = True
                 self._connection_attempts = 0

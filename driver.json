@@ -28,7 +28,7 @@
 				"field": {
 					"label": {
 						"value": {
-							"en": "The integration will discover your Android TV on your network. During the process, you might need to enter a PIN that are shown on your Android TV. Please make sure that your Android TV is powered on."
+							"en": "The integration will discover your Android TV on your network. Only devices running the [Android TV Remote Service](https://play.google.com/store/apps/details?id=com.google.android.tv.remote.service) are supported.\nDuring the process, you might need to enter a PIN that is shown on your Android TV. Please make sure that your Android TV is powered on and that no old paring request is shown.\nIf paring fails, reboot your Android TV device and try again."
 						}
 					}
 				}
