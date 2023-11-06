@@ -36,7 +36,7 @@ class Events(IntEnum):
     CONNECTED = 1
     DISCONNECTED = 2
     PAIRED = 3
-    ERROR = 4
+    AUTH_ERROR = 4
     UPDATE = 5
     VOLUME_CHANGED = 6
 
@@ -133,6 +133,7 @@ class AndroidTv:
                     return False
 
                 self._connection_attempts += 1
+                # FIXME #11 backoff delay must deduct time spent in _atv.async_get_name_and_mac()
                 backoff = self._backoff()
                 LOG.error("Cannot connect, trying again in %ss", backoff)
                 await asyncio.sleep(backoff)
@@ -218,12 +219,11 @@ class AndroidTv:
 
     async def connect(self) -> None:
         """Connect to Android TV."""
-        LOG.debug("Android TV connecting: %s", self._identifier)
-
         success = False
 
         while not success:
             try:
+                LOG.debug("Connecting Android TV: %s", self._identifier)
                 await self._atv.async_connect()
                 success = True
                 self._connection_attempts = 0
@@ -231,11 +231,12 @@ class AndroidTv:
                 # TODO: In this case we need to re-authenticate
                 # How to handle this?
                 LOG.error("Invalid auth: %s", self._identifier)
-                self.events.emit(Events.ERROR, self._identifier)
+                self.events.emit(Events.AUTH_ERROR, self._identifier)
                 break
             except (CannotConnect, ConnectionClosed):
                 LOG.error("Android TV device is unreachable on network: %s", self._identifier)
                 self._connection_attempts += 1
+                # FIXME 11 backoff delay must deduct time spent in _atv.async_connect()
                 backoff = self._backoff()
                 LOG.debug("Trying again in %s", backoff)
                 await asyncio.sleep(backoff)

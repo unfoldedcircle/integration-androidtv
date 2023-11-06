@@ -383,7 +383,7 @@ async def on_subscribe_entities(entity_ids):
 
             android_tv.events.on(tv.Events.CONNECTED, handle_connected)
             android_tv.events.on(tv.Events.DISCONNECTED, handle_disconnected)
-            android_tv.events.on(tv.Events.ERROR, handle_error)
+            android_tv.events.on(tv.Events.AUTH_ERROR, handle_authentication_error)
             android_tv.events.on(tv.Events.UPDATE, handle_android_tv_update)
 
             await android_tv.connect()
@@ -459,9 +459,9 @@ async def handle_disconnected(identifier: str):
     )
 
 
-async def handle_error(identifier: str):
-    """Set entities of Android TV to state UNAVAILABLE if connection error occurred."""
-    _LOG.debug("Android TV error: %s", identifier)
+async def handle_authentication_error(identifier: str):
+    """Set entities of Android TV to state UNAVAILABLE if authentication error occurred."""
+    _LOG.debug("Android TV authentication error: %s", identifier)
     api.configured_entities.update_attributes(
         identifier, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
     )
