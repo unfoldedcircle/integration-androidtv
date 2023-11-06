@@ -417,6 +417,7 @@ async def media_player_cmd_handler(
     """
     _LOG.info("Got %s command request: %s %s", entity.id, cmd_id, params)
 
+    # TODO map from device id to entities (see Denon integration)
     # atv_id = _tv_from_entity_id(entity.id)
     # if atv_id is None:
     #     return ucapi.StatusCodes.NOT_FOUND
@@ -429,45 +430,18 @@ async def media_player_cmd_handler(
     android_tv = _configured_android_tvs[atv_id]
     res = ucapi.StatusCodes.NOT_IMPLEMENTED
 
-    if cmd_id == media_player.Commands.PLAY_PAUSE:
-        res = android_tv.play_pause()
-    elif cmd_id == media_player.Commands.NEXT:
-        res = android_tv.next()
-    elif cmd_id == media_player.Commands.PREVIOUS:
-        res = android_tv.previous()
-    elif cmd_id == media_player.Commands.VOLUME_UP:
-        res = android_tv.volume_up()
-    elif cmd_id == media_player.Commands.VOLUME_DOWN:
-        res = android_tv.volume_down()
-    elif cmd_id == media_player.Commands.MUTE_TOGGLE:
-        res = android_tv.mute_toggle()
-    elif cmd_id == media_player.Commands.ON:
+    # TODO might require special handling on the current device state to avoid toggling power state
+    if cmd_id == media_player.Commands.ON:
         res = android_tv.turn_on()
     elif cmd_id == media_player.Commands.OFF:
         res = android_tv.turn_off()
-    elif cmd_id == media_player.Commands.CURSOR_UP:
-        res = android_tv.cursor_up()
-    elif cmd_id == media_player.Commands.CURSOR_DOWN:
-        res = android_tv.cursor_down()
-    elif cmd_id == media_player.Commands.CURSOR_LEFT:
-        res = android_tv.cursor_left()
-    elif cmd_id == media_player.Commands.CURSOR_RIGHT:
-        res = android_tv.cursor_right()
-    elif cmd_id == media_player.Commands.CURSOR_ENTER:
-        res = android_tv.cursor_enter()
-    elif cmd_id == media_player.Commands.HOME:
-        res = android_tv.home()
-    elif cmd_id == media_player.Commands.BACK:
-        res = android_tv.back()
-    elif cmd_id == media_player.Commands.CHANNEL_DOWN:
-        res = android_tv.channel_down()
-    elif cmd_id == media_player.Commands.CHANNEL_UP:
-        res = android_tv.channel_up()
     elif cmd_id == media_player.Commands.SELECT_SOURCE:
         if params is None or "source" not in params:
             res = ucapi.StatusCodes.BAD_REQUEST
         else:
             res = android_tv.select_source(params["source"])
+    else:
+        res = android_tv.send_media_player_command(cmd_id)
 
     return res
 

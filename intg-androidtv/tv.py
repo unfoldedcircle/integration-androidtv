@@ -14,8 +14,14 @@ from enum import IntEnum
 import apps
 import inputs
 import ucapi
-from androidtvremote2 import AndroidTVRemote, CannotConnect, ConnectionClosed, InvalidAuth
+from androidtvremote2 import (
+    AndroidTVRemote,
+    CannotConnect,
+    ConnectionClosed,
+    InvalidAuth,
+)
 from pyee import AsyncIOEventEmitter
+from ucapi import media_player
 
 LOG = logging.getLogger(__name__)
 
@@ -33,6 +39,38 @@ class Events(IntEnum):
     ERROR = 4
     UPDATE = 5
     VOLUME_CHANGED = 6
+
+
+# Map media-player entity commands to Android TV key codes
+# See https://github.com/tronikos/androidtvremote2/blob/v0.0.14/src/androidtvremote2/remotemessage.proto
+MEDIA_PLAYER_COMMANDS = {
+    media_player.Commands.ON.value: "POWER",
+    media_player.Commands.OFF.value: "POWER",
+    media_player.Commands.PLAY_PAUSE.value: "MEDIA_PLAY_PAUSE",
+    media_player.Commands.STOP.value: "MEDIA_STOP",
+    media_player.Commands.PREVIOUS.value: "MEDIA_PREVIOUS",
+    media_player.Commands.NEXT.value: "MEDIA_NEXT",
+    media_player.Commands.FAST_FORWARD.value: "MEDIA_FAST_FORWARD",
+    media_player.Commands.REWIND.value: "MEDIA_REWIND",
+    media_player.Commands.VOLUME_UP.value: "VOLUME_UP",
+    media_player.Commands.VOLUME_DOWN.value: "VOLUME_DOWN",
+    media_player.Commands.MUTE_TOGGLE.value: "VOLUME_MUTE",
+    media_player.Commands.CHANNEL_UP.value: "CHANNEL_UP",
+    media_player.Commands.CHANNEL_DOWN.value: "CHANNEL_DOWN",
+    media_player.Commands.CURSOR_UP.value: "DPAD_UP",
+    media_player.Commands.CURSOR_DOWN.value: "DPAD_DOWN",
+    media_player.Commands.CURSOR_LEFT.value: "DPAD_LEFT",
+    media_player.Commands.CURSOR_RIGHT.value: "DPAD_RIGHT",
+    media_player.Commands.CURSOR_ENTER.value: "DPAD_CENTER",
+    media_player.Commands.FUNCTION_RED.value: "PROG_RED",
+    media_player.Commands.FUNCTION_GREEN.value: "PROG_GREEN",
+    media_player.Commands.FUNCTION_YELLOW.value: "PROG_YELLOW",
+    media_player.Commands.FUNCTION_BLUE.value: "PROG_BLUE",
+    media_player.Commands.HOME.value: "HOME",
+    media_player.Commands.MENU.value: "MENU",  # KEYCODE_TV_CONTENTS_MENU  KEYCODE_TV_MEDIA_CONTEXT_MENU
+    media_player.Commands.BACK.value: "BACK",
+    media_player.Commands.SEARCH.value: "SEARCH",
+}
 
 
 class AndroidTv:
@@ -222,44 +260,29 @@ class AndroidTv:
         LOG.info("Device is on: %s", is_on)
         update = {}
         if is_on:
-            update["state"] = "ON"
+            update["state"] = media_player.States.ON.value
         else:
-            update["state"] = "OFF"
+            update["state"] = media_player.States.OFF.value
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _current_app_updated(self, current_app: str) -> None:
         """Notify that the current app on Android TV is updated."""
         LOG.info("Notified that current_app: %s", current_app)
-        update = {}
+        update = {"source": current_app}
 
-        if current_app in apps.SourceMappings:
-            update["source"] = apps.SourceMappings[current_app]
-        elif "netflix" in current_app:
-            update["source"] = "Netflix"
-        elif "youtube" in current_app:
-            update["source"] = "YouTube"
-        elif "amazonvideo" in current_app:
-            update["source"] = "Prime Video"
-        elif "hbomax" in current_app:
-            update["source"] = "HBO Max"
-        elif "disney" in current_app:
-            update["source"] = "Disney+"
-        elif "apple" in current_app:
-            update["source"] = "Apple TV"
-        elif "plex" in current_app:
-            update["source"] = "Plex"
-        elif "kodi" in current_app:
-            update["source"] = "Kodi"
-        elif "emby" in current_app:
-            update["source"] = "Emby"
+        if current_app in apps.IdMappings:
+            update["source"] = apps.IdMappings[current_app]
         else:
-            update["source"] = current_app
+            for query, app in apps.NameMatching.items():
+                if query in current_app:
+                    update["source"] = app
+                    break
 
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
-            update["state"] = "ON"
+            update["state"] = media_player.States.ON.value
             update["title"] = ""
         else:
-            update["state"] = "PLAYING"
+            update["state"] = media_player.States.PLAYING.value
             update["title"] = update["source"]
 
         self.events.emit(Events.UPDATE, self._identifier, update)
@@ -310,6 +333,26 @@ class AndroidTv:
             LOG.error("Cannot send command, invalid key_code: %s", key_code)
             return ucapi.StatusCodes.BAD_REQUEST
 
+    def send_media_player_command(self, cmd_id: str) -> ucapi.StatusCodes:
+        """
+        Send a UCR2 media-player entity command to the Android TV.
+
+        :param cmd_id:
+        :return: OK if scheduled to be sent,
+                 SERVICE_UNAVAILABLE if there's no connection to the device,
+                 BAD_REQUEST if the ``cmd_id`` is unknown or not supported
+        """
+        try:
+            command = media_player.Commands[cmd_id.upper()]
+
+            if command.value in MEDIA_PLAYER_COMMANDS:
+                return self._send_command(MEDIA_PLAYER_COMMANDS[command.value])
+            LOG.error("Cannot send command, unknown or unsupported command: %s", command)
+            return ucapi.StatusCodes.BAD_REQUEST
+        except KeyError:
+            LOG.error("Cannot send command, unknown media_player command: %s", cmd_id)
+            return ucapi.StatusCodes.BAD_REQUEST
+
     def turn_on(self) -> ucapi.StatusCodes:
         """
         Send power command to AndroidTV device.
@@ -325,66 +368,6 @@ class AndroidTv:
         Note: there's no dedicated power-off command!
         """
         return self._send_command("POWER")
-
-    def play_pause(self) -> ucapi.StatusCodes:
-        """Send Play/Pause media key."""
-        return self._send_command("MEDIA_PLAY_PAUSE")
-
-    def next(self) -> ucapi.StatusCodes:
-        """Send Play Next media key."""
-        return self._send_command("MEDIA_NEXT")
-
-    def previous(self) -> ucapi.StatusCodes:
-        """Send Play Previous media key."""
-        return self._send_command("MEDIA_PREVIOUS")
-
-    def volume_up(self) -> ucapi.StatusCodes:
-        """Send Volume Up key."""
-        return self._send_command("VOLUME_UP")
-
-    def volume_down(self) -> ucapi.StatusCodes:
-        """Send Volume Down key."""
-        return self._send_command("VOLUME_DOWN")
-
-    def mute_toggle(self) -> ucapi.StatusCodes:
-        """Send Volume Mute key."""
-        return self._send_command("VOLUME_MUTE")
-
-    def cursor_up(self) -> ucapi.StatusCodes:
-        """Send Directional Pad Up key."""
-        return self._send_command("DPAD_UP")
-
-    def cursor_down(self) -> ucapi.StatusCodes:
-        """Send Directional Pad Down key."""
-        return self._send_command("DPAD_DOWN")
-
-    def cursor_left(self) -> ucapi.StatusCodes:
-        """Send Directional Pad Left key."""
-        return self._send_command("DPAD_LEFT")
-
-    def cursor_right(self) -> ucapi.StatusCodes:
-        """Send Directional Pad Right key."""
-        return self._send_command("DPAD_RIGHT")
-
-    def cursor_enter(self) -> ucapi.StatusCodes:
-        """Send Directional Pad Center key."""
-        return self._send_command("DPAD_CENTER")
-
-    def home(self) -> ucapi.StatusCodes:
-        """Send Home key."""
-        return self._send_command("HOME")
-
-    def back(self) -> ucapi.StatusCodes:
-        """Send Back key."""
-        return self._send_command("BACK")
-
-    def channel_up(self) -> ucapi.StatusCodes:
-        """Send Channel up key."""
-        return self._send_command("CHANNEL_UP")
-
-    def channel_down(self) -> ucapi.StatusCodes:
-        """Send Channel down key."""
-        return self._send_command("CHANNEL_DOWN")
 
     def select_source(self, source: str) -> ucapi.StatusCodes:
         """
