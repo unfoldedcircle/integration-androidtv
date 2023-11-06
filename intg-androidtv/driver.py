@@ -121,17 +121,15 @@ async def _discover_android_tvs(timeout: int = 10) -> None:
         info = AsyncServiceInfo(service_type, name)
         await info.async_request(zeroconf, 3000)
 
-        name_final = name
-        name_str = name.split(".")
-        if name_str:
-            name_final = name_str[0]
-
-        discovered_tv = {"name": name_final}
-
         if info:
+            name_final = name
+            name_str = name.split(".")
+            if name_str:
+                name_final = name_str[0]
+
             addresses = info.parsed_scoped_addresses()
             if addresses:
-                discovered_tv["address"] = addresses[0]
+                discovered_tv = {"name": name_final, "label": f"{name_final} [{addresses[0]}]", "address": addresses[0]}
                 _discovered_android_tvs.append(discovered_tv)
         else:
             _LOG.debug("No info for %s", name)
@@ -201,7 +199,7 @@ async def handle_driver_setup(_msg: DriverSetupRequest) -> RequestUserInput | Se
     dropdown_items = []
 
     for discovered_tv in _discovered_android_tvs:
-        tv_data = {"id": discovered_tv["address"], "label": {"en": discovered_tv["name"]}}
+        tv_data = {"id": discovered_tv["address"], "label": {"en": discovered_tv["label"]}}
 
         dropdown_items.append(tv_data)
 
@@ -546,6 +544,8 @@ def _add_available_android_tv(identifier: str, name: str) -> None:
         cmd_handler=media_player_cmd_handler,
     )
 
+    if api.available_entities.contains(entity.id):
+        api.available_entities.remove(entity.id)
     api.available_entities.add(entity)
 
 
