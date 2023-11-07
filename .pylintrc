@@ -31,10 +31,9 @@ max-line-length=120
 # --disable=W"
 
 disable=
-    too-many-instance-attributes,
     global-statement,
-    missing-module-docstring, # temporary
-    missing-function-docstring, # temporary
+    too-many-instance-attributes,
+    too-many-arguments,
     fixme # temporary
 
 [STRING]
