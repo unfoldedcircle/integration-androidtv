@@ -10,6 +10,7 @@ import tv
 import ucapi
 from config import AtvDevice
 from ucapi import (
+    AbortDriverSetup,
     DriverSetupRequest,
     IntegrationSetupError,
     RequestUserInput,
@@ -46,6 +47,7 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
     :return: the setup action on how to continue
     """
     global _setup_step
+    global _pairing_android_tv
 
     if isinstance(msg, DriverSetupRequest):
         _setup_step = SetupSteps.INIT
@@ -57,6 +59,12 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
         if _setup_step == SetupSteps.PAIRING_PIN and "pin" in msg.input_values:
             return await handle_user_data_pin(msg)
         _LOG.error("No or invalid user response was received: %s", msg)
+    elif isinstance(msg, AbortDriverSetup):
+        _LOG.info("Setup was aborted with code: %s", msg.error)
+        if _pairing_android_tv is not None:
+            _pairing_android_tv.disconnect()
+            _pairing_android_tv = None
+        _setup_step = SetupSteps.INIT
 
     # user confirmation not used in setup process
     # if isinstance(msg, UserConfirmationResponse):
@@ -145,6 +153,10 @@ async def handle_user_data_choice(msg: UserDataResponse) -> RequestUserInput | S
     res = await _pairing_android_tv.init(20)
     if res is False:
         return SetupError(error_type=IntegrationSetupError.TIMEOUT)
+
+    if _pairing_android_tv is None:
+        # Setup process was cancelled
+        return
 
     _LOG.info("Pairing process begin")
 
