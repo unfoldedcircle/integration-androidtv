@@ -1,3 +1,5 @@
+"""Application link and identifier mappings."""
+# Application launch links
 Apps = {
     "Youtube": {"url": "https://www.youtube.com"},
     "Prime Video": {"url": "https://app.primevideo.com"},
@@ -9,7 +11,9 @@ Apps = {
     "Apple TV": {"url": "https://tv.apple.com"},
 }
 
-SourceMappings = {
+# Direct application-id mappings to friendly names
+# Used to show which app is currently in the foreground (currently playing)
+IdMappings = {
     "com.google.android.backdrop": "Backdrop Daydream",
     "com.google.android.katniss": "Google app",
     "com.android.vending": "Google Play Store",
@@ -29,4 +33,18 @@ SourceMappings = {
     "com.google.android.videos": "Google TV",
     "tv.wuaki": "Rakuten TV",
     "homedia.sky.sport": "SKY",
+}
+
+# Application-ID substring mappings to friendly names
+# Used to show which app is currently in the foreground (currently playing)
+NameMatching = {
+    "netflix": "Netflix",
+    "youtube": "YouTube",
+    "amazonvideo": "Prime Video",
+    "hbomax": "HBO Max",
+    "disney": "Disney+",
+    "apple": "Apple TV",
+    "plex": "Plex",
+    "kodi": "Kodi",
+    "emby": "Emby",
 }

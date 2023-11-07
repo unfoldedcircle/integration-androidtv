@@ -1,4 +1,5 @@
 androidtvremote2==0.0.14
 pyee>=9.0
+ucapi==0.1.2
 websockets>=11.0
 zeroconf~=0.119.0

@@ -7,6 +7,56 @@ Button control and ON/OFF states are supported. Unfortunately media image and pl
 Source list is limited to predefined list as retrieving a list of installed apps is not possible.
 
 
+## Setup
+
+```shell
+pip3 install -r requirements.txt
+```
+
+## Code Style
+
+- Code line length: 120
+- Use double quotes as default (don't mix and match for simple quoting, checked with pylint).
+
+Install tooling:
+```shell
+pip3 install -r test-requirements.txt
+```
+
+### Verify
+
+The following tests are run as GitHub action for each push on the main branch and for pull requests.
+They can also be run anytime on a local developer machine:
+```shell
+python -m pylint intg-androidtv
+python -m flake8 intg-androidtv --count --show-source --statistics
+python -m isort intg-androidtv/. --check --verbose 
+python -m black intg-androidtv --check --verbose --line-length 120
+```
+
+Linting integration in PyCharm/IntelliJ IDEA:
+1. Install plugin [Pylint](https://plugins.jetbrains.com/plugin/11084-pylint)
+2. Open Pylint window and run a scan: `Check Module` or `Check Current File`
+
+### Format Code
+```shell
+python -m black intg-androidtv --line-length 120
+```
+
+PyCharm/IntelliJ IDEA integration:
+1. Go to `Preferences or Settings -> Tools -> Black`
+2. Configure:
+- Python interpreter
+- Use Black formatter: `On code reformat` & optionally `On save`
+- Arguments: `--line-length 120`
+
+### Sort Imports
+
+```shell
+python -m isort intg-androidtv/.
+```
+
+
 ## Build self-contained binary
 
 After some tests, turns out python stuff on embedded is a nightmare. So we're better off creating a single binary file that has everything in it.
