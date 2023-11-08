@@ -17,7 +17,7 @@ env:
   HASH_FILENAME: uc-intg-androidtv.hash
   INTG_LIB_VER: 0.0.10
   # Python version to use in the builder image. See https://hub.docker.com/r/unfoldedcircle/r2-pyinstaller for possible versions.
-  PYTHON_VER: 3.10.13
+  PYTHON_VER: 3.11.6-0.2.0
 
 jobs:
   build:

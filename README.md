@@ -9,6 +9,8 @@ Source list is limited to predefined list as retrieving a list of installed apps
 
 ## Setup
 
+Requires Python 3.11
+
 ```shell
 pip3 install -r requirements.txt
 ```
@@ -77,7 +79,7 @@ docker run --rm --name builder \
     --platform=aarch64 \
     --user=$(id -u):$(id -g) \
     -v "$PWD":/workspace \
-    docker.io/unfoldedcircle/r2-pyinstaller:3.10.13  \
+    docker.io/unfoldedcircle/r2-pyinstaller:3.11.6  \
     bash -c \
       "cd /workspace && \
       python -m pip install -r requirements.txt && \
@@ -91,7 +93,7 @@ On an aarch64 host platform, the build image can be run directly (and much faste
 docker run --rm --name builder \
     --user=$(id -u):$(id -g) \
     -v "$PWD":/workspace \
-    docker.io/unfoldedcircle/r2-pyinstaller:3.10.13  \
+    docker.io/unfoldedcircle/r2-pyinstaller:3.11.6  \
     bash -c \
       "cd /workspace && \
       python -m pip install -r requirements.txt && \
