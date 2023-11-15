@@ -333,7 +333,7 @@ def on_device_removed(device: config.AtvDevice | None) -> None:
     else:
         if device.id in _configured_android_tvs:
             _LOG.debug("Disconnecting from removed ATV %s", device.id)
-            atv = _configured_android_tvs[device.id]
+            atv = _configured_android_tvs.pop(device.id)
             atv.disconnect()
             atv.events.remove_all_listeners()
             # TODO #14 map entity IDs from device identifier
