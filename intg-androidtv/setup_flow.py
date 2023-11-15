@@ -70,8 +70,6 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
     # if isinstance(msg, UserConfirmationResponse):
     #     return handle_user_confirmation(msg)
 
-    # TODO setup abort message: reset _setup_step to INIT. Requires intg library enhancement
-
     return SetupError()
 
 
@@ -156,7 +154,7 @@ async def handle_user_data_choice(msg: UserDataResponse) -> RequestUserInput | S
 
     if _pairing_android_tv is None:
         # Setup process was cancelled
-        return
+        return SetupError()
 
     _LOG.info("Pairing process begin")
 

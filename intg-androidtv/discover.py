@@ -44,15 +44,18 @@ async def android_tvs(timeout: int = 10) -> list[dict[str, str]]:
         else:
             _LOG.debug("No info for %s", name)
 
-    aiozc = AsyncZeroconf()
-    services = ["_androidtvremote2._tcp.local."]
-    _LOG.debug("Discovering Android TV Remote Services")
+    try:
+        _LOG.debug("Discovering Android TV Remote Services")
+        # warning: this can throw `OSError: [Errno 19] No such device` if the interface is not ready yet
+        aiozc = AsyncZeroconf()
+        services = ["_androidtvremote2._tcp.local."]
 
-    aiobrowser = AsyncServiceBrowser(aiozc.zeroconf, services, handlers=[on_service_state_changed])
+        aiobrowser = AsyncServiceBrowser(aiozc.zeroconf, services, handlers=[on_service_state_changed])
 
-    await asyncio.sleep(timeout)
-    await aiobrowser.async_cancel()
-    await aiozc.async_close()
-    _LOG.debug("Discovery finished")
-
+        await asyncio.sleep(timeout)
+        await aiobrowser.async_cancel()
+        await aiozc.async_close()
+        _LOG.debug("Discovery finished")
+    except OSError as ex:
+        _LOG.error("Failed to start discovery: %s", ex)
     return discovered_android_tvs
