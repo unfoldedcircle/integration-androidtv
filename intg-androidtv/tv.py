@@ -292,7 +292,7 @@ class AndroidTv:
             backoff = 0.1
         LOG.error(
             "Cannot connect to '%s' on %s, trying again in %.1fs. %s",
-            self._identifier if self._name else self._name,
+            self._identifier if self._identifier else self._name,
             self._atv.host,
             backoff,
             ex,
@@ -301,13 +301,18 @@ class AndroidTv:
         # try resolving IP address from device name if we keep failing to connect, maybe the IP address changed
         if self._connection_attempts % 10 == 0:
             LOG.debug("Start resolving IP address for '%s'...", self._name)
-            discovered = await discover.android_tvs()
-            for item in discovered:
-                if item["name"] == self._name:
-                    if self._atv.host != item["address"]:
-                        LOG.info("IP address of '%s' changed: %s", self._name, item["address"])
-                        self._atv.host = item["address"]
-                        self.events.emit(Events.IP_ADDRESS_CHANGED, self._identifier, self._atv.host)
+            try:
+                discovered = await discover.android_tvs()
+                for item in discovered:
+                    if item["name"] == self._name:
+                        if self._atv.host != item["address"]:
+                            LOG.info("IP address of '%s' changed: %s", self._name, item["address"])
+                            self._atv.host = item["address"]
+                            self.events.emit(Events.IP_ADDRESS_CHANGED, self._identifier, self._atv.host)
+                            break
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                # extra safety, otherwise reconnection task is dead
+                LOG.error("Discovery failed: %s", e)
         else:
             await asyncio.sleep(backoff)
 

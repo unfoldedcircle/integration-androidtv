@@ -78,7 +78,7 @@ class Devices:
         return None
 
     def update(self, atv: AtvDevice) -> bool:
-        """Update a configured Android TV device."""
+        """Update a configured Android TV device and persist configuration."""
         for item in self._config:
             if item.id == atv.id:
                 item.address = atv.address
