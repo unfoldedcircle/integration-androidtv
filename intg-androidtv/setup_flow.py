@@ -28,8 +28,9 @@ class SetupSteps(IntEnum):
     """Enumeration of setup steps to keep track of user data responses."""
 
     INIT = 0
-    DEVICE_CHOICE = 1
-    PAIRING_PIN = 2
+    CONFIGURATION_MODE = 1
+    DEVICE_CHOICE = 2
+    PAIRING_PIN = 3
 
 
 _setup_step = SetupSteps.INIT
@@ -54,8 +55,10 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
         return await handle_driver_setup(msg)
     if isinstance(msg, UserDataResponse):
         _LOG.debug("UserDataResponse: %s", msg)
+        if _setup_step == SetupSteps.CONFIGURATION_MODE and "address" in msg.input_values:
+            return await handle_configuration_mode(msg)
         if _setup_step == SetupSteps.DEVICE_CHOICE and "choice" in msg.input_values:
-            return await handle_user_data_choice(msg)
+            return await handle_device_choice(msg)
         if _setup_step == SetupSteps.PAIRING_PIN and "pin" in msg.input_values:
             return await handle_user_data_pin(msg)
         _LOG.error("No or invalid user response was received: %s", msg)
@@ -78,16 +81,49 @@ async def handle_driver_setup(_msg: DriverSetupRequest) -> RequestUserInput | Se
     Start driver setup.
 
     Initiated by Remote Two to set up the driver.
-    Start Android TV discovery and present the found devices to the user to choose from.
+    Ask user to enter ip-address for manual configuration, otherwise auto-discovery is used.
 
     :param _msg: not used, we don't have any input fields in the first setup screen.
+    :return: the setup action on how to continue
+    """
+    global _setup_step
+
+    _LOG.debug("Starting driver setup")
+    _setup_step = SetupSteps.CONFIGURATION_MODE
+    return RequestUserInput(
+        {"en": "Setup mode", "de": "Setup Modus"},
+        [
+            {"field": {"text": {"value": ""}}, "id": "address", "label": {"en": "IP address", "de": "IP-Adresse"}},
+            {
+                "id": "info",
+                "label": {"en": ""},
+                "field": {
+                    "label": {
+                        "value": {
+                            "en": "Leave blank to use auto-discovery.",
+                            "de": "Leer lassen, um automatische Erkennung zu verwenden.",
+                            "fr": "Laissez le champ vide pour utiliser la découverte automatique.",
+                        }
+                    }
+                },
+            },
+        ],
+    )
+
+
+async def handle_configuration_mode(msg: UserDataResponse) -> RequestUserInput | SetupError:
+    """
+    Process user data response in a setup process.
+
+    If ``address`` field is set by the user: try connecting to device and retrieve model information.
+    Otherwise, start Android TV discovery and present the found devices to the user to choose from.
+
+    :param msg: response data from the requested user data
     :return: the setup action on how to continue
     """
     global _discovered_android_tvs
     global _pairing_android_tv
     global _setup_step
-
-    _LOG.info("Starting driver setup with Android TV discovery")
 
     # clear all configured devices and any previous pairing attempt
     if _pairing_android_tv:
@@ -95,14 +131,26 @@ async def handle_driver_setup(_msg: DriverSetupRequest) -> RequestUserInput | Se
         _pairing_android_tv = None
     config.devices.clear()  # triggers device instance removal
 
-    # start discovery
-    _discovered_android_tvs = await discover.android_tvs()
-
     dropdown_items = []
-    for discovered_tv in _discovered_android_tvs:
-        tv_data = {"id": discovered_tv["address"], "label": {"en": discovered_tv["label"]}}
+    address = msg.input_values["address"]
 
-        dropdown_items.append(tv_data)
+    if address:
+        _LOG.debug("Starting manual driver setup for %s", address)
+        # Connect to device and retrieve name
+        android_tv = tv.AndroidTv(config.devices.data_path, address, "")
+        res = await android_tv.init(20)
+        if res is False:
+            return SetupError(error_type=IntegrationSetupError.TIMEOUT)
+        dropdown_items.append({"id": address, "label": {"en": f"{android_tv.name} [{address}]"}})
+    else:
+        _LOG.debug("Starting driver setup with Android TV discovery")
+        # start discovery
+        _discovered_android_tvs = await discover.android_tvs()
+
+        for discovered_tv in _discovered_android_tvs:
+            tv_data = {"id": discovered_tv["address"], "label": {"en": discovered_tv["label"]}}
+
+            dropdown_items.append(tv_data)
 
     if not dropdown_items:
         _LOG.warning("No Android TVs found")
@@ -126,7 +174,7 @@ async def handle_driver_setup(_msg: DriverSetupRequest) -> RequestUserInput | Se
     )
 
 
-async def handle_user_data_choice(msg: UserDataResponse) -> RequestUserInput | SetupError:
+async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | SetupError:
     """
     Process user data device choice response in a setup process.
 

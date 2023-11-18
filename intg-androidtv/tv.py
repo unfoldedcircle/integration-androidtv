@@ -318,6 +318,7 @@ class AndroidTv:
 
     def disconnect(self) -> None:
         """Disconnect from Android TV."""
+        self._reconnect_delay = MIN_RECONNECT_DELAY
         self._atv.disconnect()
         self.events.emit(Events.DISCONNECTED, self._identifier)
 
