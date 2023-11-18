@@ -1,6 +1,6 @@
 {
 	"driver_id": "uc_androidtv_driver",
-	"version": "0.4.3",
+	"version": "0.4.4",
 	"min_core_api": "0.20.0",
 	"name": { "en": "Android TV" },
 	"icon": "uc:integration",
@@ -28,7 +28,7 @@
 				"field": {
 					"label": {
 						"value": {
-							"en": "The integration will discover your Android TV on your network. Only devices running the [Android TV Remote Service](https://play.google.com/store/apps/details?id=com.google.android.tv.remote.service) are supported.\nDuring the process, you might need to enter a PIN that is shown on your Android TV. Please make sure that your Android TV is powered on and that no old paring request is shown.\nIf paring continuously fails, reboot your Android TV device and try again."
+							"en": "The integration will discover your Android TV on your network. Only devices running the [Android TV Remote Service](https://play.google.com/store/apps/details?id=com.google.android.tv.remote.service) are supported.\nDuring the process, you might need to enter a PIN that is shown on your Android TV. Please make sure that your Android TV is powered on and that no old pairing request is shown.\nIf pairing continuously fails, reboot your Android TV device and try again."
 						}
 					}
 				}

@@ -69,7 +69,7 @@ To do that, we need to compile it on the target architecture as `pyinstaller` do
 
 On x86-64 Linux we need Qemu to emulate the aarch64 target platform:
 ```bash
-sudo apt-get install qemu binfmt-support qemu-user-static
+sudo apt install qemu binfmt-support qemu-user-static
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 ```
 
@@ -81,8 +81,7 @@ docker run --rm --name builder \
     -v "$PWD":/workspace \
     docker.io/unfoldedcircle/r2-pyinstaller:3.11.6  \
     bash -c \
-      "cd /workspace && \
-      python -m pip install -r requirements.txt && \
+      "python -m pip install -r requirements.txt && \
       pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
 ```
 
@@ -95,8 +94,7 @@ docker run --rm --name builder \
     -v "$PWD":/workspace \
     docker.io/unfoldedcircle/r2-pyinstaller:3.11.6  \
     bash -c \
-      "cd /workspace && \
-      python -m pip install -r requirements.txt && \
+      "python -m pip install -r requirements.txt && \
       pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
 ```
 
