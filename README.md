@@ -1,13 +1,17 @@
 # Android TV integration for Remote Two
 
-Using [androidtvremote2](https://github.com/tronikos/androidtvremote2) and [uc-integration-api](https://github.com/aitatoi/integration-python-library)
+Using [androidtvremote2](https://github.com/tronikos/androidtvremote2) and [uc-integration-api](https://github.com/aitatoi/integration-python-library).
 
 The integration currently supports almost all features that the library provides.
 Button control and ON/OFF states are supported. Unfortunately media image and playing information are not :(
 Source list is limited to predefined list as retrieving a list of installed apps is not possible.
 
+This integration is included in the Remote Two firmware and no external service must be run to connect Home Assistant
+with Android TV devices. A standalone service can be used for development or connecting multiple devices. A single
+instance of the integration doesn't support multiple Android TV devices yet (planned: [#14](https://github.com/aitatoi/integration-androidtv/issues/14)).
 
-## Setup
+## Usage
+### Setup
 
 Requires Python 3.11
 
@@ -15,49 +19,11 @@ Requires Python 3.11
 pip3 install -r requirements.txt
 ```
 
-## Code Style
-
-- Code line length: 120
-- Use double quotes as default (don't mix and match for simple quoting, checked with pylint).
-
-Install tooling:
-```shell
-pip3 install -r test-requirements.txt
-```
-
-### Verify
-
-The following tests are run as GitHub action for each push on the main branch and for pull requests.
-They can also be run anytime on a local developer machine:
-```shell
-python -m pylint intg-androidtv
-python -m flake8 intg-androidtv --count --show-source --statistics
-python -m isort intg-androidtv/. --check --verbose 
-python -m black intg-androidtv --check --verbose --line-length 120
-```
-
-Linting integration in PyCharm/IntelliJ IDEA:
-1. Install plugin [Pylint](https://plugins.jetbrains.com/plugin/11084-pylint)
-2. Open Pylint window and run a scan: `Check Module` or `Check Current File`
-
-### Format Code
-```shell
-python -m black intg-androidtv --line-length 120
-```
-
-PyCharm/IntelliJ IDEA integration:
-1. Go to `Preferences or Settings -> Tools -> Black`
-2. Configure:
-- Python interpreter
-- Use Black formatter: `On code reformat` & optionally `On save`
-- Arguments: `--line-length 120`
-
-### Sort Imports
+### Run
 
 ```shell
-python -m isort intg-androidtv/.
+python3 intg-androidtv/driver.py
 ```
-
 
 ## Build self-contained binary
 
@@ -98,31 +64,21 @@ docker run --rm --name builder \
       pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
 ```
 
-## Licenses
+## Versioning
 
-To generate the license overview file for remote-ui, [pip-licenses](https://pypi.org/project/pip-licenses/) is used
-to extract the license information in JSON format. The output JSON is then transformed in a Markdown file with a
-custom script.
+We use [SemVer](http://semver.org/) for versioning. For the versions available, see the
+[tags and releases in this repository](https://github.com/unfoldedcircle/integration-androidtv/releases).
 
-Create a virtual environment for pip-licenses, since it operates on the packages installed with pip:
-```shell
-python3 -m venv env
-source env/bin/activate
-pip3 install -r requirements.txt
-```
-Exit `venv` with `deactivate`.
+## Changelog
 
-Gather licenses:
-```shell
-pip-licenses --python ./env/bin/python \
-  --with-description --with-urls \
-  --with-license-file --no-license-path \
-  --with-notice-file \
-  --format=json > licenses.json
-```
+The major changes found in each new release are listed in the [changelog](CHANGELOG.md)
+and under the GitHub [releases](https://github.com/unfoldedcircle/integration-androidtv/releases).
 
-Transform:
-```shell
-cd tools
-node transform-pip-licenses.js ../licenses.json licenses.md
-```
+## Contributions
+
+Please read our [contribution guidelines](CONTRIBUTING.md) before opening a pull request.
+
+## License
+
+This project is licensed under the [**Mozilla Public License 2.0**](https://choosealicense.com/licenses/mpl-2.0/).
+See the [LICENSE](LICENSE) file for details.
