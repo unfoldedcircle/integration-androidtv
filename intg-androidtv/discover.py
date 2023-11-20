@@ -1,4 +1,9 @@
-"""Android TV device discovery with mDNS."""
+"""
+Android TV device discovery with mDNS.
+
+:copyright: (c) 2023 by Unfolded Circle ApS.
+:license: MPL-2.0, see LICENSE for more details.
+"""
 
 import asyncio
 import logging
