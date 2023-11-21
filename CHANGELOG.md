@@ -1,4 +1,4 @@
-# UC Integration API Python wrapper Changelog
+# Android TV integration for Remote Two Changelog
 
 All notable changes to this project will be documented in this file.
 

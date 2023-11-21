@@ -13,11 +13,21 @@ instance of the integration doesn't support multiple Android TV devices yet (pla
 ## Usage
 ### Setup
 
-Requires Python 3.11
-
+- Requires Python 3.11
+- Install required libraries:  
+  (using a [virtual environment](https://docs.python.org/3/library/venv.html) is highly recommended)
 ```shell
 pip3 install -r requirements.txt
 ```
+
+For running a separate integration driver on your network for Remote Two, the configuration in file
+[driver.json](driver.json) needs to be changed:
+
+- Set `driver_id` to a unique value, `uc_androidtv_driver` is already used for the embedded driver in the firmware.
+- Change `name` to easily identify the driver for discovery & setup  with Remote Two or the web-configurator.
+- Optionally add a `"port": 8090` field for the WebSocket server listening port.
+  - Default port: `9090`
+  - Also overrideable with environment variable `UC_INTEGRATION_HTTP_PORT`
 
 ### Run
 
@@ -25,9 +35,13 @@ pip3 install -r requirements.txt
 python3 intg-androidtv/driver.py
 ```
 
+See available [environment variables](https://github.com/unfoldedcircle/integration-python-library#environment-variables)
+in the Python integration library to control certain runtime features like listening interface and configuration directory.
+
 ## Build self-contained binary
 
-After some tests, turns out python stuff on embedded is a nightmare. So we're better off creating a single binary file that has everything in it.
+After some tests, turns out python stuff on embedded is a nightmare. So we're better off creating a single binary file
+that has everything in it.
 
 To do that, we need to compile it on the target architecture as `pyinstaller` does not support cross compilation.
 
