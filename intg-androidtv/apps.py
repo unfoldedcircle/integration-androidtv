@@ -12,7 +12,7 @@ Apps = {
     "Spotify": {"url": "spotify://"},
     "Ziggo": {"url": "ziggogo://"},
     "Videoland": {"url": "videoland-v2://"},
-    "Steam Link": {"url": "steamlink://"}
+    "Steam Link": {"url": "steamlink://"},
 }
 
 # Direct application-id mappings to friendly names
@@ -48,17 +48,15 @@ IdMappings = {
     "nl.uitzendinggemist": "NPO Start",
     "com.valvesoftware.steamlink": "Steam Link",
     "org.videolan.vlc": "VLC",
-    "com.ziggo.tv": "Ziggo GO TV"
+    "com.ziggo.tv": "Ziggo GO TV",
 }
 
 # Application-ID substring mappings to friendly names
 # Used to show which app is currently in the foreground (currently playing)
 NameMatching = {
-    "netflix": "Netflix",
     "youtube": "YouTube",
     "amazonvideo": "Prime Video",
     "hbomax": "HBO Max",
-    "disney": "Disney+",
     "apple": "Apple TV",
     "plex": "Plex",
     "kodi": "Kodi",
