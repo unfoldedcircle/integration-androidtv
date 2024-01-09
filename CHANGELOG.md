@@ -11,6 +11,10 @@ _Changes in the next release_
 
 ---
 
+## v0.4.5 - 2024-01-09
+### Added
+- More app mappings
+
 ## v0.4.4 - 2023-11-18
 ### Added
 - Manual setup mode
