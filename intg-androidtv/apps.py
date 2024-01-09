@@ -5,7 +5,8 @@ Apps = {
     "Prime Video": {"url": "https://app.primevideo.com"},
     "Plex": {"url": "plex://"},
     "Netflix": {"url": "netflix://"},
-    "HBO Max": {"url": "https://play.max.com"},
+    "HBO Max": {"url": "https://play.hbomax.com"},
+    "Max": {"url": "https://play.max.com"},
     "Emby": {"url": "embyatv://tv.emby.embyatv/startapp"},
     "Disney+": {"url": "https://www.disneyplus.com"},
     "Apple TV": {"url": "https://tv.apple.com"},
@@ -49,7 +50,8 @@ IdMappings = {
     "com.valvesoftware.steamlink": "Steam Link",
     "org.videolan.vlc": "VLC",
     "com.ziggo.tv": "Ziggo GO TV",
-    "com.wbd.stream": "HBO Max",
+    "com.hbo.hbonow": "HBO Max",
+    "com.wbd.stream": "Max",
 }
 
 # Application-ID substring mappings to friendly names
