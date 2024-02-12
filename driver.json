@@ -1,8 +1,8 @@
 {
-	"driver_id": "uc_androidtv_driver",
+	"driver_id": "uc_androidtv_driver2",
 	"version": "0.4.5",
 	"min_core_api": "0.20.0",
-	"name": { "en": "Android TV" },
+	"name": { "en": "Android TV WZ2" },
 	"icon": "uc:integration",
 	"description": {
 		"en": "Control your Android TV with Remote Two."
