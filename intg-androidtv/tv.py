@@ -72,16 +72,16 @@ MEDIA_PLAYER_COMMANDS = {
     media_player.Commands.MENU.value: "MENU",  # KEYCODE_TV_CONTENTS_MENU  KEYCODE_TV_MEDIA_CONTEXT_MENU
     media_player.Commands.BACK.value: "BACK",
     media_player.Commands.SEARCH.value: "SEARCH",
-    media_player.Commands.ZERO.value: "0",
-    media_player.Commands.ONE.value: "1",
-    media_player.Commands.TWO.value: "2",
-    media_player.Commands.THREE.value: "3",
-    media_player.Commands.FOUR.value: "4",
-    media_player.Commands.FIVE.value: "5",
-    media_player.Commands.SIX.value: "6",
-    media_player.Commands.SEVEN.value: "7",
-    media_player.Commands.EIGHT.value: "8",
-    media_player.Commands.NINE.value: "9",
+#    media_player.Commands.ZERO.value: "0",
+#    media_player.Commands.ONE.value: "1",
+#    media_player.Commands.TWO.value: "2",
+#    media_player.Commands.THREE.value: "3",
+#    media_player.Commands.FOUR.value: "4",
+#    media_player.Commands.FIVE.value: "5",
+#    media_player.Commands.SIX.value: "6",
+#    media_player.Commands.SEVEN.value: "7",
+#    media_player.Commands.EIGHT.value: "8",
+#    media_player.Commands.NINE.value: "9",
 }
 
 
