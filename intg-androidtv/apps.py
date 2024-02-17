@@ -1,4 +1,5 @@
 """Application link and identifier mappings."""
+
 # Application launch links
 Apps = {
     "Youtube": {"url": "https://www.youtube.com"},
