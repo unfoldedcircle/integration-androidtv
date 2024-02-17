@@ -60,8 +60,6 @@ async def on_exit_standby():
     Connect all Denon AVR instances.
     """
     _LOG.debug("Exit standby event: connecting device(s)")
-    # delay is only a temporary workaround, until the core verifies first that the network is up with an IP address
-    await asyncio.sleep(2)
 
     for configured in _configured_android_tvs.values():
         # start background task
