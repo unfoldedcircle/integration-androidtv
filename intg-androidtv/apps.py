@@ -14,6 +14,7 @@ Apps = {
     "Ziggo": {"url": "ziggogo://"},
     "Videoland": {"url": "videoland-v2://"},
     "Steam Link": {"url": "steamlink://"},
+    "Waipu TV": {"url": "https://www.waipu.tv"},
 }
 
 # Direct application-id mappings to friendly names
@@ -35,6 +36,7 @@ IdMappings = {
     "com.nousguide.android.rbtv": "Red Bull TV",
     "tv.arte.plus7": "ARTE",
     "com.zdf.android.mediathek": "ZDFmediathek",
+    "de.swr.avp.ard.tv": "ARDmediathek",
     "com.google.android.videos": "Google TV",
     "tv.wuaki": "Rakuten TV",
     "homedia.sky.sport": "SKY",
@@ -52,6 +54,7 @@ IdMappings = {
     "com.ziggo.tv": "Ziggo GO TV",
     "com.hbo.hbonow": "HBO Max",
     "com.wbd.stream": "Max",
+    "de.exaring.waipu": "Waipu TV",
 }
 
 # Application-ID substring mappings to friendly names
@@ -63,4 +66,7 @@ NameMatching = {
     "plex": "Plex",
     "kodi": "Kodi",
     "emby": "Emby",
+    "waipu": "Waipu TV",
+    "ard": "ARD Mediathek",
+    "zdf": "ZDF Mediathek",
 }
