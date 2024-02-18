@@ -55,8 +55,9 @@ IdMappings = {
     "com.hbo.hbonow": "HBO Max",
     "com.wbd.stream": "Max",
     "de.exaring.waipu": "Waipu TV",
-    "de.telekom.magenta.tv": "Magenta TV",
+    "de.telekom.magentatv.tv": "Magenta TV",
     "com.zatoo.player": "Zatoo",
+    "tv.pluto.android": "Pluto TV",
 }
 
 # Application-ID substring mappings to friendly names
