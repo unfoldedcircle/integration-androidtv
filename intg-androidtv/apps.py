@@ -55,6 +55,8 @@ IdMappings = {
     "com.hbo.hbonow": "HBO Max",
     "com.wbd.stream": "Max",
     "de.exaring.waipu": "Waipu TV",
+    "de.telekom.magenta.tv": "Magenta TV",
+    "com.zatoo.player": "Zatoo",
 }
 
 # Application-ID substring mappings to friendly names
@@ -66,7 +68,4 @@ NameMatching = {
     "plex": "Plex",
     "kodi": "Kodi",
     "emby": "Emby",
-    "waipu": "Waipu TV",
-    "ard": "ARD Mediathek",
-    "zdf": "ZDF Mediathek",
 }
