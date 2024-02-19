@@ -15,6 +15,12 @@ Apps = {
     "Ziggo": {"url": "ziggogo://"},
     "Videoland": {"url": "videoland-v2://"},
     "Steam Link": {"url": "steamlink://"},
+    "Waipu TV": {"url": "waipu://tv"},
+#    "Magenta TV": {"url": "https://www.telekom.de/magenta-tv"},
+    "Zatoo": {"url": "zatoo://zattoo.com"},
+    "Pluto TV": {"url": "https://pluto.tv/"},
+    "ARD Mediathek": {"url": "https://www.ardmediathek.de/"},
+    "ZDF Mediathek": {"url": "https://www.zdf.de/"},
 }
 
 # Direct application-id mappings to friendly names
@@ -53,6 +59,9 @@ IdMappings = {
     "com.ziggo.tv": "Ziggo GO TV",
     "com.hbo.hbonow": "HBO Max",
     "com.wbd.stream": "Max",
+    "de.exaring.waipu": "Waipu TV",
+    "de.telekom.magentatv.tv": "Magenta TV",
+    "tv.pluto.android": "Pluto TV",
 }
 
 # Application-ID substring mappings to friendly names
