@@ -27,7 +27,9 @@ Apps = {
 # Used to show which app is currently in the foreground (currently playing)
 IdMappings = {
     "com.google.android.backdrop": "Backdrop Daydream",
+    "com.google.android.apps.tv.dreamx": "Backdrop Daydream",
     "com.google.android.katniss": "Google app",
+    "com.google.android.apps.tv.launcherx": "Android TV",
     "com.android.vending": "Google Play Store",
     "com.android.tv.settings": "Settings",
     "com.spotify.tv.android": "Spotify",
