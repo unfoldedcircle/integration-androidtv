@@ -16,11 +16,11 @@ Apps = {
     "Videoland": {"url": "videoland-v2://"},
     "Steam Link": {"url": "steamlink://"},
     "Waipu TV": {"url": "waipu://tv"},
-#    "Magenta TV": {"url": "https://www.telekom.de/magenta-tv"},
-    "Zatoo": {"url": "zatoo://zattoo.com"},
+    "Magenta TV": {"url": "atv://de.telekom.magentatv"},
+    "Zattoo": {"url": "zattoo://zattoo.com"},
     "Pluto TV": {"url": "https://pluto.tv/"},
     "ARD Mediathek": {"url": "https://www.ardmediathek.de/"},
-    "ZDF Mediathek": {"url": "https://www.zdf.de/"},
+    "ZDF Mediathek": {"url": "https://www.zdf.de/filme"},
 }
 
 # Direct application-id mappings to friendly names
@@ -41,7 +41,6 @@ IdMappings = {
     "ch.srf.mobile.srfplayer": "Play SRF",
     "com.nousguide.android.rbtv": "Red Bull TV",
     "tv.arte.plus7": "ARTE",
-    "com.zdf.android.mediathek": "ZDFmediathek",
     "com.google.android.videos": "Google TV",
     "tv.wuaki": "Rakuten TV",
     "homedia.sky.sport": "SKY",
@@ -59,6 +58,8 @@ IdMappings = {
     "com.ziggo.tv": "Ziggo GO TV",
     "com.hbo.hbonow": "HBO Max",
     "com.wbd.stream": "Max",
+    "de.swr.avp.ard.tv": "ARD Mediathek",
+    "com.zdf.android.mediathek": "ZDF Mediathek",
     "de.exaring.waipu": "Waipu TV",
     "de.telekom.magentatv.tv": "Magenta TV",
     "tv.pluto.android": "Pluto TV",
