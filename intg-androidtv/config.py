@@ -22,8 +22,13 @@ class AtvDevice:
     """Android TV device configuration."""
 
     id: str
+    """Unique identifier of the device."""
     name: str
+    """Friendly name of the device."""
     address: str
+    """IP address of device."""
+    manufacturer: str
+    model: str
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -112,6 +117,7 @@ class Devices:
         if os.path.exists(self._cfg_file_path):
             os.remove(self._cfg_file_path)
 
+        # FIXME #14 does not work for multi-device support
         pem_file = os.path.join(self._data_path, "androidtv_remote_cert.pem")
         if os.path.exists(pem_file):
             os.remove(pem_file)
@@ -148,12 +154,20 @@ class Devices:
             with open(self._cfg_file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             for item in data:
-                self._config.append(AtvDevice(**item))
+                # not using AtvDevice(**item) to be able to migrate old configuration files with missing attributes
+                atv = AtvDevice(
+                    item.get("id"),
+                    item.get("name"),
+                    item.get("address"),
+                    item.get("manufacturer", ""),
+                    item.get("model", ""),
+                )
+                self._config.append(atv)
             return True
-        except OSError:
-            _LOG.error("Cannot open the config file")
-        except ValueError:
-            _LOG.error("Empty or invalid config file")
+        except OSError as err:
+            _LOG.error("Cannot open the config file: %s", err)
+        except (AttributeError, ValueError, TypeError) as err:
+            _LOG.error("Empty or invalid config file: %s", err)
 
         return False
 

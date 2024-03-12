@@ -1,11 +1,13 @@
 {
 	"driver_id": "uc_androidtv_driver",
-	"version": "0.4.6",
+	"version": "0.5.0",
 	"min_core_api": "0.20.0",
 	"name": { "en": "Android TV" },
 	"icon": "uc:integration",
 	"description": {
-		"en": "Control your Android TV with Remote Two."
+		"en": "Control your Android TV with Remote Two.",
+		"de": "Steuere Android TV mit Remote Two.",
+		"fr": "Contrôler votre Android TV avec Remote Two."
 	},
 	"developer": {
 		"name": "Unfolded Circle ApS",
@@ -16,14 +18,16 @@
 	"setup_data_schema": {
 		"title": {
 			"en": "Integration setup",
-			"de": "Integrationssetup"
+			"de": "Integrationssetup",
+			"fr": "Configuration de l'intégration"
 		},
 		"settings": [
 			{
 				"id": "info",
 				"label": {
 					"en": "Setup process",
-					"de": "Setup Fortschritt"
+					"de": "Setup Fortschritt",
+					"fr": "Progrès de la configuration"
 				},
 				"field": {
 					"label": {
@@ -35,5 +39,5 @@
 			}
 		]
 	},
-	"release_date": "2023-11-01"
+	"release_date": "2024-03-01"
 }
