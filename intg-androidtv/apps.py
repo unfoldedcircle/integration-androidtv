@@ -65,6 +65,7 @@ IdMappings = {
     "de.exaring.waipu": "Waipu TV",
     "de.telekom.magentatv.tv": "Magenta TV",
     "tv.pluto.android": "Pluto TV",
+    "com.nvidia.ota": "System upgrade",
 }
 
 # Application-ID substring mappings to friendly names

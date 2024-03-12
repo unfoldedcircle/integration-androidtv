@@ -9,13 +9,15 @@ This module implements a Remote Two integration driver for Android TV devices.
 import asyncio
 import logging
 import os
+from enum import Enum
 from typing import Any
 
-import config
 import setup_flow
 import tv
 import ucapi
 from ucapi import MediaPlayer, media_player
+
+import config
 
 _LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
 _LOOP = asyncio.get_event_loop()
@@ -25,17 +27,29 @@ api = ucapi.IntegrationAPI(_LOOP)
 _configured_android_tvs: dict[str, tv.AndroidTv] = {}
 
 
+class SimpleCommands(str, Enum):
+    """Additional simple commands of the Android TV not covered by media-player features."""
+
+    APP_SWITCHER = "APP_SWITCHER"
+    """Show running applications."""
+    APPS = "APPS"
+    """Show apps."""
+
+
 @api.listens_to(ucapi.Events.CONNECT)
 async def on_connect():
     """When the UCR2 connects, all configured Android TV devices are getting connected."""
+    _LOG.debug("Client connect command: connecting device(s)")
+    await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
     for atv in _configured_android_tvs.values():
         # start background task
-        _LOOP.create_task(atv.connect())
+        await atv.connect()
 
 
 @api.listens_to(ucapi.Events.DISCONNECT)
 async def on_disconnect():
     """When the UCR2 disconnects, all configured Android TV devices are disconnected."""
+    _LOG.debug("Client disconnect command: disconnecting device(s)")
     for atv in _configured_android_tvs.values():
         atv.disconnect()
 
@@ -60,10 +74,9 @@ async def on_exit_standby():
     Connect all Denon AVR instances.
     """
     _LOG.debug("Exit standby event: connecting device(s)")
-
     for configured in _configured_android_tvs.values():
         # start background task
-        _LOOP.create_task(configured.connect())
+        await configured.connect()
 
 
 @api.listens_to(ucapi.Events.SUBSCRIBE_ENTITIES)
@@ -84,6 +97,7 @@ async def on_subscribe_entities(entity_ids) -> None:
             else:
                 state = media_player.States.ON if atv.is_on else media_player.States.OFF
             api.configured_entities.update_attributes(entity_id, {media_player.Attributes.STATE: state})
+            await atv.connect()
             continue
 
         device = config.devices.get(atv_id)
@@ -134,16 +148,38 @@ async def media_player_cmd_handler(
     # TODO might require special handling on the current device state to avoid toggling power state
     # https://github.com/home-assistant/core/blob/2023.11.0/homeassistant/components/androidtv_remote/media_player.py#L115-L123
     if cmd_id == media_player.Commands.ON:
-        res = android_tv.turn_on()
+        res = await android_tv.turn_on()
     elif cmd_id == media_player.Commands.OFF:
-        res = android_tv.turn_off()
+        res = await android_tv.turn_off()
     elif cmd_id == media_player.Commands.SELECT_SOURCE:
         if params is None or "source" not in params:
             res = ucapi.StatusCodes.BAD_REQUEST
         else:
-            res = android_tv.select_source(params["source"])
+            res = await android_tv.select_source(params["source"])
+    elif cmd_id == media_player.Commands.CONTEXT_MENU:
+        res = await android_tv.send_media_player_command(media_player.Commands.CURSOR_ENTER.value, tv.KeyPress.LONG)
+    elif cmd_id == SimpleCommands.APPS:
+        # Shield TV only
+        res = await android_tv.send_media_player_command(media_player.Commands.HOME.value, tv.KeyPress.LONG)
+    elif cmd_id == media_player.Commands.SETTINGS:
+        # Shield TV
+        res = await android_tv.send_media_player_command(media_player.Commands.BACK.value, tv.KeyPress.LONG)
+        # Google Chromecast
+        # res = await android_tv.send_media_player_command(media_player.Commands.HOME.value, tv.KeyPress.LONG)
+    elif cmd_id == SimpleCommands.APP_SWITCHER:
+        # Shield TV only
+        res = await android_tv.send_media_player_command(media_player.Commands.HOME.value, tv.KeyPress.DOUBLE_CLICK)
     else:
-        res = android_tv.send_media_player_command(cmd_id)
+        res = await android_tv.send_media_player_command(cmd_id)
+
+    # TODO #29 special key handling based on device:
+    # NVIDIA Shield TV:
+    # - long press home: apps
+    # - long press back: settings
+    # - double click home: app switcher
+    # Google Chromecast:
+    # - long press home: settings
+    # - double click back: screensaver
 
     return res
 
@@ -153,8 +189,7 @@ async def handle_connected(identifier: str):
     _LOG.debug("Android TV connected: %s", identifier)
     # TODO is this the correct state?
     api.configured_entities.update_attributes(identifier, {media_player.Attributes.STATE: media_player.States.STANDBY})
-    # TODO #14 when multiple devices are supported, the device state logic isn't that simple anymore!
-    await api.set_device_state(ucapi.DeviceStates.CONNECTED)
+    await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
 
 
 async def handle_disconnected(identifier: str):
@@ -163,8 +198,6 @@ async def handle_disconnected(identifier: str):
     api.configured_entities.update_attributes(
         identifier, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
     )
-    # TODO #14 when multiple devices are supported, the device state logic isn't that simple anymore!
-    await api.set_device_state(ucapi.DeviceStates.DISCONNECTED)
 
 
 async def handle_authentication_error(identifier: str):
@@ -296,6 +329,16 @@ def _register_available_entities(atv_id: str, name: str) -> None:
             media_player.Features.COLOR_BUTTONS,
             media_player.Features.FAST_FORWARD,
             media_player.Features.REWIND,
+            # TODO #29 for testing only: we need device profiles and build dynamic features.
+            # A streaming box has way less features than a TV.
+            media_player.Features.NUMPAD,
+            media_player.Features.GUIDE,
+            media_player.Features.INFO,
+            media_player.Features.EJECT,
+            media_player.Features.OPEN_CLOSE,
+            media_player.Features.AUDIO_TRACK,
+            media_player.Features.SUBTITLE,
+            media_player.Features.RECORD,
         ],
         {
             media_player.Attributes.STATE: media_player.States.UNKNOWN,
@@ -304,6 +347,12 @@ def _register_available_entities(atv_id: str, name: str) -> None:
             media_player.Attributes.MEDIA_TITLE: "",
         },
         device_class=media_player.DeviceClasses.TV,
+        options={
+            media_player.Options.SIMPLE_COMMANDS: [
+                SimpleCommands.APPS.value,
+                SimpleCommands.APP_SWITCHER.value,
+            ]
+        },
         cmd_handler=media_player_cmd_handler,
     )
 
@@ -321,7 +370,7 @@ def on_device_added(device: config.AtvDevice) -> None:
 def on_device_removed(device: config.AtvDevice | None) -> None:
     """Handle a removed device in the configuration."""
     if device is None:
-        _LOG.debug("Configuration cleared, disconnecting & removing all configured ATV instances")
+        _LOG.debug("Configuration cleared, disconnecting & removing all configured Android TV instances")
         for atv in _configured_android_tvs.values():
             atv.disconnect()
             atv.events.remove_all_listeners()
@@ -330,7 +379,7 @@ def on_device_removed(device: config.AtvDevice | None) -> None:
         api.available_entities.clear()
     else:
         if device.id in _configured_android_tvs:
-            _LOG.debug("Disconnecting from removed ATV %s", device.id)
+            _LOG.debug("Disconnecting from removed Android TV %s", device.id)
             atv = _configured_android_tvs.pop(device.id)
             atv.disconnect()
             atv.events.remove_all_listeners()

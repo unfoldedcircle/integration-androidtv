@@ -1,11 +1,13 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="driver" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
     <module name="integration-androidtv" />
+    <option name="ENV_FILES" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
       <env name="UC_INTEGRATION_HTTP_PORT" value="8888" />
+      <env name="UC_CONFIG_HOME" value="$PROJECT_DIR$" />
     </envs>
     <option name="SDK_HOME" value="" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
