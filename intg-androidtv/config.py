@@ -22,7 +22,9 @@ class AtvDevice:
     """Android TV device configuration."""
 
     id: str
+    """Unique identifier of the device."""
     name: str
+    """Friendly name of the device."""
     address: str
 
 
@@ -67,12 +69,18 @@ class Devices:
                 return True
         return False
 
-    def add(self, atv: AtvDevice) -> None:
-        """Add a new configured Android TV device."""
-        # TODO duplicate check
-        self._config.append(atv)
-        if self._add_handler is not None:
-            self._add_handler(atv)
+    def add_or_update(self, atv: AtvDevice) -> None:
+        """
+        Add a new configured Android TV device and persist configuration.
+
+        The device is updated if it already exists in the configuration.
+        """
+        # duplicate check
+        if not self.update(atv):
+            self._config.append(atv)
+            self.store()
+            if self._add_handler is not None:
+                self._add_handler(atv)
 
     def get(self, atv_id: str) -> AtvDevice | None:
         """Get device configuration for given identifier."""
@@ -133,8 +141,8 @@ class Devices:
             with open(self._cfg_file_path, "w+", encoding="utf-8") as f:
                 json.dump(self._config, f, ensure_ascii=False, cls=_EnhancedJSONEncoder)
             return True
-        except OSError:
-            _LOG.error("Cannot write the config file")
+        except OSError as err:
+            _LOG.error("Cannot write the config file: %s", err)
 
         return False
 
@@ -150,10 +158,10 @@ class Devices:
             for item in data:
                 self._config.append(AtvDevice(**item))
             return True
-        except OSError:
-            _LOG.error("Cannot open the config file")
-        except ValueError:
-            _LOG.error("Empty or invalid config file")
+        except OSError as err:
+            _LOG.error("Cannot open the config file: %s", err)
+        except (AttributeError, ValueError, TypeError) as err:
+            _LOG.error("Empty or invalid config file: %s", err)
 
         return False
 

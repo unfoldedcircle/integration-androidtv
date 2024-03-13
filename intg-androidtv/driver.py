@@ -57,7 +57,7 @@ async def on_exit_standby():
     """
     Exit standby notification.
 
-    Connect all Denon AVR instances.
+    Connect all Android TV instances.
     """
     _LOG.debug("Exit standby event: connecting device(s)")
 
@@ -99,8 +99,10 @@ async def on_unsubscribe_entities(entity_ids) -> None:
     _LOG.debug("Unsubscribe entities event: %s", entity_ids)
     # TODO #14 add entity_id --> atv_id mapping. Right now the atv_id == entity_id!
     for entity_id in entity_ids:
-        _configured_android_tvs[entity_id].disconnect()
-        _configured_android_tvs[entity_id].events.remove_all_listeners()
+        if entity_id in _configured_android_tvs:
+            device = _configured_android_tvs.pop(entity_id)
+            device.disconnect()
+            device.events.remove_all_listeners()
 
 
 async def media_player_cmd_handler(
@@ -114,9 +116,9 @@ async def media_player_cmd_handler(
     :param entity: media-player entity
     :param cmd_id: command
     :param params: optional command parameters
-    :return:
+    :return: status code of the command. StatusCodes.OK if the command succeeded.
     """
-    _LOG.info("Got %s command request: %s %s", entity.id, cmd_id, params)
+    _LOG.info("Got %s command request: %s %s", entity.id, cmd_id, params if params else "")
 
     # TODO #14 map from device id to entities (see Denon integration)
     # atv_id = _tv_from_entity_id(entity.id)
@@ -124,7 +126,9 @@ async def media_player_cmd_handler(
     #     return ucapi.StatusCodes.NOT_FOUND
     atv_id = entity.id
 
-    if atv_id not in _configured_android_tvs:
+    configured_entity = api.configured_entities.get(entity.id)
+
+    if configured_entity is None:
         _LOG.warning("No Android TV device found for entity: %s", entity.id)
         return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
@@ -151,6 +155,7 @@ async def media_player_cmd_handler(
 async def handle_connected(identifier: str):
     """Handle Android TV connection."""
     _LOG.debug("Android TV connected: %s", identifier)
+
     # TODO is this the correct state?
     api.configured_entities.update_attributes(identifier, {media_player.Attributes.STATE: media_player.States.STANDBY})
     # TODO #14 when multiple devices are supported, the device state logic isn't that simple anymore!
@@ -198,7 +203,13 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
     # TODO #14 AndroidTV identifier is currently identical to the one and only exposed media-player entity per device!
     entity_id = atv_id
 
-    configured_entity = api.configured_entities.get(entity_id)
+
+    # FIXME temporary workaround until ucapi has been refactored:
+    #       there's shouldn't be separate lists for available and configured entities
+    if api.configured_entities.contains(entity_id):
+        configured_entity = api.configured_entities.get(entity_id)
+    else:
+        configured_entity = api.available_entities.get(entity_id)
     if configured_entity is None:
         return
 
@@ -352,7 +363,8 @@ async def main():
 
     config.devices = config.Devices(api.config_dir_path, on_device_added, on_device_removed)
     for device in config.devices.all():
-        _add_configured_android_tv(device, connect=False)
+        # TODO Not sure about that : _add_configured_android_tv(device, connect=False)
+        _register_available_entities(device.id, device.name)
 
     await api.init("driver.json", setup_flow.driver_setup_handler)
 
