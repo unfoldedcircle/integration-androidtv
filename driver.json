@@ -1,11 +1,12 @@
 {
 	"driver_id": "uc_androidtv_driver",
-	"version": "0.4.6",
+	"version": "0.4.7",
 	"min_core_api": "0.20.0",
 	"name": { "en": "Android TV" },
 	"icon": "uc:integration",
 	"description": {
-		"en": "Control your Android TV with Remote Two."
+		"en": "Control your Android TV with Remote Two.",
+		"de": "Steuere dein Android TV mit der Remote Two."
 	},
 	"developer": {
 		"name": "Unfolded Circle ApS",
@@ -16,7 +17,7 @@
 	"setup_data_schema": {
 		"title": {
 			"en": "Integration setup",
-			"de": "Integrationssetup"
+			"de": "Integrations Einstellungen"
 		},
 		"settings": [
 			{
@@ -28,12 +29,13 @@
 				"field": {
 					"label": {
 						"value": {
-							"en": "The integration will discover your Android TV on your network. Only devices running the [Android TV Remote Service](https://play.google.com/store/apps/details?id=com.google.android.tv.remote.service) are supported.\nDuring the process, you might need to enter a PIN that is shown on your Android TV. Please make sure that your Android TV is powered on and that no old pairing request is shown.\nIf pairing continuously fails, reboot your Android TV device and try again."
+							"en": "The integration will discover your Android TV on your network. Only devices running the [Android TV Remote Service](https://play.google.com/store/apps/details?id=com.google.android.tv.remote.service) are supported.\nDuring the process, you might need to enter a PIN that is shown on your Android TV. Please make sure that your Android TV is powered on and that no old pairing request is shown.\nIf pairing continuously fails, reboot your Android TV device and try again.",
+							"de": "Diese Integration wird deine Android TV Geräte in deinem Netzwerk erkennen. Nur Geräte auf denen  [Android TV Remote Service](https://play.google.com/store/apps/details?id=com.google.android.tv.remote.service) läuft werden unterstützt.\nWährend der Einrichtung der Integration wird ein PIN abgefragt der auf deiem Android TV anhezeigt wird. Bitte stelle sicher das dein Android TV eingeschaltet ist und keine alte Pairing anforderung gezeigt wird.\nWenn das Pairen wiederholt fehlschlägt, reboote dein Android TV Gerät und versuche es erneut."
 						}
 					}
 				}
 			}
 		]
 	},
-	"release_date": "2023-11-01"
+	"release_date": "2024-03-13"
 }
