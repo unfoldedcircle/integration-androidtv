@@ -1,0 +1,46 @@
+{
+  "description": "NVIDIA SHIELD TV (Pro)",
+  "manufacturer": "NVIDIA",
+  "model": "SHIELD",
+  "features": [
+    "on_off",
+    "toggle",
+    "volume_up_down",
+    "mute_toggle",
+    "play_pause",
+    "next",
+    "previous",
+    "home",
+    "menu",
+    "channel_switcher",
+    "dpad",
+    "numpad",
+    "select_source",
+    "media_title",
+    "fast_forward",
+    "rewind",
+    "settings"
+  ],
+  "simple_commands": [
+    "APPS",
+    "APP_SWITCHER"
+  ],
+  "command_map": {
+    "context_menu": {
+      "keycode": "DPAD_CENTER",
+      "action": "LONG"
+    },
+    "settings": {
+      "keycode": "BACK",
+      "action": "LONG"
+    },
+    "APPS": {
+      "keycode": "HOME",
+      "action": "LONG"
+    },
+    "APP_SWITCHER": {
+      "keycode": "HOME",
+      "action": "DOUBLE_CLICK"
+    }
+  }
+}
