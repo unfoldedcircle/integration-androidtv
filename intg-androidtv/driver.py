@@ -340,6 +340,7 @@ def _register_available_entities(atv_id: str, name: str) -> None:
             media_player.Features.COLOR_BUTTONS,
             media_player.Features.FAST_FORWARD,
             media_player.Features.REWIND,
+            media_player.Features.CONTEXT_MENU,
             # TODO #29 for testing only: we need device profiles and build dynamic features.
             # A streaming box has way less features than a TV.
             media_player.Features.NUMPAD,
