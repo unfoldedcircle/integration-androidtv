@@ -177,6 +177,7 @@ class DeviceProfile:
 
         :param path: file path of device profile files
         """
+        _LOG.debug("Loading device profile from %s", path)
         self._profiles = []
         files = sorted(glob.glob(path + "/*.json"), key=str.swapcase)
         for file in files:

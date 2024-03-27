@@ -353,8 +353,13 @@ async def main():
     logging.getLogger("driver").setLevel(level)
     logging.getLogger("discover").setLevel(level)
     logging.getLogger("setup_flow").setLevel(level)
+    logging.getLogger("profiles").setLevel(level)
 
+    # Internal driver mode
     profile_path = os.path.join(api.config_dir_path, "config/profiles")
+    # External driver mode
+    if not os.path.exists(profile_path):
+        profile_path = "config/profiles"
     device_profile.load(profile_path)
 
     config.devices = config.Devices(api.config_dir_path, on_device_added, on_device_removed)

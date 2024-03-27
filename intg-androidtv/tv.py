@@ -415,6 +415,7 @@ class AndroidTv:
             else:
                 direction = "SHORT"
 
+            LOG.debug("Android send_command %s %d %s", keycode, action,  direction)
             self._atv.send_key_command(keycode, direction)
 
             if action == KeyPress.DOUBLE_CLICK:
