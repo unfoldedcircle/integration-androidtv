@@ -125,11 +125,15 @@ class AndroidTv:
         self._data_path: str = data_path
         self._name: str = name
         self.events = AsyncIOEventEmitter(loop or asyncio.get_running_loop())
+        id = "" if identifier is None else identifier.replace(":", "")
+        self._certfile = data_path + f"/androidtv_{id}_remote_cert.pem"
+        self._keyfile = data_path + f"/androidtv_{id}_remote_key.pem"
+
         self._atv: AndroidTVRemote = AndroidTVRemote(
             client_name="Remote Two",
             # FIXME #14 does not work for multi-device support
-            certfile=data_path + "/androidtv_remote_cert.pem",
-            keyfile=data_path + "/androidtv_remote_key.pem",
+            certfile=self._certfile,
+            keyfile=self._keyfile,
             host=host,
             loop=loop or asyncio.get_running_loop(),
         )
@@ -215,6 +219,16 @@ class AndroidTv:
     def address(self) -> str:
         """Return the IP address of the device."""
         return self._atv.host
+
+    @property
+    def certfile(self) -> str:
+        """Return the certificate file  of the device."""
+        return self._certfile
+
+    @property
+    def keyfile(self) -> str:
+        """Return the key file  of the device."""
+        return self._keyfile
 
     @property
     def is_on(self) -> bool | None:

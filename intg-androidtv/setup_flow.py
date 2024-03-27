@@ -7,6 +7,7 @@ Setup flow for Android TV Remote integration.
 
 import asyncio
 import logging
+import os
 from enum import IntEnum
 
 import discover
@@ -47,14 +48,14 @@ _pairing_android_tv: tv.AndroidTv | None = None
 # TODO #12 externalize language texts
 # pylint: disable=line-too-long
 _user_input_discovery = RequestUserInput(
-        {"en": "Setup mode", "de": "Setup Modus"},
+        {"en": "Setup mode", "de": "Setup Modus", "fr": "Installation"},
         [
             {
                 "id": "info",
                 "label": {
                     "en": "Discover or connect to Android TV device",
                     "de": "Suche oder Verbinde auf Android TV Gerät",
-                    "fr": "Découvrir ou connexion à l'appareil Android TV",
+                    "fr": "Découverte ou connexion à l'appareil Android TV",
                 },
                 "field": {
                     "label": {
@@ -386,7 +387,16 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         return SetupError()
 
     res = await _pairing_android_tv.finish_pairing(msg.input_values["pin"])
+    await _pairing_android_tv.init(20)
     _pairing_android_tv.disconnect()
+
+    # Now rename the certificate files so that they are unique per device (with the identifier = mac address)
+    target_certfile = config.devices.data_path + f"/androidtv_{_pairing_android_tv.identifier}_remote_cert.pem"
+    target_keyfile = config.devices.data_path + f"/androidtv_{_pairing_android_tv.identifier}_remote_key.pem"
+    _LOG.info("Rename certificate file %s to %s", _pairing_android_tv.certfile, target_certfile)
+    os.rename(_pairing_android_tv.certfile, target_certfile)
+    _LOG.info("Rename key file %s to %s", _pairing_android_tv.keyfile, target_keyfile)
+    os.rename(_pairing_android_tv.keyfile, target_keyfile)
 
     if res != ucapi.StatusCodes.OK:
         _pairing_android_tv = None
