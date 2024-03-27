@@ -23,6 +23,7 @@ _LOG = logging.getLogger(__name__)
 MEDIA_PLAYER_COMMANDS = {
     media_player.Commands.ON.value: "POWER",
     media_player.Commands.OFF.value: "POWER",
+    media_player.Commands.TOGGLE.value: "POWER",
     media_player.Commands.PLAY_PAUSE.value: "MEDIA_PLAY_PAUSE",
     media_player.Commands.STOP.value: "MEDIA_STOP",
     media_player.Commands.PREVIOUS.value: "MEDIA_PREVIOUS",

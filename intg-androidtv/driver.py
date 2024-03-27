@@ -73,7 +73,7 @@ async def on_exit_standby():
     """
     Exit standby notification.
 
-    Connect all Denon AVR instances.
+    Connect all Android TV instances.
     """
     _LOG.debug("Exit standby event: connecting device(s)")
     for configured in _configured_android_tvs.values():
@@ -146,8 +146,6 @@ async def media_player_cmd_handler(
 
     android_tv = _configured_android_tvs[atv_id]
 
-    # TODO might require special handling on the current device state to avoid toggling power state
-    # https://github.com/home-assistant/core/blob/2023.11.0/homeassistant/components/androidtv_remote/media_player.py#L115-L123
     if cmd_id == media_player.Commands.ON:
         return await android_tv.turn_on()
     if cmd_id == media_player.Commands.OFF:
