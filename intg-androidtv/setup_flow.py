@@ -48,32 +48,32 @@ _pairing_android_tv: tv.AndroidTv | None = None
 # TODO #12 externalize language texts
 # pylint: disable=line-too-long
 _user_input_discovery = RequestUserInput(
-        {"en": "Setup mode", "de": "Setup Modus", "fr": "Installation"},
-        [
-            {
-                "id": "info",
+    {"en": "Setup mode", "de": "Setup Modus", "fr": "Installation"},
+    [
+        {
+            "id": "info",
+            "label": {
+                "en": "Discover or connect to Android TV device",
+                "de": "Suche oder Verbinde auf Android TV Gerät",
+                "fr": "Découverte ou connexion à l'appareil Android TV",
+            },
+            "field": {
                 "label": {
-                    "en": "Discover or connect to Android TV device",
-                    "de": "Suche oder Verbinde auf Android TV Gerät",
-                    "fr": "Découverte ou connexion à l'appareil Android TV",
-                },
-                "field": {
-                    "label": {
-                        "value": {
-                            "en": "Leave blank to use auto-discovery.",
-                            "de": "Leer lassen, um automatische Erkennung zu verwenden.",
-                            "fr": "Laissez le champ vide pour utiliser la découverte automatique.",
-                        }
+                    "value": {
+                        "en": "Leave blank to use auto-discovery.",
+                        "de": "Leer lassen, um automatische Erkennung zu verwenden.",
+                        "fr": "Laissez le champ vide pour utiliser la découverte automatique.",
                     }
-                },
+                }
             },
-            {
-                "field": {"text": {"value": ""}},
-                "id": "address",
-                "label": {"en": "IP address", "de": "IP-Adresse", "fr": "Adresse IP"}
-            },
-        ],
-    )
+        },
+        {
+            "field": {"text": {"value": ""}},
+            "id": "address",
+            "label": {"en": "IP address", "de": "IP-Adresse", "fr": "Adresse IP"},
+        },
+    ],
+)
 
 
 async def driver_setup_handler(msg: SetupDriver) -> SetupAction:

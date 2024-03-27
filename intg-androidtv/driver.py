@@ -201,7 +201,6 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
     # TODO #14 AndroidTV identifier is currently identical to the one and only exposed media-player entity per device!
     entity_id = atv_id
 
-
     # FIXME temporary workaround until ucapi has been refactored:
     #       there's shouldn't be separate lists for available and configured entities
     if api.configured_entities.contains(entity_id):
