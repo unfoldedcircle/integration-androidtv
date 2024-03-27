@@ -63,7 +63,6 @@ class AndroidTv:
         :param host: IP address of the Android TV.
         :param name: Name of the Android TV device.
         :param identifier: Device identifier if known, otherwise init() has to be called.
-        :param profile: Device profile used for command mappings.
         :param loop: event loop. Used for connections and futures.
         """
         self._data_path: str = data_path

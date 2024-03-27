@@ -64,6 +64,7 @@ jobs:
         run: |
           cp dist/intg-androidtv artifacts/
           cp driver.json artifacts/
+          cp -r config artifacts/
           echo "ARTIFACT_NAME=uc-intg-${{ env.INTG_NAME }}-${{ env.VERSION }}-aarch64" >> $GITHUB_ENV
           
       - name: Create upload artifact
