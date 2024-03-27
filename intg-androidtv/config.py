@@ -26,6 +26,9 @@ class AtvDevice:
     name: str
     """Friendly name of the device."""
     address: str
+    """IP address of device."""
+    manufacturer: str
+    model: str
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -156,7 +159,15 @@ class Devices:
             with open(self._cfg_file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             for item in data:
-                self._config.append(AtvDevice(**item))
+                # not using AtvDevice(**item) to be able to migrate old configuration files with missing attributes
+                atv = AtvDevice(
+                    item.get("id"),
+                    item.get("name"),
+                    item.get("address"),
+                    item.get("manufacturer", ""),
+                    item.get("model", ""),
+                )
+                self._config.append(atv)
             return True
         except OSError as err:
             _LOG.error("Cannot open the config file: %s", err)

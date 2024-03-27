@@ -387,8 +387,19 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         return SetupError()
 
     res = await _pairing_android_tv.finish_pairing(msg.input_values["pin"])
-    await _pairing_android_tv.init(20)
+    target_certfile = config.devices.data_path + f"/androidtv_{_pairing_android_tv.identifier}_remote_cert.pem"
+    target_keyfile = config.devices.data_path + f"/androidtv_{_pairing_android_tv.identifier}_remote_key.pem"
     _pairing_android_tv.disconnect()
+
+    device_info = None
+
+    # Retrieve additional device information
+    if res == ucapi.StatusCodes.OK:
+        _LOG.info("Pairing done, retrieving device information")
+        if await _pairing_android_tv.init(10):
+            await _pairing_android_tv.connect(10)
+            device_info = _pairing_android_tv.device_info
+        _pairing_android_tv.disconnect()
 
     # Now rename the certificate files so that they are unique per device (with the identifier = mac address)
     target_certfile = config.devices.data_path + f"/androidtv_{_pairing_android_tv.identifier}_remote_cert.pem"
@@ -398,14 +409,23 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     _LOG.info("Rename key file %s to %s", _pairing_android_tv.keyfile, target_keyfile)
     os.rename(_pairing_android_tv.keyfile, target_keyfile)
 
+    if not device_info:
+        device_info = {}
+
     if res != ucapi.StatusCodes.OK:
         _pairing_android_tv = None
         if res == ucapi.StatusCodes.UNAUTHORIZED:
             return SetupError(error_type=IntegrationSetupError.AUTHORIZATION_ERROR)
         return SetupError(error_type=IntegrationSetupError.CONNECTION_REFUSED)
 
-    device = AtvDevice(_pairing_android_tv.identifier, _pairing_android_tv.name, _pairing_android_tv.address)
-    config.devices.add_or_update(device)  # triggers AndroidTv instance creation
+    device = AtvDevice(
+        _pairing_android_tv.identifier,
+        _pairing_android_tv.name,
+        _pairing_android_tv.address,
+        device_info.get("manufacturer", ""),
+        device_info.get("model", ""),
+    )
+    config.devices.add(device)  # triggers AndroidTv instance creation
     config.devices.store()
 
     # ATV device connection will be triggered with subscribe_entities request
