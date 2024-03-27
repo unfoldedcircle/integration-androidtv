@@ -26,6 +26,9 @@ class AtvDevice:
     name: str
     """Friendly name of the device."""
     address: str
+    """IP address of device."""
+    manufacturer: str
+    model: str
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -69,18 +72,12 @@ class Devices:
                 return True
         return False
 
-    def add_or_update(self, atv: AtvDevice) -> None:
-        """
-        Add a new configured Android TV device and persist configuration.
-
-        The device is updated if it already exists in the configuration.
-        """
-        # duplicate check
-        if not self.update(atv):
-            self._config.append(atv)
-            self.store()
-            if self._add_handler is not None:
-                self._add_handler(atv)
+    def add(self, atv: AtvDevice) -> None:
+        """Add a new configured Android TV device."""
+        # TODO duplicate check
+        self._config.append(atv)
+        if self._add_handler is not None:
+            self._add_handler(atv)
 
     def get(self, atv_id: str) -> AtvDevice | None:
         """Get device configuration for given identifier."""
@@ -120,6 +117,7 @@ class Devices:
         if os.path.exists(self._cfg_file_path):
             os.remove(self._cfg_file_path)
 
+        # FIXME #14 does not work for multi-device support
         pem_file = os.path.join(self._data_path, "androidtv_remote_cert.pem")
         if os.path.exists(pem_file):
             os.remove(pem_file)
@@ -141,8 +139,8 @@ class Devices:
             with open(self._cfg_file_path, "w+", encoding="utf-8") as f:
                 json.dump(self._config, f, ensure_ascii=False, cls=_EnhancedJSONEncoder)
             return True
-        except OSError as err:
-            _LOG.error("Cannot write the config file: %s", err)
+        except OSError:
+            _LOG.error("Cannot write the config file")
 
         return False
 
@@ -156,7 +154,15 @@ class Devices:
             with open(self._cfg_file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             for item in data:
-                self._config.append(AtvDevice(**item))
+                # not using AtvDevice(**item) to be able to migrate old configuration files with missing attributes
+                atv = AtvDevice(
+                    item.get("id"),
+                    item.get("name"),
+                    item.get("address"),
+                    item.get("manufacturer", ""),
+                    item.get("model", ""),
+                )
+                self._config.append(atv)
             return True
         except OSError as err:
             _LOG.error("Cannot open the config file: %s", err)
