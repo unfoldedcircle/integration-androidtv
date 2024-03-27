@@ -69,42 +69,10 @@ MEDIA_PLAYER_COMMANDS = {
     media_player.Commands.FUNCTION_YELLOW.value: "PROG_YELLOW",
     media_player.Commands.FUNCTION_BLUE.value: "PROG_BLUE",
     media_player.Commands.HOME.value: "HOME",
-    media_player.Commands.MENU.value: "MENU",  # alternatives: KEYCODE_TV_CONTENTS_MENU  KEYCODE_TV_MEDIA_CONTEXT_MENU
-    # not used at the moment: overridden in driver.py with long-press CURSOR_ENTER
-    media_player.Commands.CONTEXT_MENU.value: "TV_MEDIA_CONTEXT_MENU",
-    media_player.Commands.GUIDE.value: "GUIDE",
-    media_player.Commands.INFO.value: "INFO",
+    media_player.Commands.MENU.value: "MENU",  # KEYCODE_TV_CONTENTS_MENU  KEYCODE_TV_MEDIA_CONTEXT_MENU
     media_player.Commands.BACK.value: "BACK",
-    media_player.Commands.DIGIT_0.value: "NUMPAD_0",
-    media_player.Commands.DIGIT_1.value: "NUMPAD_1",
-    media_player.Commands.DIGIT_2.value: "NUMPAD_2",
-    media_player.Commands.DIGIT_3.value: "NUMPAD_3",
-    media_player.Commands.DIGIT_4.value: "NUMPAD_4",
-    media_player.Commands.DIGIT_5.value: "NUMPAD_5",
-    media_player.Commands.DIGIT_6.value: "NUMPAD_6",
-    media_player.Commands.DIGIT_7.value: "NUMPAD_7",
-    media_player.Commands.DIGIT_8.value: "NUMPAD_8",
-    media_player.Commands.DIGIT_9.value: "NUMPAD_9",
-    media_player.Commands.RECORD.value: "MEDIA_RECORD",
-    media_player.Commands.MY_RECORDINGS.value: "DVR",
-    media_player.Commands.LIVE.value: "TV",
-    media_player.Commands.EJECT.value: "MEDIA_EJECT",
-    media_player.Commands.OPEN_CLOSE.value: "MEDIA_CLOSE",
-    media_player.Commands.AUDIO_TRACK.value: "MEDIA_AUDIO_TRACK",
-    media_player.Commands.SUBTITLE.value: "CAPTIONS",
-    media_player.Commands.SETTINGS.value: "SETTINGS",
     media_player.Commands.SEARCH.value: "SEARCH",
 }
-
-
-class KeyPress(IntEnum):
-    """Key press actions."""
-
-    SHORT = 0
-    LONG = 1
-    DOUBLE_CLICK = 2
-    BEGIN = 3
-    END = 4
 
 
 class AndroidTv:
@@ -428,7 +396,7 @@ class AndroidTv:
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     # Commands
-    async def _send_command(self, key_code: int | str, action: KeyPress = KeyPress.SHORT) -> ucapi.StatusCodes:
+    def _send_command(self, key_code: int | str, direction: str = "SHORT") -> ucapi.StatusCodes:
         """
         Send a key press to Android TV.
 
@@ -438,27 +406,13 @@ class AndroidTv:
         :param key_code: int (e.g. 26) or str (e.g. "KEYCODE_POWER" or just "POWER")
                          from the enum RemoteKeyCode in remotemessage.proto. See
                          https://github.com/tronikos/androidtvremote2/blob/v0.0.14/src/androidtvremote2/remotemessage.proto#L90
-        :param action: key press action type, default = short press
+        :param direction: "SHORT" (default) or "START_LONG" or "END_LONG".
         :return: OK if scheduled to be sent,
                  SERVICE_UNAVAILABLE if there's no connection to the device,
                  BAD_REQUEST if the ``key_code`` is unknown
         """  # noqa
         try:
-            if action in (KeyPress.LONG, KeyPress.BEGIN):
-                direction = "START_LONG"
-            elif action == KeyPress.END:
-                await asyncio.sleep(1)
-                direction = "END_LONG"
-            else:
-                direction = "SHORT"
-
             self._atv.send_key_command(key_code, direction)
-
-            if action == KeyPress.DOUBLE_CLICK:
-                self._atv.send_key_command(key_code, direction)
-            elif action == KeyPress.LONG:
-                self._atv.send_key_command(key_code, "END_LONG")
-
             return ucapi.StatusCodes.OK
         except ConnectionClosed:
             LOG.error("Cannot send command, connection lost: %s", self._identifier)
@@ -467,12 +421,11 @@ class AndroidTv:
             LOG.error("Cannot send command, invalid key_code: %s", key_code)
             return ucapi.StatusCodes.BAD_REQUEST
 
-    async def send_media_player_command(self, cmd_id: str, direction: KeyPress = KeyPress.SHORT) -> ucapi.StatusCodes:
+    def send_media_player_command(self, cmd_id: str) -> ucapi.StatusCodes:
         """
         Send a UCR2 media-player entity command to the Android TV.
 
-        :param cmd_id: command identifier
-        :param direction: type of key press action
+        :param cmd_id:
         :return: OK if scheduled to be sent,
                  SERVICE_UNAVAILABLE if there's no connection to the device,
                  BAD_REQUEST if the ``cmd_id`` is unknown or not supported
@@ -481,30 +434,30 @@ class AndroidTv:
             command = media_player.Commands[cmd_id.upper()]
 
             if command.value in MEDIA_PLAYER_COMMANDS:
-                return await self._send_command(MEDIA_PLAYER_COMMANDS[command.value], direction)
+                return self._send_command(MEDIA_PLAYER_COMMANDS[command.value])
             LOG.error("Cannot send command, unknown or unsupported command: %s", command)
             return ucapi.StatusCodes.BAD_REQUEST
         except KeyError:
             LOG.error("Cannot send command, unknown media_player command: %s", cmd_id)
             return ucapi.StatusCodes.BAD_REQUEST
 
-    async def turn_on(self) -> ucapi.StatusCodes:
+    def turn_on(self) -> ucapi.StatusCodes:
         """
         Send power command to AndroidTV device.
 
         Note: there's no dedicated power-on command!
         """
-        return await self._send_command("POWER")
+        return self._send_command("POWER")
 
-    async def turn_off(self) -> ucapi.StatusCodes:
+    def turn_off(self) -> ucapi.StatusCodes:
         """
         Send power command to AndroidTV device.
 
         Note: there's no dedicated power-off command!
         """
-        return await self._send_command("POWER")
+        return self._send_command("POWER")
 
-    async def select_source(self, source: str) -> ucapi.StatusCodes:
+    def select_source(self, source: str) -> ucapi.StatusCodes:
         """
         Select a given source, either an app or input.
 
@@ -513,7 +466,7 @@ class AndroidTv:
         if source in apps.Apps:
             return self._launch_app(source)
         if source in inputs.KeyCode:
-            return await self._switch_input(source)
+            return self._switch_input(source)
 
         LOG.warning(
             "[%s] Unknown source parameter in select_source command: %s",
@@ -531,12 +484,12 @@ class AndroidTv:
             LOG.error("Cannot launch app, connection lost: %s", self._identifier)
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
-    async def _switch_input(self, source: str) -> ucapi.StatusCodes:
+    def _switch_input(self, source: str) -> ucapi.StatusCodes:
         """
         TEST FUNCTION: Send a KEYCODE_TV_INPUT_* key.
 
         Uses the inputs.py mappings to map from an input name to a KEYCODE_TV_* key.
         """
         if source in inputs.KeyCode:
-            return await self._send_command(inputs.KeyCode[source])
+            return self._send_command(inputs.KeyCode[source])
         return ucapi.StatusCodes.BAD_REQUEST

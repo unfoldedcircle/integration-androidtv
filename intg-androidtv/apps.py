@@ -21,7 +21,6 @@ Apps = {
     "Pluto TV": {"url": "https://pluto.tv/"},
     "ARD Mediathek": {"url": "https://www.ardmediathek.de/"},
     "ZDF Mediathek": {"url": "https://www.zdf.de/filme"},
-    "Kodi": {"url": "market://launch?id=org.xbmc.kodi"},
 }
 
 # Direct application-id mappings to friendly names
@@ -66,7 +65,6 @@ IdMappings = {
     "de.exaring.waipu": "Waipu TV",
     "de.telekom.magentatv.tv": "Magenta TV",
     "tv.pluto.android": "Pluto TV",
-    "com.nvidia.ota": "System upgrade",
 }
 
 # Application-ID substring mappings to friendly names
@@ -78,5 +76,4 @@ NameMatching = {
     "plex": "Plex",
     "kodi": "Kodi",
     "emby": "Emby",
-    "dune": "Dune HD"
 }
