@@ -20,11 +20,11 @@
     "media_title",
     "fast_forward",
     "rewind",
-    "settings"
+    "settings",
+    "search"
   ],
   "simple_commands": [
-    "SCREENSAVER",
-    "KEYCODE_SEARCH"
+    "SCREENSAVER"
   ],
   "command_map": {
     "context_menu": {
