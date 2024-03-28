@@ -9,7 +9,6 @@ This module implements a Remote Two integration driver for Android TV devices.
 import asyncio
 import logging
 import os
-from enum import Enum
 from typing import Any
 
 import setup_flow
@@ -27,15 +26,6 @@ _LOOP = asyncio.get_event_loop()
 api = ucapi.IntegrationAPI(_LOOP)
 _configured_android_tvs: dict[str, tv.AndroidTv] = {}
 device_profile = DeviceProfile()
-
-
-class SimpleCommands(str, Enum):
-    """Additional simple commands of the Android TV not covered by media-player features."""
-
-    APP_SWITCHER = "APP_SWITCHER"
-    """Show running applications."""
-    APPS = "APPS"
-    """Show apps."""
 
 
 @api.listens_to(ucapi.Events.CONNECT)
@@ -263,6 +253,13 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         android_tv.events.on(tv.Events.IP_ADDRESS_CHANGED, handle_android_tv_address_change)
 
         _configured_android_tvs[device.id] = android_tv
+        _LOG.info(
+            "Configured Android TV device '%s' (%s) with profile: %s %s",
+            device.name,
+            device.id,
+            profile.manufacturer,
+            profile.model,
+        )
 
     async def start_connection():
         res = await android_tv.init()
@@ -349,13 +346,20 @@ async def main():
     level = os.getenv("UC_LOG_LEVEL", "DEBUG").upper()
     logging.getLogger("tv").setLevel(level)
     logging.getLogger("driver").setLevel(level)
+    logging.getLogger("config").setLevel(level)
     logging.getLogger("discover").setLevel(level)
+    logging.getLogger("profiles").setLevel(level)
     logging.getLogger("setup_flow").setLevel(level)
 
     profile_path = os.path.join(api.config_dir_path, "config/profiles")
     device_profile.load(profile_path)
 
+    # load paired devices
     config.devices = config.Devices(api.config_dir_path, on_device_added, on_device_removed)
+    # best effort migration (if required): network might not be available during startup
+    if config.devices.migration_required():
+        await config.devices.migrate()
+    # and register them as available devices.
     for device in config.devices.all():
         _add_configured_android_tv(device, connect=False)
 

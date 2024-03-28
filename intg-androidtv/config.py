@@ -12,6 +12,8 @@ import os
 from dataclasses import dataclass
 from typing import Iterator
 
+from tv import AndroidTv
+
 _LOG = logging.getLogger(__name__)
 
 _CFG_FILENAME = "config.json"
@@ -28,7 +30,9 @@ class AtvDevice:
     address: str
     """IP address of device."""
     manufacturer: str
+    """Device manufacturer name."""
     model: str
+    """Device model name."""
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -170,6 +174,57 @@ class Devices:
             _LOG.error("Empty or invalid config file: %s", err)
 
         return False
+
+    def migration_required(self) -> bool:
+        """Check if configuration migration is required."""
+        for item in self._config:
+            if not item.manufacturer:
+                return True
+        return False
+
+    async def migrate(self) -> bool:
+        """Migrate configuration if required."""
+        result = True
+        for item in self._config:
+            if not item.manufacturer:
+                _LOG.info(
+                    "Migrating configuration: connecting to device '%s' (%s) to update manufacturer and device model",
+                    item.name,
+                    item.id,
+                )
+                android_tv = AndroidTv(self.data_path, item.address, item.name, item.id)
+                if await android_tv.init(10) and await android_tv.connect(10):
+                    if device_info := android_tv.device_info:
+                        item.manufacturer = android_tv.device_info
+                        item.manufacturer = device_info.get("manufacturer", "")
+                        item.model = device_info.get("model", "")
+
+                        _LOG.info(
+                            "Updating device configuration '%s' (%s) with: manufacturer=%s, model=%s",
+                            item.name,
+                            item.id,
+                            item.manufacturer,
+                            item.model,
+                        )
+                        if not self.store():
+                            result = False
+                    else:
+                        result = False
+                        _LOG.warning(
+                            "Could not migrate device configuration '%s' (%s): device information not available",
+                            item.name,
+                            item.id,
+                        )
+                else:
+                    result = False
+                    _LOG.warning(
+                        "Could not migrate device configuration '%s' (%s): device not found on network",
+                        item.name,
+                        item.id,
+                    )
+
+        _LOG.debug("Device configuration migration state: %s", result)
+        return result
 
 
 devices: Devices | None = None

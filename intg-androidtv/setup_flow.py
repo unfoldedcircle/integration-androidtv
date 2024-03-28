@@ -82,19 +82,26 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
     return SetupError()
 
 
-async def handle_driver_setup(_msg: DriverSetupRequest) -> RequestUserInput | SetupError:
+async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | SetupError:
     """
     Start driver setup.
 
     Initiated by Remote Two to set up the driver.
     Ask user to enter ip-address for manual configuration, otherwise auto-discovery is used.
 
-    :param _msg: not used, we don't have any input fields in the first setup screen.
+    :param msg: driver setup request data, only `reconfigure` flag is of interest.
     :return: the setup action on how to continue
     """
     global _setup_step
 
-    _LOG.debug("Starting driver setup")
+    reconfigure = msg.reconfigure
+    _LOG.debug("Starting driver setup, reconfigure=%s", reconfigure)
+
+    if reconfigure:
+        # make sure configuration is up-to-date
+        if config.devices.migration_required():
+            await config.devices.migrate()
+
     _setup_step = SetupSteps.CONFIGURATION_MODE
 
     # workaround for web-configurator not picking up first response

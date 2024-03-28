@@ -10,6 +10,7 @@ Each manufacturer uses different commands or patterns to call certain functions.
 import glob
 import json
 import logging
+import os
 from dataclasses import dataclass
 from enum import IntEnum
 
@@ -180,7 +181,7 @@ class DeviceProfile:
         self._profiles = []
         files = sorted(glob.glob(path + "/*.json"), key=str.swapcase)
         for file in files:
-            _LOG.debug("Loading device profile file: %s", file)
+            _LOG.debug("Loading device profile: %s", os.path.basename(file))
 
             try:
                 with open(file, "r", encoding="utf-8") as f:
@@ -198,8 +199,8 @@ class DeviceProfile:
                         self._default_profile = profile
                     self._profiles.append(profile)
             except Exception as ex:  # pylint: disable=broad-exception-caught
-                _LOG.error("Error loading device profile file %s: %s", file, ex)
-        _LOG.debug("Loaded profiles: %s", self._profiles)
+                _LOG.error("Error loading device profile file %s: %s", os.path.basename(file), ex)
+        _LOG.info("Loaded device profiles: %d", len(self._profiles))
 
     def match(self, manufacturer: str, model: str) -> Profile:
         """
