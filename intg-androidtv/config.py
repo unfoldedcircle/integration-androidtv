@@ -76,12 +76,18 @@ class Devices:
                 return True
         return False
 
-    def add(self, atv: AtvDevice) -> None:
-        """Add a new configured Android TV device."""
-        # TODO duplicate check
-        self._config.append(atv)
-        if self._add_handler is not None:
-            self._add_handler(atv)
+    def add_or_update(self, atv: AtvDevice) -> None:
+        """
+        Add a new configured Android TV device and persist configuration.
+
+        The device is updated if it already exists in the configuration.
+        """
+        # duplicate check
+        if not self.update(atv):
+            self._config.append(atv)
+            self.store()
+            if self._add_handler is not None:
+                self._add_handler(atv)
 
     def get(self, atv_id: str) -> AtvDevice | None:
         """Get device configuration for given identifier."""
@@ -116,19 +122,19 @@ class Devices:
 
     def clear(self) -> None:
         """Remove the configuration file and device certificates."""
+        for item in self._config:
+            android_tv = AndroidTv(self.data_path, item.address, item.name, item.id)
+            pem_file = android_tv.certfile
+            if os.path.exists(pem_file):
+                os.remove(pem_file)
+            pem_file = android_tv.keyfile
+            if os.path.exists(pem_file):
+                os.remove(pem_file)
+
         self._config = []
 
         if os.path.exists(self._cfg_file_path):
             os.remove(self._cfg_file_path)
-
-        # FIXME #14 does not work for multi-device support
-        pem_file = os.path.join(self._data_path, "androidtv_remote_cert.pem")
-        if os.path.exists(pem_file):
-            os.remove(pem_file)
-
-        pem_file = os.path.join(self._data_path, "androidtv_remote_key.pem")
-        if os.path.exists(pem_file):
-            os.remove(pem_file)
 
         if self._remove_handler is not None:
             self._remove_handler(None)
