@@ -360,6 +360,19 @@ async def main():
 
     config.devices = config.Devices(api.config_dir_path, on_device_added, on_device_removed)
     for device in config.devices.all():
+        # Migration of certificate/key files with identifier in name
+        _android_tv = tv.AndroidTv(api.config_dir_path, device.address, device.name, device.id)
+        if not os.path.exists(_android_tv.certfile):
+            current_certfile = api.config_dir_path + "/androidtv_remote_cert.pem"
+            current_keyfile = api.config_dir_path + "/androidtv_remote_key.pem"
+            try:
+                _LOG.info("Rename certificate file %s to %s", current_certfile, _android_tv.certfile)
+                os.rename(current_certfile, _android_tv.certfile)
+                _LOG.info("Rename key file %s to %s", current_keyfile, _android_tv.keyfile)
+                os.rename(current_keyfile, _android_tv.keyfile)
+            except Exception as ex:
+                _LOG.error("Error while migrating certificate files", ex)
+
         # TODO Not sure about that : _add_configured_android_tv(device, connect=False)
         _register_available_entities(device.id, device.name)
 

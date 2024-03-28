@@ -390,13 +390,31 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     await _pairing_android_tv.init(20)
     _pairing_android_tv.disconnect()
 
+    # Retrieve certificate and key file names to rename them
+    # with the identifier now that we have it (through init)
+    current_certfile = _pairing_android_tv.certfile
+    current_keyfile = _pairing_android_tv.keyfile
+    identifier = _pairing_android_tv.identifier
+
+    # Retrieve additional device information
+    if res == ucapi.StatusCodes.OK:
+        _LOG.info("Pairing done, retrieving device information")
+        _pairing_android_tv = tv.AndroidTv(config.devices.data_path,
+                                           _pairing_android_tv.address,
+                                           _pairing_android_tv.name,
+                                           identifier)
+        target_certfile = _pairing_android_tv.certfile
+        target_keyfile = _pairing_android_tv.keyfile
+        _LOG.info("Rename certificate file %s to %s", current_certfile, target_certfile)
+        os.rename(current_certfile, target_certfile)
+        _LOG.info("Rename key file %s to %s", current_keyfile, target_keyfile)
+        os.rename(current_keyfile, target_keyfile)
+        if await _pairing_android_tv.init(10):
+            await _pairing_android_tv.connect(10)
+        _pairing_android_tv.disconnect()
+
+
     # Now rename the certificate files so that they are unique per device (with the identifier = mac address)
-    target_certfile = config.devices.data_path + f"/androidtv_{_pairing_android_tv.identifier}_remote_cert.pem"
-    target_keyfile = config.devices.data_path + f"/androidtv_{_pairing_android_tv.identifier}_remote_key.pem"
-    _LOG.info("Rename certificate file %s to %s", _pairing_android_tv.certfile, target_certfile)
-    os.rename(_pairing_android_tv.certfile, target_certfile)
-    _LOG.info("Rename key file %s to %s", _pairing_android_tv.keyfile, target_keyfile)
-    os.rename(_pairing_android_tv.keyfile, target_keyfile)
 
     if res != ucapi.StatusCodes.OK:
         _pairing_android_tv = None
