@@ -12,6 +12,8 @@ import os
 from dataclasses import dataclass
 from typing import Iterator
 
+from tv import AndroidTv
+
 _LOG = logging.getLogger(__name__)
 
 _CFG_FILENAME = "config.json"
@@ -28,7 +30,9 @@ class AtvDevice:
     address: str
     """IP address of device."""
     manufacturer: str
+    """Device manufacturer name."""
     model: str
+    """Device model name."""
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -72,12 +76,18 @@ class Devices:
                 return True
         return False
 
-    def add(self, atv: AtvDevice) -> None:
-        """Add a new configured Android TV device."""
-        # TODO duplicate check
-        self._config.append(atv)
-        if self._add_handler is not None:
-            self._add_handler(atv)
+    def add_or_update(self, atv: AtvDevice) -> None:
+        """
+        Add a new configured Android TV device and persist configuration.
+
+        The device is updated if it already exists in the configuration.
+        """
+        # duplicate check
+        if not self.update(atv):
+            self._config.append(atv)
+            self.store()
+            if self._add_handler is not None:
+                self._add_handler(atv)
 
     def get(self, atv_id: str) -> AtvDevice | None:
         """Get device configuration for given identifier."""
@@ -117,7 +127,6 @@ class Devices:
         if os.path.exists(self._cfg_file_path):
             os.remove(self._cfg_file_path)
 
-        # FIXME #14 does not work for multi-device support
         pem_file = os.path.join(self._data_path, "androidtv_remote_cert.pem")
         if os.path.exists(pem_file):
             os.remove(pem_file)
@@ -170,6 +179,57 @@ class Devices:
             _LOG.error("Empty or invalid config file: %s", err)
 
         return False
+
+    def migration_required(self) -> bool:
+        """Check if configuration migration is required."""
+        for item in self._config:
+            if not item.manufacturer:
+                return True
+        return False
+
+    async def migrate(self) -> bool:
+        """Migrate configuration if required."""
+        result = True
+        for item in self._config:
+            if not item.manufacturer:
+                _LOG.info(
+                    "Migrating configuration: connecting to device '%s' (%s) to update manufacturer and device model",
+                    item.name,
+                    item.id,
+                )
+                android_tv = AndroidTv(self.data_path, item.address, item.name, item.id)
+                if await android_tv.init(10) and await android_tv.connect(10):
+                    if device_info := android_tv.device_info:
+                        item.manufacturer = android_tv.device_info
+                        item.manufacturer = device_info.get("manufacturer", "")
+                        item.model = device_info.get("model", "")
+
+                        _LOG.info(
+                            "Updating device configuration '%s' (%s) with: manufacturer=%s, model=%s",
+                            item.name,
+                            item.id,
+                            item.manufacturer,
+                            item.model,
+                        )
+                        if not self.store():
+                            result = False
+                    else:
+                        result = False
+                        _LOG.warning(
+                            "Could not migrate device configuration '%s' (%s): device information not available",
+                            item.name,
+                            item.id,
+                        )
+                else:
+                    result = False
+                    _LOG.warning(
+                        "Could not migrate device configuration '%s' (%s): device not found on network",
+                        item.name,
+                        item.id,
+                    )
+
+        _LOG.debug("Device configuration migration state: %s", result)
+        return result
 
 
 devices: Devices | None = None

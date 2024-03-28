@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Added
+- New media-player features and device profiles (generic, Google Chromecast, NVIDIA Shield TV) ([#34](https://github.com/unfoldedcircle/integration-androidtv/pull/34)).
+- Google Android TV app mappings.
+
 ---
 
 ## v0.4.6 - 2024-02-17

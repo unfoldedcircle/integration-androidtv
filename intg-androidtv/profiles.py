@@ -10,6 +10,7 @@ Each manufacturer uses different commands or patterns to call certain functions.
 import glob
 import json
 import logging
+import os
 from dataclasses import dataclass
 from enum import IntEnum
 
@@ -23,6 +24,7 @@ _LOG = logging.getLogger(__name__)
 MEDIA_PLAYER_COMMANDS = {
     media_player.Commands.ON.value: "POWER",
     media_player.Commands.OFF.value: "POWER",
+    media_player.Commands.TOGGLE.value: "POWER",
     media_player.Commands.PLAY_PAUSE.value: "MEDIA_PLAY_PAUSE",
     media_player.Commands.STOP.value: "MEDIA_STOP",
     media_player.Commands.PREVIOUS.value: "MEDIA_PREVIOUS",
@@ -165,7 +167,6 @@ class DeviceProfile:
                 media_player.Features.AUDIO_TRACK,
                 media_player.Features.SUBTITLE,
                 media_player.Features.RECORD,
-                media_player.Features.CONTEXT_MENU,
             ],
             [],
             {},
@@ -177,11 +178,10 @@ class DeviceProfile:
 
         :param path: file path of device profile files
         """
-        _LOG.debug("Loading device profile from %s", path)
         self._profiles = []
         files = sorted(glob.glob(path + "/*.json"), key=str.swapcase)
         for file in files:
-            _LOG.debug("Loading device profile file: %s", file)
+            _LOG.debug("Loading device profile: %s", os.path.basename(file))
 
             try:
                 with open(file, "r", encoding="utf-8") as f:
@@ -199,8 +199,8 @@ class DeviceProfile:
                         self._default_profile = profile
                     self._profiles.append(profile)
             except Exception as ex:  # pylint: disable=broad-exception-caught
-                _LOG.error("Error loading device profile file %s: %s", file, ex)
-        _LOG.debug("Loaded profiles: %s", self._profiles)
+                _LOG.error("Error loading device profile file %s: %s", os.path.basename(file), ex)
+        _LOG.info("Loaded device profiles: %d", len(self._profiles))
 
     def match(self, manufacturer: str, model: str) -> Profile:
         """

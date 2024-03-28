@@ -7,6 +7,9 @@ on:
     branches: [main]
     tags:
       - v[0-9]+.[0-9]+.[0-9]+*
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 env:
   INTG_NAME: androidtv
@@ -73,7 +76,7 @@ jobs:
           tar czvf ${{ env.ARTIFACT_NAME }}.tar.gz -C ${GITHUB_WORKSPACE}/artifacts .
           ls -lah
           
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         id: upload_artifact
         with:
           name: ${{ env.ARTIFACT_NAME }}
@@ -89,7 +92,7 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
 
       - name: Extract build archives from downloaded files
         run: |

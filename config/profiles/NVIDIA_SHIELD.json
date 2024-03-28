@@ -12,6 +12,7 @@
     "previous",
     "home",
     "menu",
+    "context_menu",
     "channel_switcher",
     "dpad",
     "numpad",
@@ -19,8 +20,7 @@
     "media_title",
     "fast_forward",
     "rewind",
-    "settings",
-	"context_menu"
+    "settings"
   ],
   "simple_commands": [
     "APPS",

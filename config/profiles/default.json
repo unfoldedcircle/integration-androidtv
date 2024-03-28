@@ -13,8 +13,6 @@
     "previous",
     "fast_forward",
     "rewind",
-    "repeat",
-    "shuffle",
     "media_title",
     "dpad",
     "numpad",
@@ -28,9 +26,11 @@
     "select_source",
     "eject",
     "open_close",
+    "audio_track",
     "subtitle",
     "record",
-    "settings"
+    "settings",
+    "search"
   ],
   "simple_commands": [
     "CURSOR_ENTER_LONG",
@@ -91,8 +91,7 @@
     "KEYCODE_F9",
     "KEYCODE_F10",
     "KEYCODE_F11",
-    "KEYCODE_F12",
-    "KEYCODE_SEARCH"
+    "KEYCODE_F12"
   ],
   "command_map": {
     "CURSOR_ENTER_LONG": {

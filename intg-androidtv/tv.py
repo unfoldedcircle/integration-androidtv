@@ -63,6 +63,7 @@ class AndroidTv:
         :param host: IP address of the Android TV.
         :param name: Name of the Android TV device.
         :param identifier: Device identifier if known, otherwise init() has to be called.
+        :param profile: Device profile used for command mappings.
         :param loop: event loop. Used for connections and futures.
         """
         self._data_path: str = data_path
@@ -419,7 +420,6 @@ class AndroidTv:
             else:
                 direction = "SHORT"
 
-            LOG.debug("Android send_command %s %d %s", keycode, action, direction)
             self._atv.send_key_command(keycode, direction)
 
             if action == KeyPress.DOUBLE_CLICK:
@@ -457,19 +457,24 @@ class AndroidTv:
 
     async def turn_on(self) -> ucapi.StatusCodes:
         """
-        Send power command to AndroidTV device.
+        Send power command to AndroidTV device if device is in off-state.
 
-        Note: there's no dedicated power-on command!
+        Note: there's no dedicated power-on command! Power handling based on HA integration:
+        https://github.com/home-assistant/core/blob/2023.11.0/homeassistant/components/androidtv_remote/media_player.py#L115-L123
         """
-        return await self._send_command("POWER")
+        if not self.is_on:
+            return await self._send_command("POWER")
+        return ucapi.StatusCodes.OK
 
     async def turn_off(self) -> ucapi.StatusCodes:
         """
-        Send power command to AndroidTV device.
+        Send power command to AndroidTV device if device is in off-state.
 
         Note: there's no dedicated power-off command!
         """
-        return await self._send_command("POWER")
+        if self.is_on:
+            return await self._send_command("POWER")
+        return ucapi.StatusCodes.OK
 
     async def select_source(self, source: str) -> ucapi.StatusCodes:
         """

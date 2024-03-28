@@ -9,7 +9,6 @@ This module implements a Remote Two integration driver for Android TV devices.
 import asyncio
 import logging
 import os
-from enum import Enum
 from typing import Any
 
 import setup_flow
@@ -27,15 +26,6 @@ _LOOP = asyncio.get_event_loop()
 api = ucapi.IntegrationAPI(_LOOP)
 _configured_android_tvs: dict[str, tv.AndroidTv] = {}
 device_profile = DeviceProfile()
-
-
-class SimpleCommands(str, Enum):
-    """Additional simple commands of the Android TV not covered by media-player features."""
-
-    APP_SWITCHER = "APP_SWITCHER"
-    """Show running applications."""
-    APPS = "APPS"
-    """Show apps."""
 
 
 @api.listens_to(ucapi.Events.CONNECT)
@@ -99,7 +89,6 @@ async def on_subscribe_entities(entity_ids) -> None:
             else:
                 state = media_player.States.ON if atv.is_on else media_player.States.OFF
             api.configured_entities.update_attributes(entity_id, {media_player.Attributes.STATE: state})
-            _LOOP.create_task(atv.connect())
             continue
 
         device = config.devices.get(atv_id)
@@ -115,10 +104,8 @@ async def on_unsubscribe_entities(entity_ids) -> None:
     _LOG.debug("Unsubscribe entities event: %s", entity_ids)
     # TODO #14 add entity_id --> atv_id mapping. Right now the atv_id == entity_id!
     for entity_id in entity_ids:
-        if entity_id in _configured_android_tvs:
-            device = _configured_android_tvs.pop(entity_id)
-            device.disconnect()
-            device.events.remove_all_listeners()
+        _configured_android_tvs[entity_id].disconnect()
+        _configured_android_tvs[entity_id].events.remove_all_listeners()
 
 
 async def media_player_cmd_handler(
@@ -132,9 +119,9 @@ async def media_player_cmd_handler(
     :param entity: media-player entity
     :param cmd_id: command
     :param params: optional command parameters
-    :return: status code of the command. StatusCodes.OK if the command succeeded.
+    :return:
     """
-    _LOG.info("Got %s command request: %s %s", entity.id, cmd_id, params if params else "")
+    _LOG.info("Got %s command request: %s %s", entity.id, cmd_id, params)
 
     # TODO #14 map from device id to entities (see Denon integration)
     # atv_id = _tv_from_entity_id(entity.id)
@@ -142,16 +129,12 @@ async def media_player_cmd_handler(
     #     return ucapi.StatusCodes.NOT_FOUND
     atv_id = entity.id
 
-    configured_entity = api.configured_entities.get(entity.id)
-
-    if configured_entity is None:
+    if atv_id not in _configured_android_tvs:
         _LOG.warning("No Android TV device found for entity: %s", entity.id)
         return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
     android_tv = _configured_android_tvs[atv_id]
 
-    # TODO might require special handling on the current device state to avoid toggling power state
-    # https://github.com/home-assistant/core/blob/2023.11.0/homeassistant/components/androidtv_remote/media_player.py#L115-L123
     if cmd_id == media_player.Commands.ON:
         return await android_tv.turn_on()
     if cmd_id == media_player.Commands.OFF:
@@ -211,13 +194,7 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
     # TODO #14 AndroidTV identifier is currently identical to the one and only exposed media-player entity per device!
     entity_id = atv_id
 
-
-    # FIXME temporary workaround until ucapi has been refactored:
-    #       there's shouldn't be separate lists for available and configured entities
-    if api.configured_entities.contains(entity_id):
-        configured_entity = api.configured_entities.get(entity_id)
-    else:
-        configured_entity = api.available_entities.get(entity_id)
+    configured_entity = api.configured_entities.get(entity_id)
     if configured_entity is None:
         return
 
@@ -275,6 +252,13 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         android_tv.events.on(tv.Events.IP_ADDRESS_CHANGED, handle_android_tv_address_change)
 
         _configured_android_tvs[device.id] = android_tv
+        _LOG.info(
+            "Configured Android TV device '%s' (%s) with profile: %s %s",
+            device.name,
+            device.id,
+            profile.manufacturer,
+            profile.model,
+        )
 
     async def start_connection():
         res = await android_tv.init()
@@ -353,23 +337,28 @@ def on_device_removed(device: config.AtvDevice | None) -> None:
 
 async def main():
     """Start the Remote Two integration driver."""
-    logging.basicConfig()
-
+    logging.basicConfig()  # when running on the device: timestamps are added by the journal
+    # logging.basicConfig(
+    #     format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
+    #     datefmt="%Y-%m-%d %H:%M:%S",
+    # )
     level = os.getenv("UC_LOG_LEVEL", "DEBUG").upper()
     logging.getLogger("tv").setLevel(level)
     logging.getLogger("driver").setLevel(level)
+    logging.getLogger("config").setLevel(level)
     logging.getLogger("discover").setLevel(level)
-    logging.getLogger("setup_flow").setLevel(level)
     logging.getLogger("profiles").setLevel(level)
+    logging.getLogger("setup_flow").setLevel(level)
 
-    # Internal driver mode
     profile_path = os.path.join(api.config_dir_path, "config/profiles")
-    # External driver mode
-    if not os.path.exists(profile_path):
-        profile_path = "config/profiles"
     device_profile.load(profile_path)
 
+    # load paired devices
     config.devices = config.Devices(api.config_dir_path, on_device_added, on_device_removed)
+    # best effort migration (if required): network might not be available during startup
+    if config.devices.migration_required():
+        await config.devices.migrate()
+    # and register them as available devices.
     for device in config.devices.all():
         # Migration of certificate/key files with identifier in name
         _android_tv = tv.AndroidTv(api.config_dir_path, device.address, device.name, device.id)
