@@ -2,15 +2,18 @@
 
 Using [androidtvremote2](https://github.com/tronikos/androidtvremote2) and [uc-integration-api](https://github.com/aitatoi/integration-python-library).
 
-The integration currently supports almost all features that the library provides.
-Button control and ON/OFF states are supported. Unfortunately media image and playing information are not :(
-Source list is limited to predefined list as retrieving a list of installed apps is not possible.
+The integration currently supports almost all features that the androidtvremote2 library provides.
+Button control and ON/OFF states are supported. Unfortunately media image and playing information are not retrievable.
+Source list is limited to a predefined list as retrieving a list of installed apps is not possible.
 
-This integration is included in the Remote Two firmware and no external service must be run to connect Home Assistant
-with Android TV devices. A standalone service can be used for development or connecting multiple devices. A single
-instance of the integration doesn't support multiple Android TV devices yet (planned: [#14](https://github.com/aitatoi/integration-androidtv/issues/14)).
+This integration is included in the Remote Two firmware and no external service must be run to connect with Android TV
+devices. A standalone service can be used for development or connecting multiple devices.
+A single instance of the integration doesn't support multiple Android TV devices yet (planned: [#14](https://github.com/aitatoi/integration-androidtv/issues/14)).
 
-## Usage
+Device profiles allow device specific support and custom key bindings, for example double-click or long-press actions.
+See [command mappings](docs/command_mapping.md) for more information.
+
+## Standalone Usage
 ### Setup
 
 - Requires Python 3.11

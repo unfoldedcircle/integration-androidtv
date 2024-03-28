@@ -21,6 +21,7 @@ from androidtvremote2 import (
     ConnectionClosed,
     InvalidAuth,
 )
+from profiles import KeyPress, Profile
 from pyee import AsyncIOEventEmitter
 from ucapi import media_player
 
@@ -43,43 +44,17 @@ class Events(IntEnum):
     IP_ADDRESS_CHANGED = 6
 
 
-# Map media-player entity commands to Android TV key codes
-# See https://github.com/tronikos/androidtvremote2/blob/v0.0.14/src/androidtvremote2/remotemessage.proto
-MEDIA_PLAYER_COMMANDS = {
-    media_player.Commands.ON.value: "POWER",
-    media_player.Commands.OFF.value: "POWER",
-    media_player.Commands.PLAY_PAUSE.value: "MEDIA_PLAY_PAUSE",
-    media_player.Commands.STOP.value: "MEDIA_STOP",
-    media_player.Commands.PREVIOUS.value: "MEDIA_PREVIOUS",
-    media_player.Commands.NEXT.value: "MEDIA_NEXT",
-    media_player.Commands.FAST_FORWARD.value: "MEDIA_FAST_FORWARD",
-    media_player.Commands.REWIND.value: "MEDIA_REWIND",
-    media_player.Commands.VOLUME_UP.value: "VOLUME_UP",
-    media_player.Commands.VOLUME_DOWN.value: "VOLUME_DOWN",
-    media_player.Commands.MUTE_TOGGLE.value: "VOLUME_MUTE",
-    media_player.Commands.CHANNEL_UP.value: "CHANNEL_UP",
-    media_player.Commands.CHANNEL_DOWN.value: "CHANNEL_DOWN",
-    media_player.Commands.CURSOR_UP.value: "DPAD_UP",
-    media_player.Commands.CURSOR_DOWN.value: "DPAD_DOWN",
-    media_player.Commands.CURSOR_LEFT.value: "DPAD_LEFT",
-    media_player.Commands.CURSOR_RIGHT.value: "DPAD_RIGHT",
-    media_player.Commands.CURSOR_ENTER.value: "DPAD_CENTER",
-    media_player.Commands.FUNCTION_RED.value: "PROG_RED",
-    media_player.Commands.FUNCTION_GREEN.value: "PROG_GREEN",
-    media_player.Commands.FUNCTION_YELLOW.value: "PROG_YELLOW",
-    media_player.Commands.FUNCTION_BLUE.value: "PROG_BLUE",
-    media_player.Commands.HOME.value: "HOME",
-    media_player.Commands.MENU.value: "MENU",  # KEYCODE_TV_CONTENTS_MENU  KEYCODE_TV_MEDIA_CONTEXT_MENU
-    media_player.Commands.BACK.value: "BACK",
-    media_player.Commands.SEARCH.value: "SEARCH",
-}
-
-
 class AndroidTv:
     """Representing an Android TV device."""
 
     def __init__(
-        self, data_path: str, host: str, name: str, identifier: str | None = None, loop: AbstractEventLoop | None = None
+        self,
+        data_path: str,
+        host: str,
+        name: str,
+        identifier: str | None = None,
+        profile: Profile | None = None,
+        loop: AbstractEventLoop | None = None,
     ):
         """
         Create instance with given IP address of Android TV device.
@@ -88,6 +63,7 @@ class AndroidTv:
         :param host: IP address of the Android TV.
         :param name: Name of the Android TV device.
         :param identifier: Device identifier if known, otherwise init() has to be called.
+        :param profile: Device profile used for command mappings.
         :param loop: event loop. Used for connections and futures.
         """
         self._data_path: str = data_path
@@ -103,6 +79,7 @@ class AndroidTv:
         )
         self._connecting: bool = False
         self._identifier: str | None = identifier
+        self._profile: Profile | None = profile
         self._connection_attempts: int = 0
         self._reconnect_delay: float = MIN_RECONNECT_DELAY
 
@@ -122,20 +99,19 @@ class AndroidTv:
 
         Connect to the Android TV and create a certificate if missing.
 
-        :param max_timeout: optional maximum timeout in seconds to try connecting to the device.
-        :return: True if connected, False if timeout occurred.
+        :param max_timeout: optional maximum timeout in seconds to try connecting to the device. Default: no timeout.
+        :return: True if connected or connecting, False if timeout occurred.
         """
         if self._connecting:
             LOG.debug("Skipping init task: connection already running for %s", self._identifier)
             return True
-
-        start = time.time()
 
         if await self._atv.async_generate_cert_if_missing():
             LOG.debug("Generated new certificate")
 
         request_start = None
         success = False
+        start = time.time()
 
         while not success:
             try:
@@ -183,6 +159,11 @@ class AndroidTv:
     def address(self) -> str:
         """Return the IP address of the device."""
         return self._atv.host
+
+    @property
+    def device_info(self) -> dict[str, str] | None:
+        """Device info (manufacturer, model, sw_version)."""
+        return self._atv.device_info
 
     @property
     def is_on(self) -> bool | None:
@@ -235,8 +216,13 @@ class AndroidTv:
             LOG.error("Initialize pair again. Error: %s", ex)
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
-    async def connect(self) -> None:
-        """Connect to Android TV."""
+    async def connect(self, max_timeout: int | None = None) -> bool:
+        """
+        Connect to Android TV.
+
+        :param max_timeout: optional maximum timeout in seconds to try connecting to the device. Default: no timeout.
+        :return: True if connected or connecting, False if timeout or authentication error occurred.
+        """
         # if we are already connecting, simply ignore further connect calls
         if self._connecting:
             LOG.debug("Connection task already running for %s", self._identifier)
@@ -246,7 +232,7 @@ class AndroidTv:
             LOG.debug("Android TV is already connected: %s", self._identifier)
             # just to make sure the state is up-to-date
             self.events.emit(Events.CONNECTED, self._identifier)
-            return
+            return True
 
         self._connecting = True
         # disconnect first if we are already connected
@@ -254,6 +240,7 @@ class AndroidTv:
 
         request_start = None
         success = False
+        start = time.time()
 
         while not success:
             try:
@@ -272,17 +259,33 @@ class AndroidTv:
                 self.events.emit(Events.AUTH_ERROR, self._identifier)
                 break
             except (CannotConnect, ConnectionClosed, asyncio.TimeoutError) as ex:
+                if max_timeout and time.time() - start > max_timeout:
+                    LOG.error(
+                        "Abort connecting after %ss: device '%s' not reachable on %s. %s",
+                        max_timeout,
+                        self._name,
+                        self._atv.host,
+                        ex,
+                    )
+                    break
                 await self._handle_connection_failure(time.time() - request_start, ex)
+            except Exception as ex:  # pylint: disable=broad-exception-caught
+                LOG.error("Fatal error connecting Android TV %s on %s: %s", self._identifier, self._atv.host, ex)
+                break
 
         if not success:
             self._connecting = False
-            return
+            return False
 
         self._atv.keep_reconnecting()
+
+        device_info = self._atv.device_info
+        LOG.info("Device information: %s", device_info)
 
         self._update_app_list()
         self.events.emit(Events.CONNECTED, self._identifier)
         self._connecting = False
+        return True
 
     async def _handle_connection_failure(self, connect_duration: float, ex):
         self._connection_attempts += 1
@@ -376,68 +379,86 @@ class AndroidTv:
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     # Commands
-    def _send_command(self, key_code: int | str, direction: str = "SHORT") -> ucapi.StatusCodes:
+    async def _send_command(self, keycode: int | str, action: KeyPress = KeyPress.SHORT) -> ucapi.StatusCodes:
         """
         Send a key press to Android TV.
 
         This does not block; it buffers the data and arranges for it to be
         sent out asynchronously.
 
-        :param key_code: int (e.g. 26) or str (e.g. "KEYCODE_POWER" or just "POWER")
+        :param keycode: int (e.g. 26) or str (e.g. "KEYCODE_POWER" or just "POWER")
                          from the enum RemoteKeyCode in remotemessage.proto. See
                          https://github.com/tronikos/androidtvremote2/blob/v0.0.14/src/androidtvremote2/remotemessage.proto#L90
-        :param direction: "SHORT" (default) or "START_LONG" or "END_LONG".
+        :param action: key press action type, default = short press
         :return: OK if scheduled to be sent,
                  SERVICE_UNAVAILABLE if there's no connection to the device,
                  BAD_REQUEST if the ``key_code`` is unknown
         """  # noqa
         try:
-            self._atv.send_key_command(key_code, direction)
+            if action in (KeyPress.LONG, KeyPress.BEGIN):
+                direction = "START_LONG"
+            elif action == KeyPress.END:
+                direction = "END_LONG"
+            else:
+                direction = "SHORT"
+
+            self._atv.send_key_command(keycode, direction)
+
+            if action == KeyPress.DOUBLE_CLICK:
+                self._atv.send_key_command(keycode, direction)
+            elif action == KeyPress.LONG:
+                await asyncio.sleep(1)
+                self._atv.send_key_command(keycode, "END_LONG")
+
             return ucapi.StatusCodes.OK
         except ConnectionClosed:
             LOG.error("Cannot send command, connection lost: %s", self._identifier)
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
         except ValueError:
-            LOG.error("Cannot send command, invalid key_code: %s", key_code)
+            LOG.error("Cannot send command, invalid key_code: %s", keycode)
             return ucapi.StatusCodes.BAD_REQUEST
 
-    def send_media_player_command(self, cmd_id: str) -> ucapi.StatusCodes:
+    async def send_media_player_command(self, cmd_id: str) -> ucapi.StatusCodes:
         """
         Send a UCR2 media-player entity command to the Android TV.
 
-        :param cmd_id:
+        :param cmd_id: command identifier
         :return: OK if scheduled to be sent,
                  SERVICE_UNAVAILABLE if there's no connection to the device,
                  BAD_REQUEST if the ``cmd_id`` is unknown or not supported
         """
-        try:
-            command = media_player.Commands[cmd_id.upper()]
+        if not self._profile:
+            LOG.error("Cannot send command %s: no device profile set", cmd_id)
+            return ucapi.StatusCodes.SERVER_ERROR
 
-            if command.value in MEDIA_PLAYER_COMMANDS:
-                return self._send_command(MEDIA_PLAYER_COMMANDS[command.value])
-            LOG.error("Cannot send command, unknown or unsupported command: %s", command)
-            return ucapi.StatusCodes.BAD_REQUEST
-        except KeyError:
-            LOG.error("Cannot send command, unknown media_player command: %s", cmd_id)
-            return ucapi.StatusCodes.BAD_REQUEST
+        if command := self._profile.command(cmd_id):
+            return await self._send_command(command.keycode, command.action)
 
-    def turn_on(self) -> ucapi.StatusCodes:
+        LOG.error("Cannot send command, unknown or unsupported command: %s", cmd_id)
+        return ucapi.StatusCodes.BAD_REQUEST
+
+    async def turn_on(self) -> ucapi.StatusCodes:
         """
-        Send power command to AndroidTV device.
+        Send power command to AndroidTV device if device is in off-state.
 
-        Note: there's no dedicated power-on command!
+        Note: there's no dedicated power-on command! Power handling based on HA integration:
+        https://github.com/home-assistant/core/blob/2023.11.0/homeassistant/components/androidtv_remote/media_player.py#L115-L123
         """
-        return self._send_command("POWER")
+        if not self.is_on:
+            return await self._send_command("POWER")
+        return ucapi.StatusCodes.OK
 
-    def turn_off(self) -> ucapi.StatusCodes:
+    async def turn_off(self) -> ucapi.StatusCodes:
         """
-        Send power command to AndroidTV device.
+        Send power command to AndroidTV device if device is in off-state.
 
         Note: there's no dedicated power-off command!
         """
-        return self._send_command("POWER")
+        if self.is_on:
+            return await self._send_command("POWER")
+        return ucapi.StatusCodes.OK
 
-    def select_source(self, source: str) -> ucapi.StatusCodes:
+    async def select_source(self, source: str) -> ucapi.StatusCodes:
         """
         Select a given source, either an app or input.
 
@@ -446,7 +467,7 @@ class AndroidTv:
         if source in apps.Apps:
             return self._launch_app(source)
         if source in inputs.KeyCode:
-            return self._switch_input(source)
+            return await self._switch_input(source)
 
         LOG.warning(
             "[%s] Unknown source parameter in select_source command: %s",
@@ -464,12 +485,12 @@ class AndroidTv:
             LOG.error("Cannot launch app, connection lost: %s", self._identifier)
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
-    def _switch_input(self, source: str) -> ucapi.StatusCodes:
+    async def _switch_input(self, source: str) -> ucapi.StatusCodes:
         """
         TEST FUNCTION: Send a KEYCODE_TV_INPUT_* key.
 
         Uses the inputs.py mappings to map from an input name to a KEYCODE_TV_* key.
         """
         if source in inputs.KeyCode:
-            return self._send_command(inputs.KeyCode[source])
+            return await self._send_command(inputs.KeyCode[source])
         return ucapi.StatusCodes.BAD_REQUEST

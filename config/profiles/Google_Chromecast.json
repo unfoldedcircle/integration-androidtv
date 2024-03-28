@@ -1,0 +1,43 @@
+{
+  "description": "Google Chromecast with Google TV, HD and 4k",
+  "manufacturer": "Google",
+  "model": "Chromecast",
+  "features": [
+    "on_off",
+    "toggle",
+    "volume_up_down",
+    "mute_toggle",
+    "play_pause",
+    "next",
+    "previous",
+    "home",
+    "menu",
+    "context_menu",
+    "channel_switcher",
+    "dpad",
+    "numpad",
+    "select_source",
+    "media_title",
+    "fast_forward",
+    "rewind",
+    "settings",
+    "search"
+  ],
+  "simple_commands": [
+    "SCREENSAVER"
+  ],
+  "command_map": {
+    "context_menu": {
+      "keycode": "DPAD_CENTER",
+      "action": "LONG"
+    },
+    "settings": {
+      "keycode": "MENU",
+      "action": "LONG"
+    },
+    "SCREENSAVER": {
+      "keycode": "BACK",
+      "action": "DOUBLE_CLICK"
+    }
+  }
+}

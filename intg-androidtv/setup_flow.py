@@ -9,11 +9,9 @@ import asyncio
 import logging
 from enum import IntEnum
 
-import config
 import discover
 import tv
 import ucapi
-from config import AtvDevice
 from ucapi import (
     AbortDriverSetup,
     DriverSetupRequest,
@@ -25,6 +23,9 @@ from ucapi import (
     SetupError,
     UserDataResponse,
 )
+
+import config
+from config import AtvDevice
 
 _LOG = logging.getLogger(__name__)
 
@@ -81,36 +82,65 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
     return SetupError()
 
 
-async def handle_driver_setup(_msg: DriverSetupRequest) -> RequestUserInput | SetupError:
+async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | SetupError:
     """
     Start driver setup.
 
     Initiated by Remote Two to set up the driver.
     Ask user to enter ip-address for manual configuration, otherwise auto-discovery is used.
 
-    :param _msg: not used, we don't have any input fields in the first setup screen.
+    :param msg: driver setup request data, only `reconfigure` flag is of interest.
     :return: the setup action on how to continue
     """
     global _setup_step
 
-    _LOG.debug("Starting driver setup")
+    reconfigure = msg.reconfigure
+    _LOG.debug("Starting driver setup, reconfigure=%s", reconfigure)
+
+    if reconfigure:
+        # make sure configuration is up-to-date
+        if config.devices.migration_required():
+            await config.devices.migrate()
+
     _setup_step = SetupSteps.CONFIGURATION_MODE
+
+    # workaround for web-configurator not picking up first response
+    await asyncio.sleep(1)
+
+    # pylint: disable=line-too-long
     return RequestUserInput(
         {"en": "Setup mode", "de": "Setup Modus"},
         [
-            {"field": {"text": {"value": ""}}, "id": "address", "label": {"en": "IP address", "de": "IP-Adresse"}},
             {
                 "id": "info",
-                "label": {"en": ""},
+                "label": {
+                    "en": "Discover or connect to Android TV device",
+                    "de": "Suche oder Verbinde auf Android TV Gerät",
+                    "fr": "Découvrir ou connexion à l'appareil Android TV",
+                },
                 "field": {
                     "label": {
                         "value": {
-                            "en": "Leave blank to use auto-discovery.",
-                            "de": "Leer lassen, um automatische Erkennung zu verwenden.",
-                            "fr": "Laissez le champ vide pour utiliser la découverte automatique.",
+                            "en": (
+                                "Leave blank to use auto-discovery and click _Next_."
+                                "The device must be on the same network as the remote."
+                            ),
+                            "de": (
+                                "Leer lassen, um automatische Erkennung zu verwenden und auf _Weiter_ klicken."
+                                "Das Gerät muss sich im gleichen Netzwerk wie die Fernbedienung befinden."
+                            ),
+                            "fr": (
+                                "Laissez le champ vide pour utiliser la découverte automatique et cliquez sur _Suivant_."  # noqa: E501
+                                "L'appareil doit être sur le même réseau que la télécommande"
+                            ),
                         }
                     }
                 },
+            },
+            {
+                "field": {"text": {"value": ""}},
+                "id": "address",
+                "label": {"en": "IP address", "de": "IP-Adresse", "fr": "Adresse IP"},
             },
         ],
     )
@@ -248,13 +278,30 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     res = await _pairing_android_tv.finish_pairing(msg.input_values["pin"])
     _pairing_android_tv.disconnect()
 
+    # Retrieve additional device information
+    if res == ucapi.StatusCodes.OK:
+        _LOG.info("Pairing done, retrieving device information")
+        if await _pairing_android_tv.init(10):
+            await _pairing_android_tv.connect(10)
+            device_info = _pairing_android_tv.device_info
+        _pairing_android_tv.disconnect()
+
+    if not device_info:
+        device_info = {}
+
     if res != ucapi.StatusCodes.OK:
         _pairing_android_tv = None
         if res == ucapi.StatusCodes.UNAUTHORIZED:
             return SetupError(error_type=IntegrationSetupError.AUTHORIZATION_ERROR)
         return SetupError(error_type=IntegrationSetupError.CONNECTION_REFUSED)
 
-    device = AtvDevice(_pairing_android_tv.identifier, _pairing_android_tv.name, _pairing_android_tv.address)
+    device = AtvDevice(
+        _pairing_android_tv.identifier,
+        _pairing_android_tv.name,
+        _pairing_android_tv.address,
+        device_info.get("manufacturer", ""),
+        device_info.get("model", ""),
+    )
     config.devices.add(device)  # triggers AndroidTv instance creation
     config.devices.store()
 

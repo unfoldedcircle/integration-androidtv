@@ -11,11 +11,13 @@ import logging
 import os
 from typing import Any
 
-import config
 import setup_flow
 import tv
 import ucapi
+from profiles import DeviceProfile, Profile
 from ucapi import MediaPlayer, media_player
+
+import config
 
 _LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
 _LOOP = asyncio.get_event_loop()
@@ -23,11 +25,14 @@ _LOOP = asyncio.get_event_loop()
 # Global variables
 api = ucapi.IntegrationAPI(_LOOP)
 _configured_android_tvs: dict[str, tv.AndroidTv] = {}
+device_profile = DeviceProfile()
 
 
 @api.listens_to(ucapi.Events.CONNECT)
 async def on_connect():
     """When the UCR2 connects, all configured Android TV devices are getting connected."""
+    _LOG.debug("Client connect command: connecting device(s)")
+    await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
     for atv in _configured_android_tvs.values():
         # start background task
         _LOOP.create_task(atv.connect())
@@ -36,6 +41,7 @@ async def on_connect():
 @api.listens_to(ucapi.Events.DISCONNECT)
 async def on_disconnect():
     """When the UCR2 disconnects, all configured Android TV devices are disconnected."""
+    _LOG.debug("Client disconnect command: disconnecting device(s)")
     for atv in _configured_android_tvs.values():
         atv.disconnect()
 
@@ -57,10 +63,9 @@ async def on_exit_standby():
     """
     Exit standby notification.
 
-    Connect all Denon AVR instances.
+    Connect all Android TV instances.
     """
     _LOG.debug("Exit standby event: connecting device(s)")
-
     for configured in _configured_android_tvs.values():
         # start background task
         _LOOP.create_task(configured.connect())
@@ -84,6 +89,7 @@ async def on_subscribe_entities(entity_ids) -> None:
             else:
                 state = media_player.States.ON if atv.is_on else media_player.States.OFF
             api.configured_entities.update_attributes(entity_id, {media_player.Attributes.STATE: state})
+            _LOOP.create_task(atv.connect())
             continue
 
         device = config.devices.get(atv_id)
@@ -129,23 +135,17 @@ async def media_player_cmd_handler(
         return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
     android_tv = _configured_android_tvs[atv_id]
-    res = ucapi.StatusCodes.NOT_IMPLEMENTED
 
-    # TODO might require special handling on the current device state to avoid toggling power state
-    # https://github.com/home-assistant/core/blob/2023.11.0/homeassistant/components/androidtv_remote/media_player.py#L115-L123
     if cmd_id == media_player.Commands.ON:
-        res = android_tv.turn_on()
-    elif cmd_id == media_player.Commands.OFF:
-        res = android_tv.turn_off()
-    elif cmd_id == media_player.Commands.SELECT_SOURCE:
+        return await android_tv.turn_on()
+    if cmd_id == media_player.Commands.OFF:
+        return await android_tv.turn_off()
+    if cmd_id == media_player.Commands.SELECT_SOURCE:
         if params is None or "source" not in params:
-            res = ucapi.StatusCodes.BAD_REQUEST
-        else:
-            res = android_tv.select_source(params["source"])
-    else:
-        res = android_tv.send_media_player_command(cmd_id)
+            return ucapi.StatusCodes.BAD_REQUEST
+        return await android_tv.select_source(params["source"])
 
-    return res
+    return await android_tv.send_media_player_command(cmd_id)
 
 
 async def handle_connected(identifier: str):
@@ -153,8 +153,7 @@ async def handle_connected(identifier: str):
     _LOG.debug("Android TV connected: %s", identifier)
     # TODO is this the correct state?
     api.configured_entities.update_attributes(identifier, {media_player.Attributes.STATE: media_player.States.STANDBY})
-    # TODO #14 when multiple devices are supported, the device state logic isn't that simple anymore!
-    await api.set_device_state(ucapi.DeviceStates.CONNECTED)
+    await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
 
 
 async def handle_disconnected(identifier: str):
@@ -163,8 +162,6 @@ async def handle_disconnected(identifier: str):
     api.configured_entities.update_attributes(
         identifier, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
     )
-    # TODO #14 when multiple devices are supported, the device state logic isn't that simple anymore!
-    await api.set_device_state(ucapi.DeviceStates.DISCONNECTED)
 
 
 async def handle_authentication_error(identifier: str):
@@ -239,12 +236,16 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
 
 
 def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -> None:
+    profile = device_profile.match(device.manufacturer, device.model)
+
     # the device should not yet be configured, but better be safe
     if device.id in _configured_android_tvs:
         android_tv = _configured_android_tvs[device.id]
         android_tv.disconnect()
     else:
-        android_tv = tv.AndroidTv(config.devices.data_path, device.address, device.name, device.id, _LOOP)
+        android_tv = tv.AndroidTv(
+            config.devices.data_path, device.address, device.name, device.id, profile=profile, loop=_LOOP
+        )
         android_tv.events.on(tv.Events.CONNECTED, handle_connected)
         android_tv.events.on(tv.Events.DISCONNECTED, handle_disconnected)
         android_tv.events.on(tv.Events.AUTH_ERROR, handle_authentication_error)
@@ -252,6 +253,13 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         android_tv.events.on(tv.Events.IP_ADDRESS_CHANGED, handle_android_tv_address_change)
 
         _configured_android_tvs[device.id] = android_tv
+        _LOG.info(
+            "Configured Android TV device '%s' (%s) with profile: %s %s",
+            device.name,
+            device.id,
+            profile.manufacturer,
+            profile.model,
+        )
 
     async def start_connection():
         res = await android_tv.init()
@@ -263,40 +271,27 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         # start background task
         _LOOP.create_task(start_connection())
 
-    _register_available_entities(device.id, device.name)
+    _register_available_entities(device, profile)
 
 
-def _register_available_entities(atv_id: str, name: str) -> None:
+def _register_available_entities(device: config.AtvDevice, profile: Profile) -> None:
     """
     Create entities for given Android TV device and register them as available entities.
 
-    :param atv_id: Android TV identifier
-    :param name: Android TV device name
+    :param device: Android TV configuration
     """
     # TODO #14 map entity IDs from device identifier
-    entity_id = atv_id
+    entity_id = device.id
     # plain and simple for now: only one media_player per ATV device
+    features = profile.features
+    options = {}
+    if profile.simple_commands:
+        options[media_player.Options.SIMPLE_COMMANDS] = profile.simple_commands
+
     entity = media_player.MediaPlayer(
         entity_id,
-        name,
-        [
-            media_player.Features.ON_OFF,
-            media_player.Features.VOLUME,
-            media_player.Features.VOLUME_UP_DOWN,
-            media_player.Features.MUTE_TOGGLE,
-            media_player.Features.PLAY_PAUSE,
-            media_player.Features.NEXT,
-            media_player.Features.PREVIOUS,
-            media_player.Features.HOME,
-            media_player.Features.MENU,
-            media_player.Features.CHANNEL_SWITCHER,
-            media_player.Features.DPAD,
-            media_player.Features.SELECT_SOURCE,
-            media_player.Features.MEDIA_TITLE,
-            media_player.Features.COLOR_BUTTONS,
-            media_player.Features.FAST_FORWARD,
-            media_player.Features.REWIND,
-        ],
+        device.name,
+        features,
         {
             media_player.Attributes.STATE: media_player.States.UNKNOWN,
             media_player.Attributes.VOLUME: 0,
@@ -304,6 +299,7 @@ def _register_available_entities(atv_id: str, name: str) -> None:
             media_player.Attributes.MEDIA_TITLE: "",
         },
         device_class=media_player.DeviceClasses.TV,
+        options=options,
         cmd_handler=media_player_cmd_handler,
     )
 
@@ -321,7 +317,7 @@ def on_device_added(device: config.AtvDevice) -> None:
 def on_device_removed(device: config.AtvDevice | None) -> None:
     """Handle a removed device in the configuration."""
     if device is None:
-        _LOG.debug("Configuration cleared, disconnecting & removing all configured ATV instances")
+        _LOG.debug("Configuration cleared, disconnecting & removing all configured Android TV instances")
         for atv in _configured_android_tvs.values():
             atv.disconnect()
             atv.events.remove_all_listeners()
@@ -330,7 +326,7 @@ def on_device_removed(device: config.AtvDevice | None) -> None:
         api.available_entities.clear()
     else:
         if device.id in _configured_android_tvs:
-            _LOG.debug("Disconnecting from removed ATV %s", device.id)
+            _LOG.debug("Disconnecting from removed Android TV %s", device.id)
             atv = _configured_android_tvs.pop(device.id)
             atv.disconnect()
             atv.events.remove_all_listeners()
@@ -342,15 +338,28 @@ def on_device_removed(device: config.AtvDevice | None) -> None:
 
 async def main():
     """Start the Remote Two integration driver."""
-    logging.basicConfig()
-
+    logging.basicConfig()  # when running on the device: timestamps are added by the journal
+    # logging.basicConfig(
+    #     format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
+    #     datefmt="%Y-%m-%d %H:%M:%S",
+    # )
     level = os.getenv("UC_LOG_LEVEL", "DEBUG").upper()
     logging.getLogger("tv").setLevel(level)
     logging.getLogger("driver").setLevel(level)
+    logging.getLogger("config").setLevel(level)
     logging.getLogger("discover").setLevel(level)
+    logging.getLogger("profiles").setLevel(level)
     logging.getLogger("setup_flow").setLevel(level)
 
+    profile_path = os.path.join(api.config_dir_path, "config/profiles")
+    device_profile.load(profile_path)
+
+    # load paired devices
     config.devices = config.Devices(api.config_dir_path, on_device_added, on_device_removed)
+    # best effort migration (if required): network might not be available during startup
+    if config.devices.migration_required():
+        await config.devices.migrate()
+    # and register them as available devices.
     for device in config.devices.all():
         _add_configured_android_tv(device, connect=False)
 
