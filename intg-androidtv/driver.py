@@ -73,7 +73,7 @@ async def on_exit_standby():
     """
     Exit standby notification.
 
-    Connect all Denon AVR instances.
+    Connect all Android TV instances.
     """
     _LOG.debug("Exit standby event: connecting device(s)")
     for configured in _configured_android_tvs.values():
@@ -115,8 +115,10 @@ async def on_unsubscribe_entities(entity_ids) -> None:
     _LOG.debug("Unsubscribe entities event: %s", entity_ids)
     # TODO #14 add entity_id --> atv_id mapping. Right now the atv_id == entity_id!
     for entity_id in entity_ids:
-        _configured_android_tvs[entity_id].disconnect()
-        _configured_android_tvs[entity_id].events.remove_all_listeners()
+        if entity_id in _configured_android_tvs:
+            device = _configured_android_tvs.pop(entity_id)
+            device.disconnect()
+            device.events.remove_all_listeners()
 
 
 async def media_player_cmd_handler(
@@ -130,9 +132,9 @@ async def media_player_cmd_handler(
     :param entity: media-player entity
     :param cmd_id: command
     :param params: optional command parameters
-    :return:
+    :return: status code of the command. StatusCodes.OK if the command succeeded.
     """
-    _LOG.info("Got %s command request: %s %s", entity.id, cmd_id, params)
+    _LOG.info("Got %s command request: %s %s", entity.id, cmd_id, params if params else "")
 
     # TODO #14 map from device id to entities (see Denon integration)
     # atv_id = _tv_from_entity_id(entity.id)
@@ -140,7 +142,9 @@ async def media_player_cmd_handler(
     #     return ucapi.StatusCodes.NOT_FOUND
     atv_id = entity.id
 
-    if atv_id not in _configured_android_tvs:
+    configured_entity = api.configured_entities.get(entity.id)
+
+    if configured_entity is None:
         _LOG.warning("No Android TV device found for entity: %s", entity.id)
         return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
@@ -207,7 +211,13 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
     # TODO #14 AndroidTV identifier is currently identical to the one and only exposed media-player entity per device!
     entity_id = atv_id
 
-    configured_entity = api.configured_entities.get(entity_id)
+
+    # FIXME temporary workaround until ucapi has been refactored:
+    #       there's shouldn't be separate lists for available and configured entities
+    if api.configured_entities.contains(entity_id):
+        configured_entity = api.configured_entities.get(entity_id)
+    else:
+        configured_entity = api.available_entities.get(entity_id)
     if configured_entity is None:
         return
 
@@ -343,11 +353,8 @@ def on_device_removed(device: config.AtvDevice | None) -> None:
 
 async def main():
     """Start the Remote Two integration driver."""
-    logging.basicConfig()  # when running on the device: timestamps are added by the journal
-    # logging.basicConfig(
-    #     format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
-    #     datefmt="%Y-%m-%d %H:%M:%S",
-    # )
+    logging.basicConfig()
+
     level = os.getenv("UC_LOG_LEVEL", "DEBUG").upper()
     logging.getLogger("tv").setLevel(level)
     logging.getLogger("driver").setLevel(level)
@@ -364,6 +371,19 @@ async def main():
 
     config.devices = config.Devices(api.config_dir_path, on_device_added, on_device_removed)
     for device in config.devices.all():
+        # Migration of certificate/key files with identifier in name
+        _android_tv = tv.AndroidTv(api.config_dir_path, device.address, device.name, device.id)
+        if not os.path.exists(_android_tv.certfile):
+            current_certfile = api.config_dir_path + "/androidtv_remote_cert.pem"
+            current_keyfile = api.config_dir_path + "/androidtv_remote_key.pem"
+            try:
+                _LOG.info("Rename certificate file %s to %s", current_certfile, _android_tv.certfile)
+                os.rename(current_certfile, _android_tv.certfile)
+                _LOG.info("Rename key file %s to %s", current_keyfile, _android_tv.keyfile)
+                os.rename(current_keyfile, _android_tv.keyfile)
+            except Exception as ex:
+                _LOG.error("Error while migrating certificate files", ex)
+
         _add_configured_android_tv(device, connect=False)
 
     await api.init("driver.json", setup_flow.driver_setup_handler)
