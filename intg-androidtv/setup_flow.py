@@ -399,10 +399,9 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     # Retrieve additional device information
     if res == ucapi.StatusCodes.OK:
         _LOG.info("Pairing done, retrieving device information")
-        _pairing_android_tv = tv.AndroidTv(config.devices.data_path,
-                                           _pairing_android_tv.address,
-                                           _pairing_android_tv.name,
-                                           identifier)
+        _pairing_android_tv = tv.AndroidTv(
+            config.devices.data_path, _pairing_android_tv.address, _pairing_android_tv.name, identifier
+        )
         target_certfile = _pairing_android_tv.certfile
         target_keyfile = _pairing_android_tv.keyfile
         _LOG.info("Rename certificate file %s to %s", current_certfile, target_certfile)
@@ -412,7 +411,6 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         if await _pairing_android_tv.init(10):
             await _pairing_android_tv.connect(10)
         _pairing_android_tv.disconnect()
-
 
     # Now rename the certificate files so that they are unique per device (with the identifier = mac address)
 

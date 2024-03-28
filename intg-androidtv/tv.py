@@ -93,9 +93,12 @@ class AndroidTv:
         self._data_path: str = data_path
         self._name: str = name
         self.events = AsyncIOEventEmitter(loop or asyncio.get_running_loop())
-        prefix = data_path + f"/androidtv_{identifier}_remote_" if identifier is not None \
+        prefix = (
+            data_path + f"/androidtv_{identifier}_remote_"
+            if identifier is not None
             else data_path + f"/androidtv_remote_"
-        self._certfile = prefix +"cert.pem"
+        )
+        self._certfile = prefix + "cert.pem"
         self._keyfile = prefix + "key.pem"
 
         self._atv: AndroidTVRemote = AndroidTVRemote(
