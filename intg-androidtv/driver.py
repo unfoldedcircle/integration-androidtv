@@ -364,8 +364,8 @@ async def main():
         # Migration of certificate/key files with identifier in name
         _android_tv = tv.AndroidTv(api.config_dir_path, device.address, device.name, device.id)
         if not os.path.exists(_android_tv.certfile):
-            current_certfile = api.config_dir_path + "/androidtv_remote_cert.pem"
-            current_keyfile = api.config_dir_path + "/androidtv_remote_key.pem"
+            current_certfile = os.path.join(api.config_dir_path, "androidtv_remote_cert.pem")
+            current_keyfile = os.path.join(api.config_dir_path, "androidtv_remote_key.pem")
             try:
                 _LOG.info("Rename certificate file %s to %s", current_certfile, _android_tv.certfile)
                 os.rename(current_certfile, _android_tv.certfile)

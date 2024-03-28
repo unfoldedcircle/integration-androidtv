@@ -21,7 +21,6 @@ Apps = {
     "Pluto TV": {"url": "https://pluto.tv/"},
     "ARD Mediathek": {"url": "https://www.ardmediathek.de/"},
     "ZDF Mediathek": {"url": "https://www.zdf.de/filme"},
-    "Kodi": {"url": "market://launch?id=org.xbmc.kodi"},
 }
 
 # Direct application-id mappings to friendly names
@@ -78,5 +77,4 @@ NameMatching = {
     "plex": "Plex",
     "kodi": "Kodi",
     "emby": "Emby",
-    "dune": "Dune HD"
 }

@@ -138,6 +138,9 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
     _LOG.debug("Starting driver setup, reconfigure=%s", reconfigure)
 
     if reconfigure:
+        # make sure configuration is up-to-date
+        if config.devices.migration_required():
+            await config.devices.migrate()
         _setup_step = SetupSteps.CONFIGURATION_MODE
 
         # get all configured devices for the user to choose from

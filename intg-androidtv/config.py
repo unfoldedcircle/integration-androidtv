@@ -122,18 +122,21 @@ class Devices:
 
     def clear(self) -> None:
         """Remove the configuration file and device certificates."""
+        for item in self._config:
+            android_tv = AndroidTv(self.data_path, item.address, item.name, item.id)
+            pem_file = android_tv.certfile
+            if os.path.exists(pem_file):
+                os.remove(pem_file)
+            pem_file = android_tv.keyfile
+            if os.path.exists(pem_file):
+                os.remove(pem_file)
+
         self._config = []
 
         if os.path.exists(self._cfg_file_path):
             os.remove(self._cfg_file_path)
 
-        pem_file = os.path.join(self._data_path, "androidtv_remote_cert.pem")
-        if os.path.exists(pem_file):
-            os.remove(pem_file)
 
-        pem_file = os.path.join(self._data_path, "androidtv_remote_key.pem")
-        if os.path.exists(pem_file):
-            os.remove(pem_file)
 
         if self._remove_handler is not None:
             self._remove_handler(None)
