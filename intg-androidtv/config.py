@@ -136,8 +136,6 @@ class Devices:
         if os.path.exists(self._cfg_file_path):
             os.remove(self._cfg_file_path)
 
-
-
         if self._remove_handler is not None:
             self._remove_handler(None)
 
