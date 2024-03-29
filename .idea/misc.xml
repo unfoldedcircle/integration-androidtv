@@ -4,11 +4,10 @@
     <option name="cmdArguments" value="--line-length 120" />
     <option name="enabledOnReformat" value="true" />
     <option name="enabledOnSave" value="true" />
-    <option name="sdkName" value="Python 3.11 (integration-androidtv)" />
+    <option name="pathToExecutable" value="C:\Users\damie\AppData\Local\Programs\Python\Python312\Scripts\black.exe" />
+    <option name="sdkName" value="Python 3.11 principal" />
   </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_21" project-jdk-name="Python 3.11 (integration-androidtv)" project-jdk-type="Python SDK">
-    <output url="file://$PROJECT_DIR$/out" />
-  </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.11 (integration-androidtv)" project-jdk-type="Python SDK" />
   <component name="PythonCompatibilityInspectionAdvertiser">
     <option name="version" value="3" />
   </component>

@@ -112,6 +112,7 @@ class Devices:
         if atv is None:
             return False
         try:
+            self.remove_files(atv_id)
             self._config.remove(atv)
             if self._remove_handler is not None:
                 self._remove_handler(atv)
@@ -120,16 +121,24 @@ class Devices:
             pass
         return False
 
+    def remove_files(self, atv_id: str) -> bool:
+        """Remove the certificate and key files of a given Android TV instance"""
+        for item in self._config:
+            if item.id == atv_id:
+                android_tv = AndroidTv(self.data_path, item.address, item.name, item.id)
+                pem_file = android_tv.certfile
+                if os.path.exists(pem_file):
+                    os.remove(pem_file)
+                pem_file = android_tv.keyfile
+                if os.path.exists(pem_file):
+                    os.remove(pem_file)
+                return True
+        return False
+
     def clear(self) -> None:
         """Remove the configuration file and device certificates."""
         for item in self._config:
-            android_tv = AndroidTv(self.data_path, item.address, item.name, item.id)
-            pem_file = android_tv.certfile
-            if os.path.exists(pem_file):
-                os.remove(pem_file)
-            pem_file = android_tv.keyfile
-            if os.path.exists(pem_file):
-                os.remove(pem_file)
+            self.remove_files(item.id)
 
         self._config = []
 
