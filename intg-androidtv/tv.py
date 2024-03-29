@@ -420,6 +420,17 @@ class AndroidTv:
             else:
                 direction = "SHORT"
 
+            if self.is_on is None:
+                return ucapi.StatusCodes.SERVICE_UNAVAILABLE
+
+            # workaround for "swallowed commands" since _atv.send_key_command doesn't provide a result
+            # pylint: disable=W0212
+            if (
+                not (self._atv._remote_message_protocol and self._atv._remote_message_protocol.transport)
+                or self._atv._remote_message_protocol.transport.is_closing()
+            ):
+                return ucapi.StatusCodes.SERVICE_UNAVAILABLE
+
             self._atv.send_key_command(keycode, direction)
 
             if action == KeyPress.DOUBLE_CLICK:
