@@ -73,7 +73,7 @@ class AndroidTv:
         prefix = (
             os.path.join(data_path, f"androidtv_{identifier}_remote_")
             if identifier is not None
-            else os.path.join(data_path, "/androidtv_remote_")
+            else os.path.join(data_path, "androidtv_remote_")
         )
         self._certfile = prefix + "cert.pem"
         self._keyfile = prefix + "key.pem"

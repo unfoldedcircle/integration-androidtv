@@ -284,8 +284,8 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
         res = await android_tv.init(20)
         if res is False:
             return SetupError(error_type=IntegrationSetupError.TIMEOUT)
-        if _cfg_add_device and config.devices.contains(address):
-            _LOG.info("Skipping found device %s: already configured", address)
+        if _cfg_add_device and config.devices.contains(android_tv.identifier):
+            _LOG.info("Skipping found device %s: already configured", android_tv.identifier)
             return SetupError(error_type=IntegrationSetupError.NOT_FOUND)
         dropdown_items.append({"id": address, "label": {"en": f"{android_tv.name} [{address}]"}})
     else:
@@ -295,7 +295,7 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
 
         for discovered_tv in _discovered_android_tvs:
             tv_data = {"id": discovered_tv["address"], "label": {"en": discovered_tv["label"]}}
-            if _cfg_add_device and config.devices.contains(discovered_tv["address"]):
+            if _cfg_add_device and config.devices.contains_address(discovered_tv["address"]):
                 _LOG.info("Skipping found device %s: already configured", discovered_tv["address"])
                 continue
             dropdown_items.append(tv_data)

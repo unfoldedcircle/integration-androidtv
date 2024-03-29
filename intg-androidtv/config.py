@@ -76,6 +76,13 @@ class Devices:
                 return True
         return False
 
+    def contains_address(self, address: str) -> bool:
+        """Check if there's a device with the given device identifier."""
+        for item in self._config:
+            if item.address == address:
+                return True
+        return False
+
     def add_or_update(self, atv: AtvDevice) -> None:
         """
         Add a new configured Android TV device and persist configuration.

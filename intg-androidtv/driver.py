@@ -371,8 +371,8 @@ async def main():
                 os.rename(current_certfile, _android_tv.certfile)
                 _LOG.info("Rename key file %s to %s", current_keyfile, _android_tv.keyfile)
                 os.rename(current_keyfile, _android_tv.keyfile)
-            except Exception as ex:
-                _LOG.error("Error while migrating certificate files", ex)
+            except OSError as ex:
+                _LOG.error("Error while migrating certificate files: %s", ex)
 
         _add_configured_android_tv(device, connect=False)
 
