@@ -137,6 +137,9 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
     reconfigure = msg.reconfigure
     _LOG.debug("Starting driver setup, reconfigure=%s", reconfigure)
 
+    # workaround for web-configurator not picking up first response
+    await asyncio.sleep(1)
+
     if reconfigure:
         # make sure configuration is up-to-date
         if config.devices.migration_required():

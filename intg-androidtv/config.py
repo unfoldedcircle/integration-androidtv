@@ -129,7 +129,7 @@ class Devices:
         return False
 
     def remove_files(self, atv_id: str) -> bool:
-        """Remove the certificate and key files of a given Android TV instance"""
+        """Remove the certificate and key files of a given Android TV instance."""
         for item in self._config:
             if item.id == atv_id:
                 android_tv = AndroidTv(self.data_path, item.address, item.name, item.id)
