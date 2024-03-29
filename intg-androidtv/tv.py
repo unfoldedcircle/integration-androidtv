@@ -7,6 +7,7 @@ This module implements the Android TV communication of the Remote Two integratio
 
 import asyncio
 import logging
+import os
 import time
 from asyncio import AbstractEventLoop, timeout
 from enum import IntEnum
@@ -69,11 +70,18 @@ class AndroidTv:
         self._data_path: str = data_path
         self._name: str = name
         self.events = AsyncIOEventEmitter(loop or asyncio.get_running_loop())
+        prefix = (
+            os.path.join(data_path, f"androidtv_{identifier}_remote_")
+            if identifier is not None
+            else os.path.join(data_path, "androidtv_remote_")
+        )
+        self._certfile = prefix + "cert.pem"
+        self._keyfile = prefix + "key.pem"
+
         self._atv: AndroidTVRemote = AndroidTVRemote(
             client_name="Remote Two",
-            # FIXME #14 does not work for multi-device support
-            certfile=data_path + "/androidtv_remote_cert.pem",
-            keyfile=data_path + "/androidtv_remote_key.pem",
+            certfile=self._certfile,
+            keyfile=self._keyfile,
             host=host,
             loop=loop or asyncio.get_running_loop(),
         )
@@ -164,6 +172,16 @@ class AndroidTv:
     def device_info(self) -> dict[str, str] | None:
         """Device info (manufacturer, model, sw_version)."""
         return self._atv.device_info
+
+    @property
+    def certfile(self) -> str:
+        """Return the certificate file  of the device."""
+        return self._certfile
+
+    @property
+    def keyfile(self) -> str:
+        """Return the key file  of the device."""
+        return self._keyfile
 
     @property
     def is_on(self) -> bool | None:

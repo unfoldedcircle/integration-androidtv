@@ -361,6 +361,19 @@ async def main():
         await config.devices.migrate()
     # and register them as available devices.
     for device in config.devices.all():
+        # Migration of certificate/key files with identifier in name
+        _android_tv = tv.AndroidTv(api.config_dir_path, device.address, device.name, device.id)
+        if not os.path.exists(_android_tv.certfile):
+            current_certfile = os.path.join(api.config_dir_path, "androidtv_remote_cert.pem")
+            current_keyfile = os.path.join(api.config_dir_path, "androidtv_remote_key.pem")
+            try:
+                _LOG.info("Rename certificate file %s to %s", current_certfile, _android_tv.certfile)
+                os.rename(current_certfile, _android_tv.certfile)
+                _LOG.info("Rename key file %s to %s", current_keyfile, _android_tv.keyfile)
+                os.rename(current_keyfile, _android_tv.keyfile)
+            except OSError as ex:
+                _LOG.error("Error while migrating certificate files: %s", ex)
+
         _add_configured_android_tv(device, connect=False)
 
     await api.init("driver.json", setup_flow.driver_setup_handler)
