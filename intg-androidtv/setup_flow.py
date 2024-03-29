@@ -1,7 +1,7 @@
 """
 Setup flow for Android TV Remote integration.
 
-:copyright: (c) 2023 by Unfolded Circle ApS.
+:copyright: (c) 2023-2024 by Unfolded Circle ApS.
 :license: MPL-2.0, see LICENSE for more details.
 """
 
@@ -45,7 +45,7 @@ _setup_step = SetupSteps.INIT
 _cfg_add_device: bool = False
 _discovered_android_tvs: list[dict[str, str]] = []
 _pairing_android_tv: tv.AndroidTv | None = None
-# TODO #12 externalize language texts
+# TODO #9 externalize language texts
 # pylint: disable=line-too-long
 _user_input_discovery = RequestUserInput(
     {"en": "Setup mode", "de": "Setup Modus", "fr": "Installation"},
@@ -151,7 +151,7 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
         for device in config.devices.all():
             dropdown_devices.append({"id": device.id, "label": {"en": f"{device.name} ({device.id})"}})
 
-        # TODO #12 externalize language texts
+        # TODO #9 externalize language texts
         # build user actions, based on available devices
         dropdown_actions = [
             {

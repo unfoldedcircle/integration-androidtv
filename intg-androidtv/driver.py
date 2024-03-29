@@ -2,7 +2,7 @@
 """
 This module implements a Remote Two integration driver for Android TV devices.
 
-:copyright: (c) 2023 by Unfolded Circle ApS.
+:copyright: (c) 2023-2024 by Unfolded Circle ApS.
 :license: Mozilla Public License Version 2.0, see LICENSE for more details.
 """
 
@@ -80,7 +80,7 @@ async def on_subscribe_entities(entity_ids) -> None:
     """
     _LOG.debug("Subscribe entities event: %s", entity_ids)
     for entity_id in entity_ids:
-        # TODO #14 add atv_id -> list(entities_id) mapping. Right now the atv_id == entity_id!
+        # Simple mapping at the moment: one entity per device (with the same id)
         atv_id = entity_id
         if atv_id in _configured_android_tvs:
             atv = _configured_android_tvs[atv_id]
@@ -103,7 +103,7 @@ async def on_subscribe_entities(entity_ids) -> None:
 async def on_unsubscribe_entities(entity_ids) -> None:
     """On unsubscribe, we disconnect the devices and remove listeners for events."""
     _LOG.debug("Unsubscribe entities event: %s", entity_ids)
-    # TODO #14 add entity_id --> atv_id mapping. Right now the atv_id == entity_id!
+    # Simple mapping at the moment: one entity per device (with the same id)
     for entity_id in entity_ids:
         _configured_android_tvs[entity_id].disconnect()
         _configured_android_tvs[entity_id].events.remove_all_listeners()
@@ -124,10 +124,7 @@ async def media_player_cmd_handler(
     """
     _LOG.info("Got %s command request: %s %s", entity.id, cmd_id, params)
 
-    # TODO #14 map from device id to entities (see Denon integration)
-    # atv_id = _tv_from_entity_id(entity.id)
-    # if atv_id is None:
-    #     return ucapi.StatusCodes.NOT_FOUND
+    # Simple mapping at the moment: one entity per device (with the same id)
     atv_id = entity.id
 
     if atv_id not in _configured_android_tvs:
@@ -192,7 +189,7 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
     _LOG.debug("[%s] ATV update: %s", atv_id, update)
 
     attributes = {}
-    # TODO #14 AndroidTV identifier is currently identical to the one and only exposed media-player entity per device!
+    # Simple mapping at the moment: one entity per device (with the same id)
     entity_id = atv_id
 
     configured_entity = api.configured_entities.get(entity_id)
@@ -280,9 +277,8 @@ def _register_available_entities(device: config.AtvDevice, profile: Profile) -> 
 
     :param device: Android TV configuration
     """
-    # TODO #14 map entity IDs from device identifier
+    # Simple mapping at the moment: one entity per device (with the same id)
     entity_id = device.id
-    # plain and simple for now: only one media_player per ATV device
     features = profile.features
     options = {}
     if profile.simple_commands:
@@ -330,7 +326,7 @@ def on_device_removed(device: config.AtvDevice | None) -> None:
             atv = _configured_android_tvs.pop(device.id)
             atv.disconnect()
             atv.events.remove_all_listeners()
-            # TODO #14 map entity IDs from device identifier
+            # Simple mapping at the moment: one entity per device (with the same id)
             entity_id = atv.identifier
             api.configured_entities.remove(entity_id)
             api.available_entities.remove(entity_id)

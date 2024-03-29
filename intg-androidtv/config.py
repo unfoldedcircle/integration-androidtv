@@ -1,7 +1,7 @@
 """
 Configuration handling of the integration driver.
 
-:copyright: (c) 2023 by Unfolded Circle ApS.
+:copyright: (c) 2023-2024 by Unfolded Circle ApS.
 :license: MPL-2.0, see LICENSE for more details.
 """
 

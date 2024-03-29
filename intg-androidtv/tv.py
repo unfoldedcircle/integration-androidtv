@@ -1,7 +1,7 @@
 """
 This module implements the Android TV communication of the Remote Two integration driver.
 
-:copyright: (c) 2023 by Unfolded Circle ApS.
+:copyright: (c) 2023-2024 by Unfolded Circle ApS.
 :license: Mozilla Public License Version 2.0, see LICENSE for more details.
 """
 
@@ -153,7 +153,11 @@ class AndroidTv:
 
     @property
     def identifier(self) -> str:
-        """Return the device identifier."""
+        """
+        Return the device identifier.
+
+        :raises ValueError: if no identifier is set
+        """
         if not self._identifier:
             raise ValueError("Instance not initialized, no identifier available")
         return self._identifier
