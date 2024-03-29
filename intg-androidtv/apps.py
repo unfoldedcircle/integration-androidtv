@@ -21,6 +21,7 @@ Apps = {
     "Pluto TV": {"url": "https://pluto.tv/"},
     "ARD Mediathek": {"url": "https://www.ardmediathek.de/"},
     "ZDF Mediathek": {"url": "https://www.zdf.de/filme"},
+    "Kodi": {"url": "market://launch?id=org.xbmc.kodi"},
 }
 
 # Direct application-id mappings to friendly names
@@ -30,6 +31,7 @@ IdMappings = {
     "com.google.android.apps.tv.dreamx": "Backdrop Daydream",
     "com.google.android.katniss": "Google app",
     "com.google.android.apps.tv.launcherx": "Android TV",
+    "com.google.android.gms": "Google Play services",
     "com.android.vending": "Google Play Store",
     "com.android.tv.settings": "Settings",
     "com.spotify.tv.android": "Spotify",
@@ -77,4 +79,5 @@ NameMatching = {
     "plex": "Plex",
     "kodi": "Kodi",
     "emby": "Emby",
+    "dune": "Dune HD",
 }
