@@ -122,16 +122,21 @@ async def media_player_cmd_handler(
     :param params: optional command parameters
     :return:
     """
-    _LOG.info("Got %s command request: %s %s", entity.id, cmd_id, params)
-
     # Simple mapping at the moment: one entity per device (with the same id)
     atv_id = entity.id
 
     if atv_id not in _configured_android_tvs:
-        _LOG.warning("No Android TV device found for entity: %s", entity.id)
+        _LOG.warning(
+            "Cannot execute command %s %s: no Android TV device found for entity %s",
+            cmd_id,
+            params if params else "",
+            entity.id,
+        )
         return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
     android_tv = _configured_android_tvs[atv_id]
+
+    _LOG.info("[%s] command: %s %s", android_tv.log_id, cmd_id, params if params else "")
 
     if cmd_id == media_player.Commands.ON:
         return await android_tv.turn_on()
@@ -174,7 +179,7 @@ async def handle_android_tv_address_change(atv_id: str, address: str) -> None:
     """Update device configuration with changed IP address."""
     device = config.devices.get(atv_id)
     if device and device.address != address:
-        _LOG.info("Updating IP address %s of configured ATV %s", address, atv_id)
+        _LOG.info("Updating IP address %s of configured device %s", address, atv_id)
         device.address = address
         config.devices.update(device)
 
@@ -186,7 +191,7 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
     :param atv_id: AndroidTV identifier
     :param update: dictionary containing the updated properties
     """
-    _LOG.debug("[%s] ATV update: %s", atv_id, update)
+    _LOG.debug("[%s] device update: %s", atv_id, update)
 
     attributes = {}
     # Simple mapping at the moment: one entity per device (with the same id)
@@ -251,7 +256,7 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
 
         _configured_android_tvs[device.id] = android_tv
         _LOG.info(
-            "Configured Android TV device '%s' (%s) with profile: %s %s",
+            "[%s] Configured Android TV device %s with profile: %s %s",
             device.name,
             device.id,
             profile.manufacturer,
