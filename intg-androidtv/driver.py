@@ -132,7 +132,7 @@ async def media_player_cmd_handler(
             params if params else "",
             entity.id,
         )
-        return ucapi.StatusCodes.SERVICE_UNAVAILABLE
+        return ucapi.StatusCodes.NOT_FOUND
 
     android_tv = _configured_android_tvs[atv_id]
 
@@ -172,7 +172,6 @@ async def handle_authentication_error(identifier: str):
     api.configured_entities.update_attributes(
         identifier, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
     )
-    await api.set_device_state(ucapi.DeviceStates.ERROR)
 
 
 async def handle_android_tv_address_change(atv_id: str, address: str) -> None:
@@ -264,10 +263,8 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         )
 
     async def start_connection():
-        res = await android_tv.init()
-        if res is False:
-            await api.set_device_state(ucapi.DeviceStates.ERROR)
-        await android_tv.connect()
+        if await android_tv.init():
+            await android_tv.connect()
 
     if connect:
         # start background task
