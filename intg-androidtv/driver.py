@@ -153,6 +153,11 @@ async def media_player_cmd_handler(
 async def handle_connected(identifier: str):
     """Handle Android TV connection."""
     _LOG.debug("Android TV connected: %s", identifier)
+    device = config.devices.get(identifier)
+    if device and device.auth_error:
+        device.auth_error = False
+        config.devices.update(device)
+
     # TODO is this the correct state?
     api.configured_entities.update_attributes(identifier, {media_player.Attributes.STATE: media_player.States.STANDBY})
     await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
@@ -169,6 +174,11 @@ async def handle_disconnected(identifier: str):
 async def handle_authentication_error(identifier: str):
     """Set entities of Android TV to state UNAVAILABLE if authentication error occurred."""
     _LOG.debug("Android TV authentication error: %s", identifier)
+    device = config.devices.get(identifier)
+    if device and not device.auth_error:
+        device.auth_error = True
+        config.devices.update(device)
+
     api.configured_entities.update_attributes(
         identifier, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
     )
@@ -366,9 +376,15 @@ async def main():
             current_certfile = os.path.join(api.config_dir_path, "androidtv_remote_cert.pem")
             current_keyfile = os.path.join(api.config_dir_path, "androidtv_remote_key.pem")
             try:
-                _LOG.info("Rename certificate file %s to %s", current_certfile, _android_tv.certfile)
+                _LOG.info(
+                    "Rename certificate file %s to %s",
+                    os.path.basename(current_certfile),
+                    os.path.basename(_android_tv.certfile),
+                )
                 os.rename(current_certfile, _android_tv.certfile)
-                _LOG.info("Rename key file %s to %s", current_keyfile, _android_tv.keyfile)
+                _LOG.info(
+                    "Rename key file %s to %s", os.path.basename(current_keyfile), os.path.basename(_android_tv.keyfile)
+                )
                 os.rename(current_keyfile, _android_tv.keyfile)
             except OSError as ex:
                 _LOG.error("Error while migrating certificate files: %s", ex)

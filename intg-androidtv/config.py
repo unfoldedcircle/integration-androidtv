@@ -33,6 +33,8 @@ class AtvDevice:
     """Device manufacturer name."""
     model: str
     """Device model name."""
+    auth_error: bool = False
+    """Authentication error, device requires pairing."""
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -76,13 +78,6 @@ class Devices:
                 return True
         return False
 
-    def contains_address(self, address: str) -> bool:
-        """Check if there's a device with the given device identifier."""
-        for item in self._config:
-            if item.address == address:
-                return True
-        return False
-
     def add_or_update(self, atv: AtvDevice) -> None:
         """
         Add a new configured Android TV device and persist configuration.
@@ -97,9 +92,25 @@ class Devices:
                 self._add_handler(atv)
 
     def get(self, atv_id: str) -> AtvDevice | None:
-        """Get device configuration for given identifier."""
+        """
+        Get device configuration for given identifier.
+
+        :return: A copy of the device configuration or None if not found.
+        """
         for item in self._config:
             if item.id == atv_id:
+                # return a copy
+                return dataclasses.replace(item)
+        return None
+
+    def get_by_name_or_address(self, name: str, address: str) -> AtvDevice | None:
+        """
+        Get device configuration for a matching name or address.
+
+        :return: A copy of the device configuration or None if not found.
+        """
+        for item in self._config:
+            if item.name == name or item.address == address:
                 # return a copy
                 return dataclasses.replace(item)
         return None
@@ -110,6 +121,9 @@ class Devices:
             if item.id == atv.id:
                 item.address = atv.address
                 item.name = atv.name
+                item.manufacturer = atv.manufacturer
+                item.model = atv.model
+                item.auth_error = atv.auth_error
                 return self.store()
         return False
 
@@ -187,6 +201,7 @@ class Devices:
                     item.get("address"),
                     item.get("manufacturer", ""),
                     item.get("model", ""),
+                    item.get("auth_error", False),
                 )
                 self._config.append(atv)
             return True

@@ -149,7 +149,14 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
         # get all configured devices for the user to choose from
         dropdown_devices = []
         for device in config.devices.all():
-            dropdown_devices.append({"id": device.id, "label": {"en": f"{device.name} ({device.id})"}})
+            prefix = "! " if device.auth_error else ""
+            model = f"{device.manufacturer} {device.model}"[:30]
+            dropdown_devices.append(
+                {
+                    "id": device.id,
+                    "label": {"en": f"{prefix}{device.name} ({device.id}) {model}"},
+                }
+            )
 
         # TODO #9 externalize language texts
         # build user actions, based on available devices
@@ -287,8 +294,9 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
         res = await android_tv.init(20)
         if res is False:
             return SetupError(error_type=IntegrationSetupError.TIMEOUT)
-        if _cfg_add_device and config.devices.contains(android_tv.identifier):
-            _LOG.info("Skipping found device %s: already configured", android_tv.identifier)
+        existing = config.devices.get(android_tv.identifier)
+        if _cfg_add_device and existing and not existing.auth_error:
+            _LOG.info("Manually specified device '%s' %s: already configured", existing.name, android_tv.identifier)
             return SetupError(error_type=IntegrationSetupError.NOT_FOUND)
         dropdown_items.append({"id": address, "label": {"en": f"{android_tv.name} [{address}]"}})
     else:
@@ -298,8 +306,11 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
 
         for discovered_tv in _discovered_android_tvs:
             tv_data = {"id": discovered_tv["address"], "label": {"en": discovered_tv["label"]}}
-            if _cfg_add_device and config.devices.contains_address(discovered_tv["address"]):
-                _LOG.info("Skipping found device %s: already configured", discovered_tv["address"])
+            existing = config.devices.get_by_name_or_address(discovered_tv["name"], discovered_tv["address"])
+            if _cfg_add_device and existing and not existing.auth_error:
+                _LOG.info(
+                    "Skipping found device '%s' %s: already configured", discovered_tv["name"], discovered_tv["address"]
+                )
                 continue
             dropdown_items.append(tv_data)
 
@@ -410,9 +421,11 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         )
         target_certfile = _pairing_android_tv.certfile
         target_keyfile = _pairing_android_tv.keyfile
-        _LOG.info("Rename certificate file %s to %s", current_certfile, target_certfile)
+        _LOG.info(
+            "Rename certificate file %s to %s", os.path.basename(current_certfile), os.path.basename(target_certfile)
+        )
         os.rename(current_certfile, target_certfile)
-        _LOG.info("Rename key file %s to %s", current_keyfile, target_keyfile)
+        _LOG.info("Rename key file %s to %s", os.path.basename(current_keyfile), os.path.basename(target_keyfile))
         os.rename(current_keyfile, target_keyfile)
         if await _pairing_android_tv.init(10):
             await _pairing_android_tv.connect(10)
