@@ -6,8 +6,8 @@
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
+      <env name="UC_CONFIG_HOME" value="$PROJECT_DIR$/config" />
       <env name="UC_INTEGRATION_HTTP_PORT" value="8888" />
-      <env name="UC_CONFIG_HOME" value="$PROJECT_DIR$" />
     </envs>
     <option name="SDK_HOME" value="" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />

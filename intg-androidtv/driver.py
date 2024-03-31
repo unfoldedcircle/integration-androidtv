@@ -350,7 +350,7 @@ async def main():
     logging.getLogger("setup_flow").setLevel(level)
     logging.getLogger("androidtvremote2").setLevel(level)
 
-    profile_path = os.path.join(api.config_dir_path, "config/profiles")
+    profile_path = os.path.join(api.config_dir_path, "profiles")
     device_profile.load(profile_path)
 
     # load paired devices

@@ -35,7 +35,7 @@ For running a separate integration driver on your network for Remote Two, the co
 ### Run
 
 ```shell
-python3 intg-androidtv/driver.py
+UC_CONFIG_HOME=./config python3 intg-androidtv/driver.py
 ```
 
 See available [environment variables](https://github.com/unfoldedcircle/integration-python-library#environment-variables)
