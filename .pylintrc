@@ -19,6 +19,7 @@ disable=
     global-statement,
     too-many-instance-attributes,
     too-many-arguments,
+    broad-exception-caught,
     fixme # temporary
 
 [STRING]

@@ -7,7 +7,6 @@ This module implements the Android TV communication of the Remote Two integratio
 
 import asyncio
 import logging
-import os
 import time
 from asyncio import AbstractEventLoop, timeout
 from enum import IntEnum
@@ -56,12 +55,19 @@ class DeviceState(IntEnum):
     """Android TV device connection state."""
 
     IDLE = 0
-    DISCONNECTED = 1
-    CONNECTING = 2
-    CONNECTED = 3
-    TIMEOUT = 4
-    AUTH_ERROR = 5
-    ERROR = 6
+    INITIALIZING = 1
+    INITIALIZED = 2
+    START_PAIRING = 3
+    PAIRING_STARTED = 4
+    FINISH_PAIRING = 5
+    FINISHED_PAIRING = 6
+    DISCONNECTED = 10
+    CONNECTING = 11
+    CONNECTED = 12
+    TIMEOUT = 20
+    ERROR = 30
+    AUTH_ERROR = 31
+    PAIRING_ERROR = 32
 
 
 _AndroidTvT = TypeVar("_AndroidTvT", bound="AndroidTv")
@@ -85,14 +91,12 @@ def async_handle_atvlib_errors(
         try:
             # use the same exceptions as the func is throwing (e.g. AndroidTVRemote.send_key_command)
             state = self.state
-            if state == DeviceState.IDLE:
-                raise CannotConnect("Device connection not started")
-            if state == DeviceState.DISCONNECTED or self.is_on is None:
-                raise ConnectionClosed("Disconnected from device")
-            if state == DeviceState.CONNECTING:
-                raise ConnectionClosed("Disconnected, reconnection in progress")
-            if state == DeviceState.AUTH_ERROR:
-                raise InvalidAuth("Invalid authentication, device requires to be paired again")
+            if state != DeviceState.CONNECTED:
+                if state in (DeviceState.DISCONNECTED, DeviceState.CONNECTING) or self.is_on is None:
+                    raise ConnectionClosed("Disconnected from device")
+                if state in (DeviceState.AUTH_ERROR, DeviceState.PAIRING_ERROR):
+                    raise InvalidAuth("Invalid authentication, device requires to be paired again")
+                raise CannotConnect(f"Device connection not active (state={state})")
 
             # workaround for "swallowed commands" since _atv.send_key_command doesn't provide a result
             # pylint: disable=W0212
@@ -127,7 +131,8 @@ class AndroidTv:
 
     def __init__(
         self,
-        data_path: str,
+        certfile: str,
+        keyfile: str,
         host: str,
         name: str,
         identifier: str | None = None,
@@ -137,7 +142,8 @@ class AndroidTv:
         """
         Create instance with given IP address of Android TV device.
 
-        :param data_path: configuration path directory where the client certificates are stored.
+        :param certfile: filename that contains the client certificate in PEM format.
+        :param keyfile: filename that contains the public key in PEM format.
         :param host: IP address of the Android TV.
         :param name: Name of the Android TV device.
         :param identifier: Device identifier if known, otherwise init() has to be called.
@@ -145,22 +151,14 @@ class AndroidTv:
         :param loop: event loop. Used for connections and futures.
         """
         self._state: DeviceState = DeviceState.IDLE
-        self._data_path: str = data_path
         self._name: str = name
         self._loop: AbstractEventLoop = loop or asyncio.get_running_loop()
         self.events = AsyncIOEventEmitter(self._loop)
-        prefix = (
-            os.path.join(data_path, f"androidtv_{identifier}_remote_")
-            if identifier is not None
-            else os.path.join(data_path, "androidtv_remote_")
-        )
-        self._certfile = prefix + "cert.pem"
-        self._keyfile = prefix + "key.pem"
 
         self._atv: AndroidTVRemote = AndroidTVRemote(
             client_name="Remote Two",
-            certfile=self._certfile,
-            keyfile=self._keyfile,
+            certfile=certfile,
+            keyfile=keyfile,
             host=host,
             loop=self._loop,
         )
@@ -188,9 +186,10 @@ class AndroidTv:
         :param max_timeout: optional maximum timeout in seconds to try connecting to the device. Default: no timeout.
         :return: True if connected or connecting, False if timeout occurred.
         """
-        if self._state == DeviceState.CONNECTING:
+        if self._state in (DeviceState.INITIALIZING, DeviceState.CONNECTING):
             _LOG.debug("[%s] Skipping init task: connection task already running", self.log_id)
             return True
+        self._state = DeviceState.INITIALIZING
 
         if await self._atv.async_generate_cert_if_missing():
             _LOG.debug("[%s] Generated new certificate", self.log_id)
@@ -201,7 +200,12 @@ class AndroidTv:
 
         while not success:
             try:
-                _LOG.debug("[%s] Retrieving device information from %s", self.log_id, self._atv.host)
+                _LOG.debug(
+                    "[%s] Retrieving device information from %s (timeout=%.1fs)",
+                    self.log_id,
+                    self._atv.host,
+                    CONNECTION_TIMEOUT,
+                )
                 # Limit connection time for async_get_name_and_mac: if a previous pairing screen is still shown,
                 # this would hang for a long time (often minutes)!
                 request_start = time.time()
@@ -212,8 +216,9 @@ class AndroidTv:
                 self._reconnect_delay = MIN_RECONNECT_DELAY
             except (CannotConnect, ConnectionClosed, asyncio.TimeoutError) as ex:
                 if max_timeout and time.time() - start > max_timeout:
+                    self._state = DeviceState.TIMEOUT
                     _LOG.error(
-                        "[%s] Abort connecting after %ss: device %s not reachable on %s. %s",
+                        "[%s] Abort connecting after %ds: device %s not reachable on %s. %s",
                         self.log_id,
                         max_timeout,
                         self._identifier,
@@ -222,12 +227,22 @@ class AndroidTv:
                     )
                     return False
                 await self._handle_connection_failure(time.time() - request_start, ex)
+            except InvalidAuth as ex:
+                self._state = DeviceState.AUTH_ERROR
+                _LOG.error(
+                    "[%s] Authentication error while initializing device %s: %s",
+                    self.log_id,
+                    self._atv.host,
+                    ex,
+                )
+                return False
 
         if not self._name:
             self._name = name
         self._identifier = mac.replace(":", "")
 
-        _LOG.debug("[%s] Android TV initialised", self.log_id)
+        self._state = DeviceState.INITIALIZED
+        _LOG.debug("[%s] Android TV initialized", self.log_id)
         return True
 
     @property
@@ -267,16 +282,6 @@ class AndroidTv:
         return self._atv.device_info
 
     @property
-    def certfile(self) -> str:
-        """Return the certificate file  of the device."""
-        return self._certfile
-
-    @property
-    def keyfile(self) -> str:
-        """Return the key file  of the device."""
-        return self._keyfile
-
-    @property
     def is_on(self) -> bool | None:
         """Whether the Android TV is on or off. Returns None if not connected."""
         return self._atv.is_on
@@ -298,15 +303,18 @@ class AndroidTv:
                  SERVER_ERROR if connection was closed during pairing.
         """
         try:
+            self._state = DeviceState.START_PAIRING
             await self._atv.async_start_pairing()
+            self._state = DeviceState.PAIRING_STARTED
             return ucapi.StatusCodes.OK
-        except CannotConnect as ex:
-            _LOG.error("[%s] Failed to start pairing. Error connecting: %s", self.log_id, ex)
+        except (CannotConnect, ConnectionClosed) as ex:
+            self._state = DeviceState.PAIRING_ERROR
+            _LOG.error("[%s] Failed to start pairing: %s", self.log_id, ex)
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
-        except ConnectionClosed as ex:
-            # TODO better error code?
-            _LOG.error("[%s] Failed to start pairing. Connection closed: %s", self.log_id, ex)
-            return ucapi.StatusCodes.SERVER_ERROR
+        except InvalidAuth as ex:
+            self._state = DeviceState.AUTH_ERROR
+            _LOG.error("[%s] Authentication error in start pairing: %s", self.log_id, ex)
+            return ucapi.StatusCodes.UNAUTHORIZED
 
     async def finish_pairing(self, pin: str) -> ucapi.StatusCodes:
         """
@@ -318,12 +326,16 @@ class AndroidTv:
                  SERVICE_UNAVAILABLE if connection was lost, e.g. user pressed cancel on the Android TV.
         """
         try:
+            self._state = DeviceState.FINISH_PAIRING
             await self._atv.async_finish_pairing(pin)
+            self._state = DeviceState.FINISHED_PAIRING
             return ucapi.StatusCodes.OK
         except InvalidAuth as ex:
+            self._state = DeviceState.AUTH_ERROR
             _LOG.error("[%s] Invalid pairing code. Error: %s", self.log_id, ex)
             return ucapi.StatusCodes.UNAUTHORIZED
-        except ConnectionClosed as ex:
+        except (CannotConnect, ConnectionClosed) as ex:
+            self._state = DeviceState.PAIRING_ERROR
             _LOG.error("[%s] Initialize pair again. Error: %s", self.log_id, ex)
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
@@ -355,7 +367,13 @@ class AndroidTv:
 
         while not success:
             try:
-                _LOG.debug("[%s] Connecting Android TV %s on %s", self.log_id, self._identifier, self._atv.host)
+                _LOG.debug(
+                    "[%s] Connecting Android TV %s on %s (timeout=%.1fs)",
+                    self.log_id,
+                    self._identifier,
+                    self._atv.host,
+                    CONNECTION_TIMEOUT,
+                )
                 self.events.emit(Events.CONNECTING, self._identifier)
                 request_start = time.time()
                 async with timeout(CONNECTION_TIMEOUT):
@@ -372,7 +390,7 @@ class AndroidTv:
                 if max_timeout and time.time() - start > max_timeout:
                     self._state = DeviceState.TIMEOUT
                     _LOG.error(
-                        "[%s] Abort connecting after %ss: device %s not reachable on %s. %s",
+                        "[%s] Abort connecting after %ds: device %s not reachable on %s. %s",
                         self.log_id,
                         max_timeout,
                         self._identifier,
@@ -381,7 +399,7 @@ class AndroidTv:
                     )
                     break
                 await self._handle_connection_failure(time.time() - request_start, ex)
-            except Exception as ex:  # pylint: disable=broad-exception-caught
+            except Exception as ex:
                 self._state = DeviceState.ERROR
                 _LOG.error(
                     "[%s] Fatal error connecting Android TV %s on %s: %s",
@@ -441,7 +459,7 @@ class AndroidTv:
                             self._atv.host = item["address"]
                             self.events.emit(Events.IP_ADDRESS_CHANGED, self._identifier, self._atv.host)
                             break
-            except Exception as e:  # pylint: disable=broad-exception-caught
+            except Exception as e:
                 # extra safety, otherwise reconnection task is dead
                 _LOG.error("[%s] Discovery failed: %s", self.log_id, e)
         else:
