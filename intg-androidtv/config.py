@@ -6,6 +6,7 @@ Configuration handling of the integration driver.
 """
 
 import dataclasses
+import glob
 import json
 import logging
 import os
@@ -33,6 +34,8 @@ class AtvDevice:
     """Device manufacturer name."""
     model: str
     """Device model name."""
+    auth_error: bool = False
+    """Authentication error, device requires pairing."""
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -76,30 +79,43 @@ class Devices:
                 return True
         return False
 
-    def contains_address(self, address: str) -> bool:
-        """Check if there's a device with the given device identifier."""
-        for item in self._config:
-            if item.address == address:
-                return True
-        return False
-
     def add_or_update(self, atv: AtvDevice) -> None:
         """
         Add a new configured Android TV device and persist configuration.
 
         The device is updated if it already exists in the configuration.
         """
-        # duplicate check
-        if not self.update(atv):
+        if self.update(atv):
+            if self._remove_handler is not None:
+                self._remove_handler(atv)
+            if self._add_handler is not None:
+                self._add_handler(atv)
+        else:
             self._config.append(atv)
             self.store()
             if self._add_handler is not None:
                 self._add_handler(atv)
 
     def get(self, atv_id: str) -> AtvDevice | None:
-        """Get device configuration for given identifier."""
+        """
+        Get device configuration for given identifier.
+
+        :return: A copy of the device configuration or None if not found.
+        """
         for item in self._config:
             if item.id == atv_id:
+                # return a copy
+                return dataclasses.replace(item)
+        return None
+
+    def get_by_name_or_address(self, name: str, address: str) -> AtvDevice | None:
+        """
+        Get device configuration for a matching name or address.
+
+        :return: A copy of the device configuration or None if not found.
+        """
+        for item in self._config:
+            if item.name == name or item.address == address:
                 # return a copy
                 return dataclasses.replace(item)
         return None
@@ -110,8 +126,27 @@ class Devices:
             if item.id == atv.id:
                 item.address = atv.address
                 item.name = atv.name
+                item.manufacturer = atv.manufacturer
+                item.model = atv.model
+                item.auth_error = atv.auth_error
                 return self.store()
         return False
+
+    def default_certfile(self) -> str:
+        """Return the default certificate file for initializing a device."""
+        return os.path.join(self._data_path, "androidtv_remote_cert.pem")
+
+    def default_keyfile(self) -> str:
+        """Return the default key file for initializing a device."""
+        return os.path.join(self._data_path, "androidtv_remote_key.pem")
+
+    def certfile(self, atv_id: str) -> str:
+        """Return the certificate file of the device."""
+        return os.path.join(self._data_path, f"androidtv_{atv_id}_remote_cert.pem")
+
+    def keyfile(self, atv_id: str) -> str:
+        """Return the key file of the device."""
+        return os.path.join(self._data_path, f"androidtv_{atv_id}_remote_key.pem")
 
     def remove(self, atv_id: str) -> bool:
         """Remove the given device configuration."""
@@ -119,7 +154,7 @@ class Devices:
         if atv is None:
             return False
         try:
-            self.remove_files(atv_id)
+            self.remove_certificates(atv_id)
             self._config.remove(atv)
             if self._remove_handler is not None:
                 self._remove_handler(atv)
@@ -128,24 +163,27 @@ class Devices:
             pass
         return False
 
-    def remove_files(self, atv_id: str) -> bool:
+    def remove_certificates(self, atv_id: str) -> bool:
         """Remove the certificate and key files of a given Android TV instance."""
-        for item in self._config:
-            if item.id == atv_id:
-                android_tv = AndroidTv(self.data_path, item.address, item.name, item.id)
-                pem_file = android_tv.certfile
-                if os.path.exists(pem_file):
-                    os.remove(pem_file)
-                pem_file = android_tv.keyfile
-                if os.path.exists(pem_file):
-                    os.remove(pem_file)
-                return True
-        return False
+        try:
+            pem_file = self.certfile(atv_id)
+            if os.path.exists(pem_file):
+                os.remove(pem_file)
+            pem_file = self.keyfile(atv_id)
+            if os.path.exists(pem_file):
+                os.remove(pem_file)
+            return True
+        except OSError as ex:
+            _LOG.error("Failed to remove certificate file of %s: %s", atv_id, ex)
+            return False
 
     def clear(self) -> None:
         """Remove the configuration file and device certificates."""
-        for item in self._config:
-            self.remove_files(item.id)
+        for file in glob.glob(os.path.join(self._data_path, "*.pem")):
+            try:
+                os.remove(file)
+            except OSError as ex:
+                _LOG.error("Failed to remove certificate file %s: %s", os.path.basename(file), ex)
 
         self._config = []
 
@@ -187,6 +225,7 @@ class Devices:
                     item.get("address"),
                     item.get("manufacturer", ""),
                     item.get("model", ""),
+                    item.get("auth_error", False),
                 )
                 self._config.append(atv)
             return True
@@ -202,19 +241,26 @@ class Devices:
         for item in self._config:
             if not item.manufacturer:
                 return True
+
+        # Are there old certificate files to rename?
+        if os.path.exists(self.default_certfile()) or os.path.exists(self.default_keyfile()):
+            return True
+
         return False
 
     async def migrate(self) -> bool:
         """Migrate configuration if required."""
         result = True
         for item in self._config:
+            # don't force certificate migration: default certs might be a leftover from a previous pairing attempt
+            self.assign_default_certs_to_device(item.id, False)
             if not item.manufacturer:
                 _LOG.info(
                     "Migrating configuration: connecting to device '%s' (%s) to update manufacturer and device model",
                     item.name,
                     item.id,
                 )
-                android_tv = AndroidTv(self.data_path, item.address, item.name, item.id)
+                android_tv = AndroidTv(self.certfile(item.id), self.keyfile(item.id), item.address, item.name, item.id)
                 if await android_tv.init(10) and await android_tv.connect(10):
                     if device_info := android_tv.device_info:
                         item.manufacturer = android_tv.device_info
@@ -244,9 +290,50 @@ class Devices:
                         item.name,
                         item.id,
                     )
+                android_tv.disconnect()
 
         _LOG.debug("Device configuration migration state: %s", result)
         return result
+
+    def assign_default_certs_to_device(self, atv_id: str, force: bool = False) -> bool:
+        """
+        Assign the default certificate files to the given device.
+
+        :param atv_id: Android TV identifier
+        :param force: Overwrite device certificates, otherwise only assign default certificates if device certificates
+                      don't exist.
+        :return: True if the certificates could be assigned, or were already assigned, False if assignment failed
+        """
+        # Migration of certificate/key files with identifier in name
+        old_certfile = self.default_certfile()
+        old_keyfile = self.default_keyfile()
+        new_certfile = self.certfile(atv_id)
+        new_keyfile = self.keyfile(atv_id)
+        if (
+            os.path.exists(old_certfile)
+            and os.path.exists(old_keyfile)
+            and (force or not (os.path.exists(new_certfile) and os.path.exists(new_keyfile)))
+        ):
+            try:
+                new_file = new_certfile
+                _LOG.info(
+                    "Rename certificate file %s to %s",
+                    os.path.basename(old_certfile),
+                    os.path.basename(new_certfile),
+                )
+                os.rename(old_certfile, new_file)
+
+                new_file = new_keyfile
+                _LOG.info(
+                    "Rename key file %s to %s",
+                    os.path.basename(old_keyfile),
+                    os.path.basename(new_file),
+                )
+                os.rename(old_keyfile, new_file)
+            except OSError as ex:
+                _LOG.error("Error while migrating certificate file %s: %s", os.path.basename(new_file), ex)
+                return False
+        return True
 
 
 devices: Devices | None = None

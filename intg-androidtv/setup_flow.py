@@ -7,7 +7,6 @@ Setup flow for Android TV Remote integration.
 
 import asyncio
 import logging
-import os
 from enum import IntEnum
 
 import discover
@@ -46,7 +45,6 @@ _cfg_add_device: bool = False
 _discovered_android_tvs: list[dict[str, str]] = []
 _pairing_android_tv: tv.AndroidTv | None = None
 # TODO #9 externalize language texts
-# pylint: disable=line-too-long
 _user_input_discovery = RequestUserInput(
     {"en": "Setup mode", "de": "Setup Modus", "fr": "Installation"},
     [
@@ -149,7 +147,14 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
         # get all configured devices for the user to choose from
         dropdown_devices = []
         for device in config.devices.all():
-            dropdown_devices.append({"id": device.id, "label": {"en": f"{device.name} ({device.id})"}})
+            prefix = "! " if device.auth_error else ""
+            model = f"{device.manufacturer} {device.model}"[:30]
+            dropdown_devices.append(
+                {
+                    "id": device.id,
+                    "label": {"en": f"{prefix}{device.name} ({device.id}) {model}"},
+                }
+            )
 
         # TODO #9 externalize language texts
         # build user actions, based on available devices
@@ -283,23 +288,33 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
     if address:
         _LOG.debug("Starting manual driver setup for %s", address)
         # Connect to device and retrieve name
-        android_tv = tv.AndroidTv(config.devices.data_path, address, "")
+        certfile = config.devices.default_certfile()
+        keyfile = config.devices.default_keyfile()
+        android_tv = tv.AndroidTv(certfile, keyfile, address, "")
+
         res = await android_tv.init(20)
         if res is False:
-            return SetupError(error_type=IntegrationSetupError.TIMEOUT)
-        if _cfg_add_device and config.devices.contains(android_tv.identifier):
-            _LOG.info("Skipping found device %s: already configured", android_tv.identifier)
-            return SetupError(error_type=IntegrationSetupError.NOT_FOUND)
+            return _setup_error_from_device_state(android_tv.state)
+
+        existing = config.devices.get(android_tv.identifier)
+        if _cfg_add_device and existing and not existing.auth_error:
+            _LOG.info("Manually specified device '%s' %s: already configured", existing.name, android_tv.identifier)
+            # no better error code at the moment
+            return SetupError(error_type=IntegrationSetupError.OTHER)
         dropdown_items.append({"id": address, "label": {"en": f"{android_tv.name} [{address}]"}})
     else:
         _LOG.debug("Starting driver setup with Android TV discovery")
         # start discovery
         _discovered_android_tvs = await discover.android_tvs()
 
+        # only add new devices or configured devices requiring new pairing
         for discovered_tv in _discovered_android_tvs:
             tv_data = {"id": discovered_tv["address"], "label": {"en": discovered_tv["label"]}}
-            if _cfg_add_device and config.devices.contains_address(discovered_tv["address"]):
-                _LOG.info("Skipping found device %s: already configured", discovered_tv["address"])
+            existing = config.devices.get_by_name_or_address(discovered_tv["name"], discovered_tv["address"])
+            if _cfg_add_device and existing and not existing.auth_error:
+                _LOG.info(
+                    "Skipping found device '%s' %s: already configured", discovered_tv["name"], discovered_tv["address"]
+                )
                 continue
             dropdown_items.append(tv_data)
 
@@ -344,18 +359,16 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
         if discovered_tv["address"] == choice:
             name = discovered_tv["name"]
 
-    _pairing_android_tv = tv.AndroidTv(config.devices.data_path, choice, name)
+    certfile = config.devices.default_certfile()
+    keyfile = config.devices.default_keyfile()
+    _pairing_android_tv = tv.AndroidTv(certfile, keyfile, choice, name)
     _LOG.info("Chosen Android TV: %s. Start pairing process...", choice)
 
     res = await _pairing_android_tv.init(20)
     if res is False:
-        return SetupError(error_type=IntegrationSetupError.TIMEOUT)
+        return _setup_error_from_device_state(_pairing_android_tv.state)
 
-    if _pairing_android_tv is None:
-        # Setup process was cancelled
-        return SetupError()
-
-    _LOG.info("Pairing process begin")
+    _LOG.info("[%s] Pairing process begin", name)
 
     res = await _pairing_android_tv.start_pairing()
     if res == ucapi.StatusCodes.OK:
@@ -370,8 +383,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
             [{"field": {"text": {"value": "000000"}}, "id": "pin", "label": {"en": "Android TV PIN"}}],
         )
 
-    # no better error code right now
-    return SetupError(error_type=IntegrationSetupError.CONNECTION_REFUSED)
+    return _setup_error_from_device_state(_pairing_android_tv.state)
 
 
 async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupError:
@@ -385,50 +397,37 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     """
     global _pairing_android_tv
 
-    _LOG.info("User has entered the PIN")
-
     if _pairing_android_tv is None:
         _LOG.error("Can't handle pairing pin: no device instance! Aborting setup")
         return SetupError()
 
+    _LOG.info("[%s] User has entered the PIN", _pairing_android_tv.log_id)
+
     res = await _pairing_android_tv.finish_pairing(msg.input_values["pin"])
-    await _pairing_android_tv.init(20)
     _pairing_android_tv.disconnect()
 
-    # Retrieve certificate and key file names to rename them
-    # with the identifier now that we have it (through init)
-    current_certfile = _pairing_android_tv.certfile
-    current_keyfile = _pairing_android_tv.keyfile
-    identifier = _pairing_android_tv.identifier
     device_info = None
 
-    # Retrieve additional device information
+    # Connect again to retrieve device identifier (with init()) and additional device information (with connect())
     if res == ucapi.StatusCodes.OK:
-        _LOG.info("Pairing done, retrieving device information")
-        _pairing_android_tv = tv.AndroidTv(
-            config.devices.data_path, _pairing_android_tv.address, _pairing_android_tv.name, identifier
-        )
-        target_certfile = _pairing_android_tv.certfile
-        target_keyfile = _pairing_android_tv.keyfile
-        _LOG.info("Rename certificate file %s to %s", current_certfile, target_certfile)
-        os.rename(current_certfile, target_certfile)
-        _LOG.info("Rename key file %s to %s", current_keyfile, target_keyfile)
-        os.rename(current_keyfile, target_keyfile)
-        if await _pairing_android_tv.init(10):
-            await _pairing_android_tv.connect(10)
+        _LOG.info("[%s] Pairing done, retrieving device information", _pairing_android_tv.log_id)
+        res = ucapi.StatusCodes.SERVER_ERROR
+        timeout = tv.CONNECTION_TIMEOUT
+        if await _pairing_android_tv.init(timeout) and await _pairing_android_tv.connect(timeout):
             device_info = _pairing_android_tv.device_info
+            # Now rename the certificate files so that they are unique per device (with the identifier = mac address)
+            if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier, True):
+                res = ucapi.StatusCodes.OK
         _pairing_android_tv.disconnect()
 
-    # Now rename the certificate files so that they are unique per device (with the identifier = mac address)
+    if res != ucapi.StatusCodes.OK:
+        state = _pairing_android_tv.state
+        _LOG.info("[%s] Setup failed: %s (state=%s)", _pairing_android_tv.log_id, res, state)
+        _pairing_android_tv = None
+        return _setup_error_from_device_state(state)
 
     if not device_info:
         device_info = {}
-
-    if res != ucapi.StatusCodes.OK:
-        _pairing_android_tv = None
-        if res == ucapi.StatusCodes.UNAUTHORIZED:
-            return SetupError(error_type=IntegrationSetupError.AUTHORIZATION_ERROR)
-        return SetupError(error_type=IntegrationSetupError.CONNECTION_REFUSED)
 
     device = AtvDevice(
         _pairing_android_tv.identifier,
@@ -445,5 +444,17 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     _pairing_android_tv = None
     await asyncio.sleep(1)
 
-    _LOG.info("Setup successfully completed for %s", device.name)
+    _LOG.info("[%s] Setup successfully completed for %s", device.name, device.id)
     return SetupComplete()
+
+
+def _setup_error_from_device_state(state: tv.DeviceState) -> SetupError:
+    match state:
+        case tv.DeviceState.AUTH_ERROR:
+            error_type = IntegrationSetupError.AUTHORIZATION_ERROR
+        case tv.DeviceState.TIMEOUT:
+            error_type = IntegrationSetupError.TIMEOUT
+        case _:
+            error_type = IntegrationSetupError.CONNECTION_REFUSED
+
+    return SetupError(error_type=error_type)

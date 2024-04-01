@@ -152,7 +152,13 @@ async def media_player_cmd_handler(
 
 async def handle_connected(identifier: str):
     """Handle Android TV connection."""
-    _LOG.debug("Android TV connected: %s", identifier)
+    device = config.devices.get(identifier)
+    _LOG.debug("[%s] device connected", device.name if device else identifier)
+
+    if device and device.auth_error:
+        device.auth_error = False
+        config.devices.update(device)
+
     # TODO is this the correct state?
     api.configured_entities.update_attributes(identifier, {media_player.Attributes.STATE: media_player.States.STANDBY})
     await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
@@ -160,7 +166,10 @@ async def handle_connected(identifier: str):
 
 async def handle_disconnected(identifier: str):
     """Handle Android TV disconnection."""
-    _LOG.debug("Android TV disconnected: %s", identifier)
+    if _LOG.isEnabledFor(logging.DEBUG):
+        device = config.devices.get(identifier)
+        _LOG.debug("[%s] device disconnected", device.name if device else identifier)
+
     api.configured_entities.update_attributes(
         identifier, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
     )
@@ -168,7 +177,11 @@ async def handle_disconnected(identifier: str):
 
 async def handle_authentication_error(identifier: str):
     """Set entities of Android TV to state UNAVAILABLE if authentication error occurred."""
-    _LOG.debug("Android TV authentication error: %s", identifier)
+    device = config.devices.get(identifier)
+    if device and not device.auth_error:
+        device.auth_error = True
+        config.devices.update(device)
+
     api.configured_entities.update_attributes(
         identifier, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
     )
@@ -178,11 +191,12 @@ async def handle_android_tv_address_change(atv_id: str, address: str) -> None:
     """Update device configuration with changed IP address."""
     device = config.devices.get(atv_id)
     if device and device.address != address:
-        _LOG.info("Updating IP address %s of configured device %s", address, atv_id)
+        _LOG.info("[%s] Updating IP address of configured device: %s", atv_id, address)
         device.address = address
         config.devices.update(device)
 
 
+# pylint: disable=too-many-branches
 async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
     """
     Update attributes of configured media-player entity if AndroidTV properties changed.
@@ -190,15 +204,18 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
     :param atv_id: AndroidTV identifier
     :param update: dictionary containing the updated properties
     """
-    _LOG.debug("[%s] device update: %s", atv_id, update)
-
     attributes = {}
     # Simple mapping at the moment: one entity per device (with the same id)
     entity_id = atv_id
 
     configured_entity = api.configured_entities.get(entity_id)
     if configured_entity is None:
+        _LOG.debug("[%s] ignoring non-configured device update: %s", atv_id, update)
         return
+
+    if _LOG.isEnabledFor(logging.DEBUG):
+        device = config.devices.get(atv_id)
+        _LOG.debug("[%s] device update: %s", device.name if device else atv_id, update)
 
     old_state = (
         configured_entity.attributes["state"]
@@ -245,7 +262,13 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         android_tv.disconnect()
     else:
         android_tv = tv.AndroidTv(
-            config.devices.data_path, device.address, device.name, device.id, profile=profile, loop=_LOOP
+            config.devices.certfile(device.id),
+            config.devices.keyfile(device.id),
+            device.address,
+            device.name,
+            device.id,
+            profile=profile,
+            loop=_LOOP,
         )
         android_tv.events.on(tv.Events.CONNECTED, handle_connected)
         android_tv.events.on(tv.Events.DISCONNECTED, handle_disconnected)
@@ -360,19 +383,6 @@ async def main():
         await config.devices.migrate()
     # and register them as available devices.
     for device in config.devices.all():
-        # Migration of certificate/key files with identifier in name
-        _android_tv = tv.AndroidTv(api.config_dir_path, device.address, device.name, device.id)
-        if not os.path.exists(_android_tv.certfile):
-            current_certfile = os.path.join(api.config_dir_path, "androidtv_remote_cert.pem")
-            current_keyfile = os.path.join(api.config_dir_path, "androidtv_remote_key.pem")
-            try:
-                _LOG.info("Rename certificate file %s to %s", current_certfile, _android_tv.certfile)
-                os.rename(current_certfile, _android_tv.certfile)
-                _LOG.info("Rename key file %s to %s", current_keyfile, _android_tv.keyfile)
-                os.rename(current_keyfile, _android_tv.keyfile)
-            except OSError as ex:
-                _LOG.error("Error while migrating certificate files: %s", ex)
-
         _add_configured_android_tv(device, connect=False)
 
     await api.init("driver.json", setup_flow.driver_setup_handler)

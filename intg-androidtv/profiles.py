@@ -198,7 +198,7 @@ class DeviceProfile:
                     if profile.manufacturer == "default":
                         self._default_profile = profile
                     self._profiles.append(profile)
-            except Exception as ex:  # pylint: disable=broad-exception-caught
+            except Exception as ex:
                 _LOG.error("Error loading device profile file %s: %s", os.path.basename(file), ex)
         _LOG.info("Loaded device profiles: %d", len(self._profiles))
 
@@ -252,6 +252,6 @@ def _convert_command_map(values: dict[str, any]) -> dict[str, Command]:
             action = getattr(KeyPress, value["action"]) if "action" in value else KeyPress.SHORT
             command = Command(value["keycode"], action)
             cmd_map[key] = command
-        except Exception as ex:  # pylint: disable=broad-exception-caught
+        except Exception as ex:
             _LOG.error("Invalid command map for %s: %s", key, ex)
     return cmd_map

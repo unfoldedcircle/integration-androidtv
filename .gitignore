@@ -102,7 +102,6 @@ ENV/
 .DS_Store
 config.json
 
-androidtv_remote_cert.pem
-androidtv_remote_key.pem
+*.pem
 licenses.json
 tools/licenses.md
