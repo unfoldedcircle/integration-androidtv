@@ -7,6 +7,8 @@ This module implements the Android TV communication of the Remote Two integratio
 
 import asyncio
 import logging
+import os
+import socket
 import time
 from asyncio import AbstractEventLoop, timeout
 from enum import IntEnum
@@ -155,8 +157,9 @@ class AndroidTv:
         self._loop: AbstractEventLoop = loop or asyncio.get_running_loop()
         self.events = AsyncIOEventEmitter(self._loop)
 
+        name = os.getenv("UC_CLIENT_NAME", socket.gethostname().split(".", 1)[0])
         self._atv: AndroidTVRemote = AndroidTVRemote(
-            client_name="Remote Two",
+            client_name=name,
             certfile=certfile,
             keyfile=keyfile,
             host=host,
