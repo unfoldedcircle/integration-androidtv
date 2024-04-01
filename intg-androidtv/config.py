@@ -6,6 +6,7 @@ Configuration handling of the integration driver.
 """
 
 import dataclasses
+import glob
 import json
 import logging
 import os
@@ -84,8 +85,12 @@ class Devices:
 
         The device is updated if it already exists in the configuration.
         """
-        # duplicate check
-        if not self.update(atv):
+        if self.update(atv):
+            if self._remove_handler is not None:
+                self._remove_handler(atv)
+            if self._add_handler is not None:
+                self._add_handler(atv)
+        else:
             self._config.append(atv)
             self.store()
             if self._add_handler is not None:
@@ -149,7 +154,7 @@ class Devices:
         if atv is None:
             return False
         try:
-            self.remove_files(atv_id)
+            self.remove_certificates(atv_id)
             self._config.remove(atv)
             if self._remove_handler is not None:
                 self._remove_handler(atv)
@@ -158,10 +163,10 @@ class Devices:
             pass
         return False
 
-    def remove_files(self, atv_id: str) -> bool:
+    def remove_certificates(self, atv_id: str) -> bool:
         """Remove the certificate and key files of a given Android TV instance."""
-        pem_file = self.certfile(atv_id)
         try:
+            pem_file = self.certfile(atv_id)
             if os.path.exists(pem_file):
                 os.remove(pem_file)
             pem_file = self.keyfile(atv_id)
@@ -174,8 +179,11 @@ class Devices:
 
     def clear(self) -> None:
         """Remove the configuration file and device certificates."""
-        for item in self._config:
-            self.remove_files(item.id)
+        for file in glob.glob(os.path.join(self._data_path, "*.pem")):
+            try:
+                os.remove(file)
+            except OSError as ex:
+                _LOG.error("Failed to remove certificate file %s: %s", os.path.basename(file), ex)
 
         self._config = []
 
@@ -235,9 +243,7 @@ class Devices:
                 return True
 
         # Are there old certificate files to rename?
-        if os.path.exists(os.path.join(self._data_path, "androidtv_remote_cert.pem")) or os.path.exists(
-            os.path.join(self._data_path, "androidtv_remote_key.pem")
-        ):
+        if os.path.exists(self.default_certfile()) or os.path.exists(self.default_keyfile()):
             return True
 
         return False
@@ -246,7 +252,8 @@ class Devices:
         """Migrate configuration if required."""
         result = True
         for item in self._config:
-            self.assign_default_certs_to_device(item.id)
+            # don't force certificate migration: default certs might be a leftover from a previous pairing attempt
+            self.assign_default_certs_to_device(item.id, False)
             if not item.manufacturer:
                 _LOG.info(
                     "Migrating configuration: connecting to device '%s' (%s) to update manufacturer and device model",
@@ -288,11 +295,13 @@ class Devices:
         _LOG.debug("Device configuration migration state: %s", result)
         return result
 
-    def assign_default_certs_to_device(self, atv_id: str) -> bool:
+    def assign_default_certs_to_device(self, atv_id: str, force: bool = False) -> bool:
         """
         Assign the default certificate files to the given device.
 
         :param atv_id: Android TV identifier
+        :param force: Overwrite device certificates, otherwise only assign default certificates if device certificates
+                      don't exist.
         :return: True if the certificates could be assigned, or were already assigned, False if assignment failed
         """
         # Migration of certificate/key files with identifier in name
@@ -303,7 +312,7 @@ class Devices:
         if (
             os.path.exists(old_certfile)
             and os.path.exists(old_keyfile)
-            and not (os.path.exists(new_certfile) and os.path.exists(new_keyfile))
+            and (force or not (os.path.exists(new_certfile) and os.path.exists(new_keyfile)))
         ):
             try:
                 new_file = new_certfile

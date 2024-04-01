@@ -368,7 +368,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     if res is False:
         return _setup_error_from_device_state(_pairing_android_tv.state)
 
-    _LOG.info("Pairing process begin")
+    _LOG.info("[%s] Pairing process begin", name)
 
     res = await _pairing_android_tv.start_pairing()
     if res == ucapi.StatusCodes.OK:
@@ -397,11 +397,11 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     """
     global _pairing_android_tv
 
-    _LOG.info("User has entered the PIN")
-
     if _pairing_android_tv is None:
         _LOG.error("Can't handle pairing pin: no device instance! Aborting setup")
         return SetupError()
+
+    _LOG.info("[%s] User has entered the PIN", _pairing_android_tv.log_id)
 
     res = await _pairing_android_tv.finish_pairing(msg.input_values["pin"])
     _pairing_android_tv.disconnect()
@@ -410,19 +410,19 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
 
     # Connect again to retrieve device identifier (with init()) and additional device information (with connect())
     if res == ucapi.StatusCodes.OK:
-        _LOG.info("Pairing done, retrieving device information")
+        _LOG.info("[%s] Pairing done, retrieving device information", _pairing_android_tv.log_id)
         res = ucapi.StatusCodes.SERVER_ERROR
         timeout = tv.CONNECTION_TIMEOUT
         if await _pairing_android_tv.init(timeout) and await _pairing_android_tv.connect(timeout):
             device_info = _pairing_android_tv.device_info
             # Now rename the certificate files so that they are unique per device (with the identifier = mac address)
-            if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier):
+            if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier, True):
                 res = ucapi.StatusCodes.OK
         _pairing_android_tv.disconnect()
 
     if res != ucapi.StatusCodes.OK:
         state = _pairing_android_tv.state
-        _LOG.info("Setup failed for %s: %s (state=%s)", _pairing_android_tv.log_id, res, state)
+        _LOG.info("[%s] Setup failed: %s (state=%s)", _pairing_android_tv.log_id, res, state)
         _pairing_android_tv = None
         return _setup_error_from_device_state(state)
 
@@ -444,7 +444,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     _pairing_android_tv = None
     await asyncio.sleep(1)
 
-    _LOG.info("Setup successfully completed for %s", device.name)
+    _LOG.info("[%s] Setup successfully completed for %s", device.name, device.id)
     return SetupComplete()
 
 
