@@ -9,11 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
-### Added
-- New media-player features and device profiles (generic, Google Chromecast, NVIDIA Shield TV) ([#34](https://github.com/unfoldedcircle/integration-androidtv/pull/34)).
-- Google Android TV app mappings.
-
 ---
+
+## v0.5.0 - 2024-04-01
+### Added
+- Support multiple Android TV instances and French translation. Contributed by @albaintor, thanks! ([#14](https://github.com/unfoldedcircle/integration-androidtv/issues/14)).
+- New media-player features and device profiles (generic, Google Chromecast, NVIDIA Shield TV) ([#34](https://github.com/unfoldedcircle/integration-androidtv/pull/34)).
+- Additional Google Android TV app mappings.
+- Kodi app mapping and German setup translation. Contributed by @Kat-CeDe, thanks!
+### Fixed
+- Same Android TV device cannot be controlled by multiple Remote Two devices ([#39](https://github.com/unfoldedcircle/integration-androidtv/issues/39)).
+- Improved reconnection handling ([#28](https://github.com/unfoldedcircle/integration-androidtv/issues/28)).
+- Re-authenticate a configured device with an invalid certificate ([#36](https://github.com/unfoldedcircle/integration-androidtv/pull/36)).
+- Power on/off command handling based on device state.
+### Changed
+- Enable logging for the androidtvremote2 module ([#28](https://github.com/unfoldedcircle/integration-androidtv/issues/28)).
 
 ## v0.4.6 - 2024-02-17
 ### Fixed
