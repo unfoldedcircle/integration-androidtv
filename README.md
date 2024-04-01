@@ -8,10 +8,11 @@ Source list is limited to a predefined list as retrieving a list of installed ap
 
 This integration is included in the Remote Two firmware and no external service must be run to connect with Android TV
 devices. A standalone service can be used for development or connecting multiple devices.
-A single instance of the integration doesn't support multiple Android TV devices yet (planned: [#14](https://github.com/aitatoi/integration-androidtv/issues/14)).
 
-Device profiles allow device specific support and custom key bindings, for example double-click or long-press actions.
-See [command mappings](docs/command_mapping.md) for more information.
+- [Requirements and setting](docs/settings.md).
+- Multiple Android TV devices are supported with version 0.5.0 and newer.
+- Device profiles allow device specific support and custom key bindings, for example double-click or long-press actions.  
+  See [command mappings](docs/command_mapping.md) for more information.
 
 ## Standalone Usage
 ### Setup
@@ -38,8 +39,10 @@ For running a separate integration driver on your network for Remote Two, the co
 UC_CONFIG_HOME=./config python3 intg-androidtv/driver.py
 ```
 
-See available [environment variables](https://github.com/unfoldedcircle/integration-python-library#environment-variables)
-in the Python integration library to control certain runtime features like listening interface and configuration directory.
+- See available [environment variables](https://github.com/unfoldedcircle/integration-python-library#environment-variables)
+  in the Python integration library to control certain runtime features like listening interface and configuration directory.
+- The client name used for the client certificate can be set in ENV variable `UC_CLIENT_NAME`.
+  The hostname is used by default. 
 
 ## Build self-contained binary
 
