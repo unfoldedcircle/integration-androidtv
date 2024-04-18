@@ -22,6 +22,8 @@ Apps = {
     "ARD Mediathek": {"url": "https://www.ardmediathek.de/"},
     "ZDF Mediathek": {"url": "https://www.zdf.de/filme"},
     "Kodi": {"url": "market://launch?id=org.xbmc.kodi"},
+    "1und1": {"url": "1und1tv://1und1.tv"},
+    "Arte": {"url": "arte://display"},
 }
 
 # Direct application-id mappings to friendly names
@@ -68,6 +70,7 @@ IdMappings = {
     "de.telekom.magentatv.tv": "Magenta TV",
     "tv.pluto.android": "Pluto TV",
     "com.nvidia.ota": "System upgrade",
+    "org.droidtv.playtv": "DVB-C/T/S",
 }
 
 # Application-ID substring mappings to friendly names
