@@ -20,7 +20,7 @@ _Changes in the next release_
     ATV PlayFI open PlayFI Settings (Philips only)
     ATV Now on TV opens an overview what is show on internal tuner
     ATV Media opens a menu to browse connected media and play them
-    ATV Bopens the web browser
+    ATV Browser opens the web browser
 
 ## v0.5.0 - 2024-04-01
 ### Added
