@@ -77,7 +77,7 @@ IdMappings = {
     "de.telekom.magentatv.tv": "Magenta TV",
     "tv.pluto.android": "Pluto TV",
     "com.nvidia.ota": "System upgrade",
-    "org.droidtv.playtv": "DVB-C/T/S"
+    "org.droidtv.playtv": "DVB-C/T/S",
 }
 
 # Application-ID substring mappings to friendly names
@@ -90,4 +90,5 @@ NameMatching = {
     "kodi": "Kodi",
     "emby": "Emby",
     "dune": "Dune HD",
+    "einsundeins": "1und1 TV",    
 }
