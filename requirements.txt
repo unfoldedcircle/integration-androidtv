@@ -1,3 +1,2 @@
-androidtvremote2==0.0.14
-ucapi==0.1.7
+androidtvremote2==0.0.15
 ucapi==0.2.0
