@@ -6,11 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-
 _Changes in the next release_
 
----
-## v0.5.0 - 2024-04-21
+## 2024-04-29
 ### Added
 - Profiles for TPV (Philips) TV and Dune HD Homatics media player
 - apps 1und1 TV (Germany) and Arte
@@ -22,6 +20,7 @@ _Changes in the next release_
     ATV Media opens a menu to browse connected media and play them
     ATV Browser opens the web browser
 
+---
 ## v0.5.0 - 2024-04-01
 ### Added
 - Support multiple Android TV instances and French translation. Contributed by @albaintor, thanks! ([#14](https://github.com/unfoldedcircle/integration-androidtv/issues/14)).
