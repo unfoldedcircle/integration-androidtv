@@ -90,5 +90,5 @@ NameMatching = {
     "kodi": "Kodi",
     "emby": "Emby",
     "dune": "Dune HD",
-    "einsundeins": "1und1 TV",    
+    "einsundeins": "1und1 TV",
 }
