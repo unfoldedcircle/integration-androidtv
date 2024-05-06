@@ -22,6 +22,15 @@ Apps = {
     "ARD Mediathek": {"url": "https://www.ardmediathek.de/"},
     "ZDF Mediathek": {"url": "https://www.zdf.de/filme"},
     "Kodi": {"url": "market://launch?id=org.xbmc.kodi"},
+    "1und1": {"url": "1und1tv://1und1.tv"},
+    "Arte": {"url": "arte://display"},
+    "Google Play Store": {"url": "https://play.google.com/store/"},
+    "DVB-C/T/S": {"url": "market://launch?id=org.droidtv.playtv"},
+    "ATV Inputs": {"url": "market://launch?id=org.droidtv.channels"},
+    "ATV PlayFI": {"url": "market://launch?id=com.phorus.playfi.tv"},
+    "ATV Now on TV": {"url": "market://launch?id=org.droidtv.nettvrecommender"},
+    "ATV Media": {"url": "market://launch?id=org.droidtv.contentexplorer"},
+    "ATV Browser": {"url": "market://launch?id=com.vewd.core.browserui"},
 }
 
 # Direct application-id mappings to friendly names
@@ -68,6 +77,7 @@ IdMappings = {
     "de.telekom.magentatv.tv": "Magenta TV",
     "tv.pluto.android": "Pluto TV",
     "com.nvidia.ota": "System upgrade",
+    "org.droidtv.playtv": "DVB-C/T/S",
 }
 
 # Application-ID substring mappings to friendly names
@@ -80,4 +90,5 @@ NameMatching = {
     "kodi": "Kodi",
     "emby": "Emby",
     "dune": "Dune HD",
+    "einsundeins": "1und1 TV",
 }

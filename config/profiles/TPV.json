@@ -1,0 +1,69 @@
+{
+  "description": "Philips Android TV",
+  "manufacturer": "TPV",
+  "model": "20",
+  "features": [
+    "on_off",
+    "toggle",
+    "volume_up_down",
+    "mute_toggle",
+    "play_pause",
+    "stop",
+    "next",
+    "previous",
+    "fast_forward",
+    "rewind",
+    "media_duration",
+    "media_position",
+    "media_title",
+    "media_artist",
+    "media_album",
+    "media_image_url",
+    "media_type",
+    "dpad",
+    "numpad",
+    "home",
+    "menu",
+    "context_menu",
+    "guide",
+    "info",
+    "color_buttons",
+    "channel_switcher",
+    "select_source",
+    "open_close",
+    "audio_track",
+    "subtitle",
+    "record",
+    "settings",
+    "search"
+  ],
+  "simple_commands": [
+    "CURSOR_ENTER_LONG",
+    "HOME_LONG",
+    "MENU_LONG",
+    "ENTER",
+    "TELETEXT"
+  ],
+  "command_map": {
+    "CURSOR_ENTER_LONG": {
+      "keycode": "DPAD_CENTER",
+      "action": "LONG"
+    },
+    "HOME_LONG": {
+      "keycode": "HOME",
+      "action": "LONG"
+    },
+    "MENU_LONG": {
+      "keycode": "MENU",
+      "action": "LONG"
+    },
+    "ENTER": {
+      "keycode": 66,
+      "action": "SHORT"
+    },
+    "TELETEXT": {
+      "keycode": 233,
+      "action": "SHORT"
+    }
+  }
+}
