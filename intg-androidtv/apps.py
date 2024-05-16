@@ -31,6 +31,7 @@ Apps = {
     "ATV Now on TV": {"url": "market://launch?id=org.droidtv.nettvrecommender"},
     "ATV Media": {"url": "market://launch?id=org.droidtv.contentexplorer"},
     "ATV Browser": {"url": "market://launch?id=com.vewd.core.browserui"},
+    "Quickline TV": {"url": "market://launch?id=ch.quickline.tv.uhd"},
 }
 
 # Direct application-id mappings to friendly names
@@ -78,6 +79,7 @@ IdMappings = {
     "tv.pluto.android": "Pluto TV",
     "com.nvidia.ota": "System upgrade",
     "org.droidtv.playtv": "DVB-C/T/S",
+    "ch.quickline.tv.uhd": "Quickline TV",
 }
 
 # Application-ID substring mappings to friendly names
