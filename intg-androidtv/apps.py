@@ -31,6 +31,7 @@ Apps = {
     "ATV Now on TV": {"url": "market://launch?id=org.droidtv.nettvrecommender"},
     "ATV Media": {"url": "market://launch?id=org.droidtv.contentexplorer"},
     "ATV Browser": {"url": "market://launch?id=com.vewd.core.browserui"},
+    "Play SRF": {"url":"market://launch?id=ch.srf.mobile.srfplayer"},
 }
 
 # Direct application-id mappings to friendly names
