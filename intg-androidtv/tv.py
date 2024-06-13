@@ -572,21 +572,16 @@ class AndroidTv:
 
     async def select_source(self, source: str) -> ucapi.StatusCodes:
         """
-        Select a given source, either an app or input.
+        Select a given source, either a pre-defined app, input or by app-link/id.
 
-        :param source: the friendly source name
+        :param source: the friendly source name or an app-link / id
         """
         if source in apps.Apps:
-            return await self._launch_app(source)
+            return await self._launch_app(apps.Apps[source]["url"])
         if source in inputs.KeyCode:
             return await self._switch_input(source)
 
-        _LOG.warning(
-            "[%s] Unknown source parameter in select_source command: %s",
-            self.log_id,
-            source,
-        )
-        return ucapi.StatusCodes.BAD_REQUEST
+        return await self._launch_app(source)
 
     @async_handle_atvlib_errors
     async def _send_command(self, keycode: int | str, action: KeyPress = KeyPress.SHORT) -> ucapi.StatusCodes:
@@ -629,7 +624,7 @@ class AndroidTv:
     @async_handle_atvlib_errors
     async def _launch_app(self, app: str) -> ucapi.StatusCodes:
         """Launch an app on Android TV."""
-        self._atv.send_launch_app_command(apps.Apps[app]["url"])
+        self._atv.send_launch_app_command(app)
         return ucapi.StatusCodes.OK
 
     async def _switch_input(self, source: str) -> ucapi.StatusCodes:
