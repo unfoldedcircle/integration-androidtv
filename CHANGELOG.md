@@ -10,6 +10,13 @@ _Changes in the next release_
 
 ---
 
+## v0.6.0 - 2024-06-14
+### Added
+- Allow manual URL / app-id option for app launch ([#47](https://github.com/unfoldedcircle/integration-androidtv/pull/47)).
+- Quickline TV app. Added by @splattner, thanks! 
+### Changed
+- Update androidtvremote2 library to 0.1.1 ([#51](https://github.com/unfoldedcircle/integration-androidtv/issues/51)).
+
 ## v0.5.1 - 2024-05-14
 ### Added
 - Profiles for TPV (Philips) TV and Dune HD Homatics media player. Contributed by @Kat-CeDe, thanks! ([#43](https://github.com/unfoldedcircle/integration-androidtv/pull/43))
