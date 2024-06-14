@@ -12,10 +12,10 @@ _Changes in the next release_
 
 ## v0.6.0 - 2024-06-14
 ### Added
-- Allow manual URL / app-id option for app launch ([#47](https://github.com/unfoldedcircle/integration-androidtv/pull/47)).
+- Allow manual URL / app-id option for app launch ([#47](https://github.com/unfoldedcircle/integration-androidtv/issues/47)).
 - Quickline TV app. Added by @splattner, thanks! 
 ### Changed
-- Update androidtvremote2 library to 0.1.1 ([#51](https://github.com/unfoldedcircle/integration-androidtv/issues/51)).
+- Update androidtvremote2 library to 0.1.1 ([#51](https://github.com/unfoldedcircle/integration-androidtv/pull/51)).
 
 ## v0.5.1 - 2024-05-14
 ### Added
