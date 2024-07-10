@@ -8,6 +8,7 @@
     "volume_up_down",
     "mute_toggle",
     "play_pause",
+    "stop",
     "next",
     "previous",
     "home",
