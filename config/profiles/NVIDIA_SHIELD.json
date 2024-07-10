@@ -20,7 +20,8 @@
     "media_title",
     "fast_forward",
     "rewind",
-    "settings"
+    "settings",
+    "stop"
   ],
   "simple_commands": [
     "APPS",
