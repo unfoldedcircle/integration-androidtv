@@ -167,6 +167,7 @@ class DeviceProfile:
                 media_player.Features.AUDIO_TRACK,
                 media_player.Features.SUBTITLE,
                 media_player.Features.RECORD,
+                media_player.Features.STOP,
             ],
             [],
             {},
