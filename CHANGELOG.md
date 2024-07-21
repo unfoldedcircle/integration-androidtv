@@ -10,6 +10,10 @@ _Changes in the next release_
 
 ---
 
+## v0.6.1 - 2024-07-21
+### Fixed
+- Add missing stop feature to Nvidia & Chromecast profiles ([#52](https://github.com/unfoldedcircle/integration-androidtv/issues/52)).
+
 ## v0.6.0 - 2024-06-14
 ### Added
 - Allow manual URL / app-id option for app launch ([#47](https://github.com/unfoldedcircle/integration-androidtv/issues/47)).
