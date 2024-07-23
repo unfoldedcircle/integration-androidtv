@@ -54,7 +54,7 @@ jobs:
             bash -c \
             "cd /workspace && \
               python -m pip install -r requirements.txt && \
-              pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
+              pyinstaller --clean --onedir --name intg-androidtv intg-androidtv/driver.py"
 
       - name: Add version
         run: |
@@ -65,7 +65,9 @@ jobs:
       - name: Prepare artifacts
         shell: bash
         run: |
-          cp dist/intg-androidtv artifacts/
+          mv dist/intg-androidtv artifacts/
+          mv artifacts/intg-androidtv artifacts/bin
+          mv artifacts/bin/intg-androidtv artifacts/bin/driver
           cp driver.json artifacts/
           cp -r config artifacts/
           echo "ARTIFACT_NAME=uc-intg-${{ env.INTG_NAME }}-${{ env.VERSION }}-aarch64" >> $GITHUB_ENV

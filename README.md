@@ -44,12 +44,18 @@ UC_CONFIG_HOME=./config python3 intg-androidtv/driver.py
 - The client name used for the client certificate can be set in ENV variable `UC_CLIENT_NAME`.
   The hostname is used by default. 
 
-## Build self-contained binary
+## Build distribution binary
 
-After some tests, turns out python stuff on embedded is a nightmare. So we're better off creating a single binary file
-that has everything in it.
+After some tests, turns out Python stuff on embedded is a nightmare. So we're better off creating a binary distribution
+that has everything in it, including the Python runtime and all required modules and native libraries.
 
-To do that, we need to compile it on the target architecture as `pyinstaller` does not support cross compilation.
+To do that, we use [PyInstaller](https://pyinstaller.org/), but it needs to run on the target architecture as
+`PyInstaller` does not support cross compilation.
+
+The `--onefile` option to create a one-file bundled executable should be avoided:
+- Higher startup cost, since the wrapper binary must first extract the archive.
+- Files are extracted to the /tmp directory on the device, which is an in-memory filesystem.  
+  This will further reduce the available memory for the integration drivers! 
 
 ### x86-64 Linux
 
@@ -59,7 +65,7 @@ sudo apt install qemu binfmt-support qemu-user-static
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 ```
 
-Run pyinstaller:
+Run PyInstaller:
 ```shell
 docker run --rm --name builder \
     --platform=aarch64 \
@@ -68,7 +74,7 @@ docker run --rm --name builder \
     docker.io/unfoldedcircle/r2-pyinstaller:3.11.6  \
     bash -c \
       "python -m pip install -r requirements.txt && \
-      pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
+      pyinstaller --clean --onedir --name intg-androidtv intg-androidtv/driver.py"
 ```
 
 ### aarch64 Linux / Mac
@@ -81,7 +87,7 @@ docker run --rm --name builder \
     docker.io/unfoldedcircle/r2-pyinstaller:3.11.6  \
     bash -c \
       "python -m pip install -r requirements.txt && \
-      pyinstaller --clean --onefile --name intg-androidtv intg-androidtv/driver.py"
+      pyinstaller --clean --onedir --name intg-androidtv intg-androidtv/driver.py"
 ```
 
 ## Versioning
