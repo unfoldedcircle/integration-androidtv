@@ -131,6 +131,7 @@ def async_handle_atvlib_errors(
 class AndroidTv:
     """Representing an Android TV device."""
 
+    # pylint: disable=R0917
     def __init__(
         self,
         certfile: str,
