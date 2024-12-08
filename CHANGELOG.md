@@ -10,6 +10,10 @@ _Changes in the next release_
 
 ---
 
+## v0.6.3 - 2024-12-08
+### Added
+- Add device profile for "onn. Streaming Device 4K pro". 
+
 ## v0.6.2 - 2024-07-23
 ### Changed
 - Create a one-folder bundle with pyinstaller instead a one-file bundle to save resources.
