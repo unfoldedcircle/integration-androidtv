@@ -1,4 +1,4 @@
-# Android TV integration for Remote Two Changelog
+# Android TV integration for Remote Two/3 Changelog
 
 All notable changes to this project will be documented in this file.
 

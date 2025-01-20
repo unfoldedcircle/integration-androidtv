@@ -1,4 +1,4 @@
-# Android TV integration for Remote Two
+# Android TV integration for Remote Two/3
 
 Using [androidtvremote2](https://github.com/tronikos/androidtvremote2) and [uc-integration-api](https://github.com/aitatoi/integration-python-library).
 
@@ -6,8 +6,8 @@ The integration currently supports almost all features that the androidtvremote2
 Button control and ON/OFF states are supported. Unfortunately media image and playing information are not retrievable.
 Source list is limited to a predefined list as retrieving a list of installed apps is not possible.
 
-This integration is included in the Remote Two firmware and no external service must be run to connect with Android TV
-devices. A standalone service can be used for development or connecting multiple devices.
+This integration is included in the Remote Two and Remote 3 firmware and no external service must be run to connect with
+Android TV devices. A standalone service can be used for development or connecting multiple devices.
 
 - [Requirements and setting](docs/settings.md).
 - Multiple Android TV devices are supported with version 0.5.0 and newer.
@@ -24,11 +24,11 @@ devices. A standalone service can be used for development or connecting multiple
 pip3 install -r requirements.txt
 ```
 
-For running a separate integration driver on your network for Remote Two, the configuration in file
+For running a separate integration driver on your network for Remote Two/3, the configuration in file
 [driver.json](driver.json) needs to be changed:
 
 - Set `driver_id` to a unique value, `uc_androidtv_driver` is already used for the embedded driver in the firmware.
-- Change `name` to easily identify the driver for discovery & setup  with Remote Two or the web-configurator.
+- Change `name` to easily identify the driver for discovery & setup  with Remote Two/3 or the web-configurator.
 - Optionally add a `"port": 8090` field for the WebSocket server listening port.
   - Default port: `9090`
   - Also overrideable with environment variable `UC_INTEGRATION_HTTP_PORT`
