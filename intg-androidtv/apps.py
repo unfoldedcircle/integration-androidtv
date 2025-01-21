@@ -32,6 +32,7 @@ Apps = {
     "ATV Media": {"url": "market://launch?id=org.droidtv.contentexplorer"},
     "ATV Browser": {"url": "market://launch?id=com.vewd.core.browserui"},
     "Quickline TV": {"url": "market://launch?id=ch.quickline.tv.uhd"},
+    "myCANAL": {"url": "market://launch?id=com.canal.android.canal"},
 }
 
 # Direct application-id mappings to friendly names
