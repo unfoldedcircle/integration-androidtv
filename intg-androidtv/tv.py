@@ -697,6 +697,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def new_connection_status(self, status: ConnectionStatus) -> None:
         """Receive new connection status event from Google cast."""
+        _LOG.debug("[%s] Received Chromecast connection status : %s", self.log_id, status)
 
     def new_media_status(self, status: MediaStatus) -> None:
         """Receive new media status event from Google cast."""
@@ -711,7 +712,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self._media_artist = status.artist
             update[MediaAttr.MEDIA_ARTIST] = self._media_artist
         if status.title != self._media_title:
-            _LOG.debug("[%s] Media info updated : %s", self.log_id, status)
+            _LOG.debug("[%s] Chromecast Media info updated : %s", self.log_id, status)
             self._media_title = status.title
             update[MediaAttr.MEDIA_TITLE] = self._media_title
         current_time = int(status.current_time) if status.current_time else 0
@@ -744,6 +745,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def new_cast_status(self, status: CastStatus) -> None:
         """Receive new cast event from Google cast."""
+        _LOG.debug("[%s] Received Chromecast cast status : %s", self.log_id, status)
 
     def media_seek(self, position: float) -> ucapi.StatusCodes:
         """Seek the media at the given position."""
@@ -752,5 +754,5 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 self._chromecast.media_controller.seek(position, timeout=5)
                 return ucapi.StatusCodes.OK
         except Exception as ex:
-            _LOG.debug("[%s] Error seeking command : %s", self.log_id, ex)
+            _LOG.error("[%s] Chromecast error seeking command : %s", self.log_id, ex)
         return ucapi.StatusCodes.BAD_REQUEST
