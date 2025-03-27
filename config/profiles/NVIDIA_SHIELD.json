@@ -18,10 +18,17 @@
     "numpad",
     "select_source",
     "media_title",
+    "media_album",
+    "media_artist",
+    "media_duration",
+    "media_position",
+    "media_type",
+    "media_image_url",
     "fast_forward",
     "rewind",
     "settings",
-    "stop"
+    "stop",
+    "seek"
   ],
   "simple_commands": [
     "APPS",
