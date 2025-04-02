@@ -480,7 +480,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             cast_info = self._chromecast.cast_info
             _LOG.info("[%s] Chromecast connected : %s", self.log_id, cast_info.friendly_name)
         except (RequestTimeout, RuntimeError):
-            _LOG.info("[%s] Chromecast is not supported on this devices", self.log_id)
+            _LOG.info("[%s] Device is not active or Chromecast is not supported on this devices", self.log_id)
 
         return True
 
@@ -538,6 +538,14 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         update = {}
         if is_on:
             update["state"] = media_player.States.ON.value
+            # Chromecast service is not accessible when the device is in standby
+            try:
+                if not self._chromecast.socket_client.is_alive():
+                    self._chromecast.wait(timeout=5)
+                cast_info = self._chromecast.cast_info
+                _LOG.info("[%s] Chromecast connected : %s", self.log_id, cast_info.friendly_name)
+            except (RequestTimeout, RuntimeError):
+                _LOG.info("[%s] Chromecast is not supported on this devices", self.log_id)
         else:
             update["state"] = media_player.States.OFF.value
         self.events.emit(Events.UPDATE, self._identifier, update)
@@ -746,6 +754,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     def new_cast_status(self, status: CastStatus) -> None:
         """Receive new cast event from Google cast."""
         _LOG.debug("[%s] Received Chromecast cast status : %s", self.log_id, status)
+        if (self._media_title is None or self._media_title == "") and status.display_name and status.display_name != "":
+            self._media_title = status.display_name
+            self.events.emit(Events.UPDATE, self._identifier, {MediaAttr.MEDIA_TITLE: self._media_title})
+
 
     def media_seek(self, position: float) -> ucapi.StatusCodes:
         """Seek the media at the given position."""
