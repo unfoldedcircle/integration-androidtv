@@ -758,7 +758,6 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self._media_title = status.display_name
             self.events.emit(Events.UPDATE, self._identifier, {MediaAttr.MEDIA_TITLE: self._media_title})
 
-
     def media_seek(self, position: float) -> ucapi.StatusCodes:
         """Seek the media at the given position."""
         try:
