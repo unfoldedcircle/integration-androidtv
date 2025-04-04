@@ -220,7 +220,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._last_update_position_time: float = 0
         self._media_type = METADATA_TYPE_MOVIE
         self._media_image_url: str | None = None
-        self._player_state = MEDIA_PLAYER_STATE_UNKNOWN
+        self._player_state = MEDIA_PLAYER_STATE_PLAYING
 
     def __del__(self):
         """Destructs instance, disconnect AndroidTVRemote."""
@@ -571,13 +571,16 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         """Notify that the current app on Android TV is updated."""
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
         update = {MediaAttr.SOURCE: current_app}
+        current_title = self.media_title
 
         if current_app in apps.IdMappings:
             update[MediaAttr.SOURCE] = apps.IdMappings[current_app]
+            self._media_app = current_app
         else:
             for query, app in apps.NameMatching.items():
                 if query in current_app:
                     update[MediaAttr.SOURCE] = app
+                    self._media_app = app
                     break
 
         # TODO verify "idle" apps, probably best to make them configurable
@@ -589,6 +592,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             update[MediaAttr.STATE] = media_player.States.PLAYING.value
             if self._media_title is None:
                 update[MediaAttr.MEDIA_TITLE] = update[MediaAttr.SOURCE]
+
+        if current_title != self.media_title:
+            update[MediaAttr.MEDIA_TITLE] = self.media_title
 
         self.events.emit(Events.UPDATE, self._identifier, update)
 
@@ -727,12 +733,12 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     def new_media_status(self, status: MediaStatus) -> None:
         """Receive new media status event from Google cast."""
         update = {}
-        if status.player_state != self._player_state:
+        if (status.player_state and GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING)
+                != self._player_state):
             # PLAYING, PAUSED, IDLE
-            self._player_state = status.player_state
+            self._player_state = GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING)
             self._last_update_position_time = 0
-            self._state = GOOGLE_CAST_MEDIA_STATES_MAP[self._player_state]
-            update[MediaAttr.STATE] = self._state
+            update[MediaAttr.STATE] = self._player_state
         if status.album_name != self._media_album:
             self._media_album = status.album_name if status.album_name else ""
             update[MediaAttr.MEDIA_ALBUM] = self._media_album
@@ -758,9 +764,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             update[MediaAttr.MEDIA_POSITION] = self._media_position
             update[MediaAttr.MEDIA_DURATION] = self._media_duration
             self._last_update_position_time = time.time()
-        if status.metadata_type != self._media_type:
-            self._media_type = status.metadata_type if status.metadata_type else METADATA_TYPE_MOVIE
-            update[MediaAttr.MEDIA_TYPE] = GOOGLE_CAST_MEDIA_TYPES_MAP.get(self._media_type, MediaType.VIDEO)
+        if (status.metadata_type and GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO)
+                != self._media_type):
+            self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(self._media_type, MediaType.VIDEO)
+            update[MediaAttr.MEDIA_TYPE] = self._media_type
 
         if status.images and len(status.images) > 0 and status.images[0] != self._media_image_url:
             self._media_image_url = status.images[0]
