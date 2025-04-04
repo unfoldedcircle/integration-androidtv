@@ -231,13 +231,8 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
         else media_player.States.UNKNOWN
     )
 
-    if MediaAttr.STATE in update:
-        if update[MediaAttr.STATE] == "ON":
-            attributes[MediaAttr.STATE] = media_player.States.ON
-        elif update[MediaAttr.STATE] == "PLAYING":
-            attributes[MediaAttr.STATE] = media_player.States.PLAYING
-        else:
-            attributes[MediaAttr.STATE] = media_player.States.OFF
+    if MediaAttr.STATE in update and update[MediaAttr.STATE] != old_state:
+        attributes[MediaAttr.STATE] = update[MediaAttr.STATE]
 
     if MediaAttr.MEDIA_TITLE in update:
         attributes[MediaAttr.MEDIA_TITLE] = update[MediaAttr.MEDIA_TITLE]
@@ -403,6 +398,7 @@ async def main():
     logging.getLogger("profiles").setLevel(level)
     logging.getLogger("setup_flow").setLevel(level)
     logging.getLogger("androidtvremote2").setLevel(level)
+    logging.getLogger("pychromecast").setLevel(level)
 
     profile_path = os.path.join(api.config_dir_path, "profiles")
     device_profile.load(profile_path)
