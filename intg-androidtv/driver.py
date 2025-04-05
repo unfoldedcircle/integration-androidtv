@@ -349,7 +349,7 @@ def _register_available_entities(device: config.AtvDevice, profile: Profile) -> 
             media_player.Attributes.MEDIA_ARTIST: "",
             media_player.Attributes.MEDIA_POSITION: 0,
             media_player.Attributes.MEDIA_DURATION: 0,
-            media_player.Attributes.MEDIA_IMAGE_URL: ""
+            media_player.Attributes.MEDIA_IMAGE_URL: "",
         },
         device_class=media_player.DeviceClasses.TV,
         options=options,

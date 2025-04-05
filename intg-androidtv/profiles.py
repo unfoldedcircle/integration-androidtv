@@ -177,7 +177,7 @@ class DeviceProfile:
                 media_player.Features.SEEK,
                 media_player.Features.VOLUME,
                 media_player.Features.VOLUME_UP_DOWN,
-                media_player.Features.MUTE_TOGGLE
+                media_player.Features.MUTE_TOGGLE,
             ],
             [],
             {},

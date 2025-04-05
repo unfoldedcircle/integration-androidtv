@@ -223,6 +223,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._media_type = METADATA_TYPE_MOVIE
         self._media_image_url: str | None = None
         self._player_state = media_player.States.ON
+        self._muted = False
 
     def __del__(self):
         """Destructs instance, disconnect AndroidTVRemote."""
@@ -605,7 +606,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     def _volume_info_updated(self, volume_info: dict[str, str | bool]) -> None:
         """Notify that the Android TV volume information is updated."""
         _LOG.debug("[%s] volume_info: %s", self.log_id, volume_info)
-        update = {MediaAttr.VOLUME: volume_info["level"], MediaAttr.MUTED: volume_info["muted"]}
+        self._muted = volume_info["muted"]
+        update = {MediaAttr.VOLUME: volume_info["level"], MediaAttr.MUTED: self._muted}
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _is_available_updated(self, is_available: bool):
@@ -734,7 +736,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         """Receive new connection status event from Google cast."""
         _LOG.debug("[%s] Received Chromecast connection status : %s", self.log_id, status)
         if status.status == "CONNECTED":
-            _LOG.debug("[%s] Chromecast connected : %s", self.log_id)
+            _LOG.debug("[%s] Chromecast connected", self.log_id)
 
     def new_media_status(self, status: MediaStatus) -> None:
         """Receive new media status event from Google cast."""
@@ -817,6 +819,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         return ucapi.StatusCodes.BAD_REQUEST
 
     async def volume_up(self) -> ucapi.StatusCodes:
+        """Change volume up."""
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
@@ -827,6 +830,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         return ucapi.StatusCodes.BAD_REQUEST
 
     async def volume_down(self) -> ucapi.StatusCodes:
+        """Change volume down."""
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
@@ -837,24 +841,26 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         return ucapi.StatusCodes.BAD_REQUEST
 
     async def volume_mute_toggle(self) -> ucapi.StatusCodes:
+        """Mute toggle."""
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
-            self._chromecast.set_volume_muted()
+            self._muted = not self._muted
+            self._chromecast.set_volume_muted(self._muted)
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
         return ucapi.StatusCodes.BAD_REQUEST
 
     async def volume_set(self, volume: float | None) -> ucapi.StatusCodes:
+        """Set volume."""
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         if volume is None:
             return ucapi.StatusCodes.BAD_REQUEST
         try:
-            await self._chromecast.set_volume(volume/100)
+            await self._chromecast.set_volume(volume / 100)
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
         return ucapi.StatusCodes.BAD_REQUEST
-
