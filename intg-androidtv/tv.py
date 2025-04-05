@@ -220,7 +220,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._last_update_position_time: float = 0
         self._media_type = METADATA_TYPE_MOVIE
         self._media_image_url: str | None = None
-        self._player_state = MEDIA_PLAYER_STATE_PLAYING
+        self._player_state = media_player.States.ON
 
     def __del__(self):
         """Destructs instance, disconnect AndroidTVRemote."""
