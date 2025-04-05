@@ -373,8 +373,9 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
 
     certfile = config.devices.default_certfile()
     keyfile = config.devices.default_keyfile()
-    _pairing_android_tv = tv.AndroidTv(certfile, keyfile,
-                                       AtvDevice(address=choice, name=name, id="", use_chromecast=False))
+    _pairing_android_tv = tv.AndroidTv(
+        certfile, keyfile, AtvDevice(address=choice, name=name, id="", use_chromecast=False)
+    )
     _LOG.info("Chosen Android TV: %s. Start pairing process...", choice)
 
     res = await _pairing_android_tv.init(20)
@@ -409,7 +410,6 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     :return: the setup action on how to continue: SetupComplete if a valid Android TV device was chosen.
     """
     global _pairing_android_tv
-    global _use_chromecast
 
     if _pairing_android_tv is None:
         _LOG.error("Can't handle pairing pin: no device instance! Aborting setup")

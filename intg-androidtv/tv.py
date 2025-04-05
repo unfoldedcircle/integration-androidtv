@@ -26,7 +26,6 @@ from androidtvremote2 import (
     ConnectionClosed,
     InvalidAuth,
 )
-from config import AtvDevice
 from profiles import KeyPress, Profile
 from pychromecast import CastStatus, CastStatusListener, Chromecast, RequestTimeout
 from pychromecast.connection_client import ConnectionStatus, ConnectionStatusListener
@@ -47,6 +46,8 @@ from pyee.asyncio import AsyncIOEventEmitter
 from ucapi import media_player
 from ucapi.media_player import Attributes as MediaAttr
 from ucapi.media_player import MediaType
+
+from config import AtvDevice
 
 _LOG = logging.getLogger(__name__)
 
@@ -337,6 +338,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     @property
     def media_title(self) -> str | None:
+        """Return media title."""
         if self._media_title and self._media_title != "":
             return self._media_title
         return self._media_app
@@ -394,7 +396,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             _LOG.error("[%s] Initialize pair again. Error: %s", self.log_id, ex)
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
-    # pylint: disable=too-many-statements,too-many-return-statements
+    # pylint: disable=too-many-statements,too-many-return-statements,too-many-branches
     async def connect(self, max_timeout: int | None = None) -> bool:
         """
         Connect to Android TV.
@@ -487,7 +489,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         # Connect to Chromecast if supported
         if self._device_config.use_chromecast:
-            if  self._chromecast is None:
+            if self._chromecast is None:
                 self._chromecast = pychromecast.get_chromecast_from_host(
                     host=(self._atv.host, None, None, None, None), tries=10, timeout=5, retry_wait=10
                 )
@@ -734,8 +736,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     def new_media_status(self, status: MediaStatus) -> None:
         """Receive new media status event from Google cast."""
         update = {}
-        if (status.player_state and GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING)
-                != self._player_state):
+        if (
+            status.player_state
+            and GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING) != self._player_state
+        ):
             # PLAYING, PAUSED, IDLE
             self._player_state = GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING)
             self._last_update_position_time = 0
@@ -765,8 +769,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             update[MediaAttr.MEDIA_POSITION] = self._media_position
             update[MediaAttr.MEDIA_DURATION] = self._media_duration
             self._last_update_position_time = time.time()
-        if (status.metadata_type and GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO)
-                != self._media_type):
+        if (
+            status.metadata_type
+            and GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO) != self._media_type
+        ):
             self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(self._media_type, MediaType.VIDEO)
             update[MediaAttr.MEDIA_TYPE] = self._media_type
 

@@ -37,6 +37,7 @@ class AtvDevice:
     use_chromecast: bool = True
     """Enable Chromecast features."""
 
+
 class _EnhancedJSONEncoder(json.JSONEncoder):
     """Python dataclass json encoder."""
 
@@ -226,7 +227,7 @@ class Devices:
                     item.get("manufacturer", ""),
                     item.get("model", ""),
                     item.get("auth_error", False),
-                    item.get("use_chromecast", True)
+                    item.get("use_chromecast", True),
                 )
                 self._config.append(atv)
             return True
@@ -251,7 +252,9 @@ class Devices:
 
     async def migrate(self) -> bool:
         """Migrate configuration if required."""
+        # pylint: disable=C0415,R0401
         from tv import AndroidTv
+
         result = True
         for item in self._config:
             # don't force certificate migration: default certs might be a leftover from a previous pairing attempt
