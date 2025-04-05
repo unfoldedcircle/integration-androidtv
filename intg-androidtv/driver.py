@@ -283,11 +283,9 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         android_tv.disconnect()
     else:
         android_tv = tv.AndroidTv(
-            config.devices.certfile(device.id),
-            config.devices.keyfile(device.id),
-            device.address,
-            device.name,
-            device.id,
+            certfile=config.devices.certfile(device.id),
+            keyfile=config.devices.keyfile(device.id),
+            device_config=device,
             profile=profile,
             loop=_LOOP,
         )

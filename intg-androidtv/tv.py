@@ -26,6 +26,7 @@ from androidtvremote2 import (
     ConnectionClosed,
     InvalidAuth,
 )
+from config import AtvDevice
 from profiles import KeyPress, Profile
 from pychromecast import CastStatus, CastStatusListener, Chromecast, RequestTimeout
 from pychromecast.connection_client import ConnectionStatus, ConnectionStatusListener
@@ -170,9 +171,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self,
         certfile: str,
         keyfile: str,
-        host: str,
-        name: str,
-        identifier: str | None = None,
+        device_config: AtvDevice,
         profile: Profile | None = None,
         loop: AbstractEventLoop | None = None,
     ):
@@ -187,8 +186,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         :param profile: Device profile used for command mappings.
         :param loop: event loop. Used for connections and futures.
         """
+        self._device_config = device_config
         self._state: DeviceState = DeviceState.IDLE
-        self._name: str = name
+        self._name: str = device_config.name
         self._loop: AbstractEventLoop = loop or asyncio.get_running_loop()
         self.events = AsyncIOEventEmitter(self._loop)
 
@@ -197,10 +197,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             client_name=name,
             certfile=certfile,
             keyfile=keyfile,
-            host=host,
+            host=device_config.address,
             loop=self._loop,
         )
-        self._identifier: str | None = identifier
+        self._identifier: str | None = device_config.id
         self._profile: Profile | None = profile
         self._connection_attempts: int = 0
         self._reconnect_delay: float = MIN_RECONNECT_DELAY
@@ -486,20 +486,21 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self.events.emit(Events.CONNECTED, self._identifier)
 
         # Connect to Chromecast if supported
-        if self._chromecast is None:
-            self._chromecast = pychromecast.get_chromecast_from_host(
-                host=(self._atv.host, None, None, None, None), tries=10, timeout=5, retry_wait=10
-            )
-            self._chromecast.register_status_listener(self)
-            self._chromecast.connection_client.media_controller.register_status_listener(self)
-            self._chromecast.register_connection_listener(self)
-        try:
-            if not self._chromecast.connection_client.connected:
-                await self._chromecast.connect(timeout=5)
-            cast_info = self._chromecast.cast_info
-            _LOG.info("[%s] Chromecast connected : %s", self.log_id, cast_info.friendly_name)
-        except (RequestTimeout, RuntimeError):
-            _LOG.info("[%s] Device is not active or Chromecast is not supported on this devices", self.log_id)
+        if self._device_config.use_chromecast:
+            if  self._chromecast is None:
+                self._chromecast = pychromecast.get_chromecast_from_host(
+                    host=(self._atv.host, None, None, None, None), tries=10, timeout=5, retry_wait=10
+                )
+                self._chromecast.register_status_listener(self)
+                self._chromecast.connection_client.media_controller.register_status_listener(self)
+                self._chromecast.register_connection_listener(self)
+            try:
+                if not self._chromecast.connection_client.connected:
+                    await self._chromecast.connect(timeout=5)
+                cast_info = self._chromecast.cast_info
+                _LOG.info("[%s] Chromecast connected : %s", self.log_id, cast_info.friendly_name)
+            except (RequestTimeout, RuntimeError):
+                _LOG.info("[%s] Device is not active or Chromecast is not supported on this devices", self.log_id)
 
         return True
 
@@ -559,7 +560,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             update[MediaAttr.STATE] = media_player.States.ON.value
             # Chromecast service is not accessible when the device is in standby
             try:
-                if not self._chromecast.connection_client.connected:
+                if self._chromecast and not self._chromecast.connection_client.connected:
                     asyncio.create_task(self._chromecast.connect(timeout=5))
             except (RequestTimeout, RuntimeError) as ex:
                 _LOG.info("[%s] Chromecast connection error %s", self.log_id, ex)
