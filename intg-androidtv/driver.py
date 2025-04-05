@@ -152,8 +152,16 @@ async def media_player_cmd_handler(
         if params is None or "source" not in params:
             return ucapi.StatusCodes.BAD_REQUEST
         return await android_tv.select_source(params["source"])
+    if cmd_id == media_player.Commands.VOLUME_UP:
+        return await android_tv.volume_up()
+    if cmd_id == media_player.Commands.VOLUME_DOWN:
+        return await android_tv.volume_down()
+    if cmd_id == media_player.Commands.MUTE_TOGGLE:
+        return await android_tv.volume_mute_toggle()
+    if cmd_id == media_player.Commands.VOLUME:
+        return await android_tv.volume_set(params.get("volume"))
     if cmd_id == media_player.Commands.SEEK:
-        return android_tv.media_seek(params.get("media_position", 0))
+        return await android_tv.media_seek(params.get("media_position", 0))
 
     return await android_tv.send_media_player_command(cmd_id)
 
@@ -341,7 +349,7 @@ def _register_available_entities(device: config.AtvDevice, profile: Profile) -> 
             media_player.Attributes.MEDIA_ARTIST: "",
             media_player.Attributes.MEDIA_POSITION: 0,
             media_player.Attributes.MEDIA_DURATION: 0,
-            media_player.Attributes.MEDIA_IMAGE_URL: "",
+            media_player.Attributes.MEDIA_IMAGE_URL: ""
         },
         device_class=media_player.DeviceClasses.TV,
         options=options,

@@ -37,7 +37,10 @@
     "record",
     "settings",
     "search",
-    "seek"
+    "seek",
+    "volume",
+    "volume_up_down",
+    "mute_toggle"
   ],
   "simple_commands": [
     "CURSOR_ENTER_LONG",

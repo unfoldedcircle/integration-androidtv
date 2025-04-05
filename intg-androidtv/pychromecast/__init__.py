@@ -422,7 +422,7 @@ class Chromecast(CastStatusListener):
         if status:
             self.status_event.set()
 
-    def start_app(self, app_id: str, force_launch: bool = False, timeout: float = REQUEST_TIMEOUT) -> None:
+    async def start_app(self, app_id: str, force_launch: bool = False, timeout: float = REQUEST_TIMEOUT) -> None:
         """Start an app on the Chromecast."""
         self.logger.info("Starting app %s", app_id)
         response_handler = WaitResponse(timeout, f"start app {app_id}")
@@ -431,17 +431,17 @@ class Chromecast(CastStatusListener):
             force_launch=force_launch,
             callback_function=response_handler.callback,
         )
-        response_handler.wait_response()
+        await response_handler.wait_response()
 
-    def quit_app(self, timeout: float = REQUEST_TIMEOUT) -> None:
+    async def quit_app(self, timeout: float = REQUEST_TIMEOUT) -> None:
         """Tells the Chromecast to quit current app_id."""
         self.logger.info("Quitting current app")
 
         response_handler = WaitResponse(timeout, "quit app")
         self.connection_client.receiver_controller.stop_app(callback_function=response_handler.callback)
-        response_handler.wait_response()
+        await response_handler.wait_response()
 
-    def volume_up(self, delta: float = 0.1, timeout: float = REQUEST_TIMEOUT) -> float:
+    async def volume_up(self, delta: float = 0.1, timeout: float = REQUEST_TIMEOUT) -> float:
         """Increment volume by 0.1 (or delta) unless it is already maxed.
         Returns the new volume.
         """
@@ -449,9 +449,9 @@ class Chromecast(CastStatusListener):
             raise ValueError(f"volume delta must be greater than zero, not {delta}")
         if not self.status:
             raise NotConnected
-        return self.set_volume(self.status.volume_level + delta, timeout=timeout)
+        return await self.set_volume(self.status.volume_level + delta, timeout=timeout)
 
-    def volume_down(self, delta: float = 0.1, timeout: float = REQUEST_TIMEOUT) -> float:
+    async def volume_down(self, delta: float = 0.1, timeout: float = REQUEST_TIMEOUT) -> float:
         """Decrement the volume by 0.1 (or delta) unless it is already 0.
         Returns the new volume.
         """
@@ -459,7 +459,7 @@ class Chromecast(CastStatusListener):
             raise ValueError(f"volume delta must be greater than zero, not {delta}")
         if not self.status:
             raise NotConnected
-        return self.set_volume(self.status.volume_level - delta, timeout=timeout)
+        return await self.set_volume(self.status.volume_level - delta, timeout=timeout)
 
     async def connect(self, timeout: float | None = None) -> None:
         """

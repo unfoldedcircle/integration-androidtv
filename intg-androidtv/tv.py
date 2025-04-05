@@ -42,6 +42,7 @@ from pychromecast.controllers.media import (
     MediaStatus,
     MediaStatusListener,
 )
+from pychromecast.error import PyChromecastError
 from pyee.asyncio import AsyncIOEventEmitter
 from ucapi import media_player
 from ucapi.media_player import Attributes as MediaAttr
@@ -500,7 +501,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 if not self._chromecast.connection_client.connected:
                     await self._chromecast.connect(timeout=5)
                 cast_info = self._chromecast.cast_info
-                _LOG.info("[%s] Chromecast connected : %s", self.log_id, cast_info.friendly_name)
+                _LOG.info("[%s] Chromecast connecting : %s", self.log_id, cast_info.friendly_name)
             except (RequestTimeout, RuntimeError):
                 _LOG.info("[%s] Device is not active or Chromecast is not supported on this devices", self.log_id)
 
@@ -732,9 +733,12 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     def new_connection_status(self, status: ConnectionStatus) -> None:
         """Receive new connection status event from Google cast."""
         _LOG.debug("[%s] Received Chromecast connection status : %s", self.log_id, status)
+        if status.status == "CONNECTED":
+            _LOG.debug("[%s] Chromecast connected : %s", self.log_id)
 
     def new_media_status(self, status: MediaStatus) -> None:
         """Receive new media status event from Google cast."""
+        # _LOG.debug("[%s] Update from Chromecast info : %s", self.log_id, status)
         update = {}
         if (
             status.player_state
@@ -802,12 +806,55 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             _LOG.debug("[%s] Update remote with Chromecast info : %s", self.log_id, update)
             self.events.emit(Events.UPDATE, self._identifier, update)
 
-    def media_seek(self, position: float) -> ucapi.StatusCodes:
+    async def media_seek(self, position: float) -> ucapi.StatusCodes:
         """Seek the media at the given position."""
         try:
             if self._chromecast:
-                self._chromecast.media_controller.seek(position, timeout=5)
+                await self._chromecast.media_controller.seek(position, timeout=5)
                 return ucapi.StatusCodes.OK
         except Exception as ex:
             _LOG.error("[%s] Chromecast error seeking command : %s", self.log_id, ex)
         return ucapi.StatusCodes.BAD_REQUEST
+
+    async def volume_up(self) -> ucapi.StatusCodes:
+        if self._chromecast is None:
+            return ucapi.StatusCodes.NOT_IMPLEMENTED
+        try:
+            await self._chromecast.volume_up()
+            return ucapi.StatusCodes.OK
+        except PyChromecastError as ex:
+            _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
+        return ucapi.StatusCodes.BAD_REQUEST
+
+    async def volume_down(self) -> ucapi.StatusCodes:
+        if self._chromecast is None:
+            return ucapi.StatusCodes.NOT_IMPLEMENTED
+        try:
+            await self._chromecast.volume_down()
+            return ucapi.StatusCodes.OK
+        except PyChromecastError as ex:
+            _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
+        return ucapi.StatusCodes.BAD_REQUEST
+
+    async def volume_mute_toggle(self) -> ucapi.StatusCodes:
+        if self._chromecast is None:
+            return ucapi.StatusCodes.NOT_IMPLEMENTED
+        try:
+            self._chromecast.set_volume_muted()
+            return ucapi.StatusCodes.OK
+        except PyChromecastError as ex:
+            _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
+        return ucapi.StatusCodes.BAD_REQUEST
+
+    async def volume_set(self, volume: float | None) -> ucapi.StatusCodes:
+        if self._chromecast is None:
+            return ucapi.StatusCodes.NOT_IMPLEMENTED
+        if volume is None:
+            return ucapi.StatusCodes.BAD_REQUEST
+        try:
+            await self._chromecast.set_volume(volume/100)
+            return ucapi.StatusCodes.OK
+        except PyChromecastError as ex:
+            _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
+        return ucapi.StatusCodes.BAD_REQUEST
+

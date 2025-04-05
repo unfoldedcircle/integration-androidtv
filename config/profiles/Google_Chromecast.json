@@ -11,7 +11,14 @@
     "stop",
     "next",
     "previous",
+    "media_album",
+    "media_artist",
+    "media_title",
+    "media_image_url",
     "home",
+    "media_duration",
+    "media_position",
+    "media_type",
     "menu",
     "context_menu",
     "channel_switcher",
@@ -22,7 +29,11 @@
     "fast_forward",
     "rewind",
     "settings",
-    "search"
+    "search",
+    "seek",
+    "volume",
+    "volume_up_down",
+    "mute_toggle"
   ],
   "simple_commands": [
     "SCREENSAVER"

@@ -55,7 +55,7 @@ class SuplaController(QuickPlayController):
             no_add_request_id=True,
         )
 
-    def quick_play(self, *, media_id: str, timeout: float, is_live: bool = False, **kwargs: Any) -> None:
+    async def quick_play(self, *, media_id: str, timeout: float, is_live: bool = False, **kwargs: Any) -> None:
         """Quick Play"""
         response_handler = WaitResponse(timeout, f"supla quick play {media_id}")
         self.play_media(
@@ -64,4 +64,4 @@ class SuplaController(QuickPlayController):
             **kwargs,
             callback_function=response_handler.callback,
         )
-        response_handler.wait_response()
+        await response_handler.wait_response()

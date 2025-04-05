@@ -28,7 +28,10 @@
     "rewind",
     "settings",
     "stop",
-    "seek"
+    "seek",
+    "volume",
+    "volume_up_down",
+    "mute_toggle"
   ],
   "simple_commands": [
     "APPS",

@@ -155,6 +155,7 @@ class DeviceProfile:
                 media_player.Features.CHANNEL_SWITCHER,
                 media_player.Features.DPAD,
                 media_player.Features.SELECT_SOURCE,
+                media_player.Features.SELECT_SOUND_MODE,
                 media_player.Features.MEDIA_TITLE,
                 media_player.Features.MEDIA_ALBUM,
                 media_player.Features.MEDIA_ARTIST,
@@ -174,6 +175,9 @@ class DeviceProfile:
                 media_player.Features.RECORD,
                 media_player.Features.STOP,
                 media_player.Features.SEEK,
+                media_player.Features.VOLUME,
+                media_player.Features.VOLUME_UP_DOWN,
+                media_player.Features.MUTE_TOGGLE
             ],
             [],
             {},
