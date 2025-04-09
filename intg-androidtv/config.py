@@ -34,7 +34,7 @@ class AtvDevice:
     """Device model name."""
     auth_error: bool = False
     """Authentication error, device requires pairing."""
-    use_chromecast: bool = True
+    use_chromecast: bool = False
     """Enable Chromecast features."""
 
 
@@ -227,7 +227,7 @@ class Devices:
                     item.get("manufacturer", ""),
                     item.get("model", ""),
                     item.get("auth_error", False),
-                    item.get("use_chromecast", True),
+                    item.get("use_chromecast", False),
                 )
                 self._config.append(atv)
             return True
