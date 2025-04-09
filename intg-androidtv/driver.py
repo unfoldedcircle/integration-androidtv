@@ -310,7 +310,7 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
             device.id,
             profile.manufacturer,
             profile.model,
-            profile.features
+            profile.features,
         )
 
     async def start_connection():

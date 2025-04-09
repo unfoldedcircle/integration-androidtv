@@ -86,6 +86,7 @@ CHROMECAST_FEATURES = [
     media_player.Features.MUTE_TOGGLE,
 ]
 
+
 class KeyPress(IntEnum):
     """Key press actions."""
 
@@ -146,10 +147,13 @@ class Profile:
 
     def __copy__(self):
         """Copy the profile instance."""
-        return Profile(manufacturer=self.manufacturer, model=self.model,
-                       features=self.features.copy(), simple_commands=self.simple_commands.copy(),
-                       command_map=self.command_map.copy())
-
+        return Profile(
+            manufacturer=self.manufacturer,
+            model=self.model,
+            features=self.features.copy(),
+            simple_commands=self.simple_commands.copy(),
+            command_map=self.command_map.copy(),
+        )
 
 
 class DeviceProfile:
@@ -251,7 +255,7 @@ class DeviceProfile:
         :param use_chromecast: enable Chromecast parameter to activate additional features
         :return: matching device profil or default profile if no match
         """
-        select_profile: Profile|None = None
+        select_profile: Profile | None = None
         for profile in self._profiles:
             if manufacturer.upper().startswith(profile.manufacturer.upper()):
                 if profile.model:
@@ -266,7 +270,7 @@ class DeviceProfile:
             select_profile = self._default_profile
 
         if use_chromecast:
-            select_profile = select_profile.__copy__()
+            select_profile = copy.copy(select_profile)
             select_profile.features.extend(CHROMECAST_FEATURES)
 
         return select_profile

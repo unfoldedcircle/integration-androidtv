@@ -41,8 +41,8 @@ from pychromecast.controllers.media import (
     MediaStatus,
     MediaStatusListener,
 )
-from pychromecast.socket_client import ConnectionStatus, ConnectionStatusListener
 from pychromecast.error import PyChromecastError
+from pychromecast.socket_client import ConnectionStatus, ConnectionStatusListener
 from pyee.asyncio import AsyncIOEventEmitter
 from ucapi import media_player
 from ucapi.media_player import Attributes as MediaAttr
@@ -491,8 +491,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._device_config.use_chromecast:
             if self._chromecast is None:
                 self._chromecast = pychromecast.get_chromecast_from_host(
-                    host=(self._atv.host, None, None, None, None), tries=10, timeout=CONNECTION_TIMEOUT,
-                    retry_wait=CONNECTION_TIMEOUT
+                    host=(self._atv.host, None, None, None, None),
+                    tries=10,
+                    timeout=CONNECTION_TIMEOUT,
+                    retry_wait=CONNECTION_TIMEOUT,
                 )
                 self._chromecast.register_status_listener(self)
                 self._chromecast.socket_client.media_controller.register_status_listener(self)
