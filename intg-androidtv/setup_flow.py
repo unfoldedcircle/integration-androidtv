@@ -44,7 +44,7 @@ _setup_step = SetupSteps.INIT
 _cfg_add_device: bool = False
 _discovered_android_tvs: list[dict[str, str]] = []
 _pairing_android_tv: tv.AndroidTv | None = None
-_use_chromecast: bool = True
+_use_chromecast: bool = False
 
 # TODO #9 externalize language texts
 _user_input_discovery = RequestUserInput(
@@ -344,7 +344,7 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                     "en": "Enable Chromecast features",
                     "fr": "Activer les fonctionnalités de Chromecast",
                 },
-                "field": {"checkbox": {"value": True}},
+                "field": {"checkbox": {"value": False}},
             },
         ],
     )
@@ -364,7 +364,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     global _setup_step
 
     choice = msg.input_values["choice"]
-    _use_chromecast = msg.input_values.get("chromecast", "true") == "true"
+    _use_chromecast = msg.input_values.get("chromecast", "false") == "true"
     name = ""
 
     for discovered_tv in _discovered_android_tvs:

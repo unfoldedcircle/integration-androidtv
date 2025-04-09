@@ -28,7 +28,6 @@ from androidtvremote2 import (
 )
 from profiles import KeyPress, Profile
 from pychromecast import CastStatus, CastStatusListener, Chromecast, RequestTimeout
-from pychromecast.connection_client import ConnectionStatus, ConnectionStatusListener
 from pychromecast.controllers.media import (
     MEDIA_PLAYER_STATE_BUFFERING,
     MEDIA_PLAYER_STATE_IDLE,
@@ -42,6 +41,7 @@ from pychromecast.controllers.media import (
     MediaStatus,
     MediaStatusListener,
 )
+from pychromecast.socket_client import ConnectionStatus, ConnectionStatusListener
 from pychromecast.error import PyChromecastError
 from pyee.asyncio import AsyncIOEventEmitter
 from ucapi import media_player
@@ -182,9 +182,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         :param certfile: filename that contains the client certificate in PEM format.
         :param keyfile: filename that contains the public key in PEM format.
-        :param host: IP address of the Android TV.
-        :param name: Name of the Android TV device.
-        :param identifier: Device identifier if known, otherwise init() has to be called.
+        :param device_config: device configuration of the Android TV.
         :param profile: Device profile used for command mappings.
         :param loop: event loop. Used for connections and futures.
         """
@@ -496,13 +494,14 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     host=(self._atv.host, None, None, None, None), tries=10, timeout=5, retry_wait=10
                 )
                 self._chromecast.register_status_listener(self)
-                self._chromecast.connection_client.media_controller.register_status_listener(self)
+                self._chromecast.socket_client.media_controller.register_status_listener(self)
                 self._chromecast.register_connection_listener(self)
             try:
-                if not self._chromecast.connection_client.connected:
-                    await self._chromecast.connect(timeout=5)
-                cast_info = self._chromecast.cast_info
-                _LOG.info("[%s] Chromecast connecting : %s", self.log_id, cast_info.friendly_name)
+                if not self._chromecast.socket_client.is_alive():
+                    self._chromecast.wait(timeout=5)
+                    _LOG.info("[%s] Chromecast connecting", self.log_id)
+                else:
+                    _LOG.info("[%s] Chromecast already connected", self.log_id)
             except (RequestTimeout, RuntimeError):
                 _LOG.info("[%s] Device is not active or Chromecast is not supported on this devices", self.log_id)
 
@@ -547,9 +546,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         """Disconnect from Android TV."""
         self._reconnect_delay = MIN_RECONNECT_DELAY
         self._atv.disconnect()
-        if self._chromecast and self._chromecast.connection_client.connected:
+        if self._chromecast and self._chromecast.socket_client.is_alive():
             try:
-                self._chromecast.disconnect()
+                self._chromecast.disconnect(timeout=5)
             except Exception:
                 pass
         self._state = DeviceState.DISCONNECTED
@@ -564,8 +563,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             update[MediaAttr.STATE] = media_player.States.ON.value
             # Chromecast service is not accessible when the device is in standby
             try:
-                if self._chromecast and not self._chromecast.connection_client.connected:
-                    asyncio.create_task(self._chromecast.connect(timeout=5))
+                if self._chromecast and not self._chromecast.socket_client.is_alive():
+                    self._chromecast.wait(timeout=5)
             except (RequestTimeout, RuntimeError) as ex:
                 _LOG.info("[%s] Chromecast connection error %s", self.log_id, ex)
         else:
@@ -740,7 +739,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def new_media_status(self, status: MediaStatus) -> None:
         """Receive new media status event from Google cast."""
-        # _LOG.debug("[%s] Update from Chromecast info : %s", self.log_id, status)
+        _LOG.debug("[%s] Update from Chromecast info : %s", self.log_id, status)
         update = {}
         if (
             status.player_state
@@ -812,7 +811,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         """Seek the media at the given position."""
         try:
             if self._chromecast:
-                await self._chromecast.media_controller.seek(position, timeout=5)
+                self._chromecast.media_controller.seek(position, timeout=5)
                 return ucapi.StatusCodes.OK
         except Exception as ex:
             _LOG.error("[%s] Chromecast error seeking command : %s", self.log_id, ex)
@@ -823,7 +822,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
-            await self._chromecast.volume_up()
+            self._chromecast.volume_up()
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
@@ -834,7 +833,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
-            await self._chromecast.volume_down()
+            self._chromecast.volume_down()
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
