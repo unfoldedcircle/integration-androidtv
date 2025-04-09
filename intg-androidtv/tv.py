@@ -491,14 +491,15 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._device_config.use_chromecast:
             if self._chromecast is None:
                 self._chromecast = pychromecast.get_chromecast_from_host(
-                    host=(self._atv.host, None, None, None, None), tries=10, timeout=5, retry_wait=10
+                    host=(self._atv.host, None, None, None, None), tries=10, timeout=CONNECTION_TIMEOUT,
+                    retry_wait=CONNECTION_TIMEOUT
                 )
                 self._chromecast.register_status_listener(self)
                 self._chromecast.socket_client.media_controller.register_status_listener(self)
                 self._chromecast.register_connection_listener(self)
             try:
                 if not self._chromecast.socket_client.is_alive():
-                    self._chromecast.wait(timeout=5)
+                    self._chromecast.wait(timeout=CONNECTION_TIMEOUT)
                     _LOG.info("[%s] Chromecast connecting", self.log_id)
                 else:
                     _LOG.info("[%s] Chromecast already connected", self.log_id)
@@ -548,7 +549,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._atv.disconnect()
         if self._chromecast and self._chromecast.socket_client.is_alive():
             try:
-                self._chromecast.disconnect(timeout=5)
+                self._chromecast.disconnect(timeout=CONNECTION_TIMEOUT)
             except Exception:
                 pass
         self._state = DeviceState.DISCONNECTED
@@ -564,7 +565,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             # Chromecast service is not accessible when the device is in standby
             try:
                 if self._chromecast and not self._chromecast.socket_client.is_alive():
-                    self._chromecast.wait(timeout=5)
+                    self._chromecast.wait(timeout=CONNECTION_TIMEOUT)
             except (RequestTimeout, RuntimeError) as ex:
                 _LOG.info("[%s] Chromecast connection error %s", self.log_id, ex)
         else:
@@ -811,7 +812,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         """Seek the media at the given position."""
         try:
             if self._chromecast:
-                self._chromecast.media_controller.seek(position, timeout=5)
+                self._chromecast.media_controller.seek(position, timeout=CONNECTION_TIMEOUT)
                 return ucapi.StatusCodes.OK
         except Exception as ex:
             _LOG.error("[%s] Chromecast error seeking command : %s", self.log_id, ex)

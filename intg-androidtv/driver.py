@@ -283,7 +283,7 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
 
 
 def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -> None:
-    profile = device_profile.match(device.manufacturer, device.model)
+    profile = device_profile.match(device.manufacturer, device.model, device.use_chromecast)
 
     # the device should not yet be configured, but better be safe
     if device.id in _configured_android_tvs:
@@ -305,11 +305,12 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
 
         _configured_android_tvs[device.id] = android_tv
         _LOG.info(
-            "[%s] Configured Android TV device %s with profile: %s %s",
+            "[%s] Configured Android TV device %s with profile and features : %s %s %s",
             device.name,
             device.id,
             profile.manufacturer,
             profile.model,
+            profile.features
         )
 
     async def start_connection():

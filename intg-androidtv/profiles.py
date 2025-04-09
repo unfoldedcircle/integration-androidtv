@@ -7,6 +7,7 @@ Each manufacturer uses different commands or patterns to call certain functions.
 :license: MPL-2.0, see LICENSE for more details.
 """
 
+import copy
 import glob
 import json
 import logging
@@ -72,6 +73,18 @@ MEDIA_PLAYER_COMMANDS = {
     media_player.Commands.SEARCH.value: "SEARCH",
 }
 
+CHROMECAST_FEATURES = [
+    media_player.Features.MEDIA_ALBUM,
+    media_player.Features.MEDIA_ARTIST,
+    media_player.Features.MEDIA_IMAGE_URL,
+    media_player.Features.MEDIA_POSITION,
+    media_player.Features.MEDIA_DURATION,
+    media_player.Features.MEDIA_TYPE,
+    media_player.Features.SEEK,
+    media_player.Features.VOLUME,
+    media_player.Features.VOLUME_UP_DOWN,
+    media_player.Features.MUTE_TOGGLE,
+]
 
 class KeyPress(IntEnum):
     """Key press actions."""
@@ -130,6 +143,13 @@ class Profile:
             return Command(int(cmd_id))
 
         return None
+
+    def __copy__(self):
+        """Copy the profile instance."""
+        return Profile(manufacturer=self.manufacturer, model=self.model,
+                       features=self.features.copy(), simple_commands=self.simple_commands.copy(),
+                       command_map=self.command_map.copy())
+
 
 
 class DeviceProfile:
@@ -213,7 +233,7 @@ class DeviceProfile:
                 _LOG.error("Error loading device profile file %s: %s", os.path.basename(file), ex)
         _LOG.info("Loaded device profiles: %d", len(self._profiles))
 
-    def match(self, manufacturer: str, model: str) -> Profile:
+    def match(self, manufacturer: str, model: str, use_chromecast: bool) -> Profile:
         """
         Get a matching device profile for the given manufacturer and model.
 
@@ -228,17 +248,28 @@ class DeviceProfile:
 
         :param manufacturer: mandatory manufacturer prefix
         :param model: optional model name prefix, ignored if empty
+        :param use_chromecast: enable Chromecast parameter to activate additional features
         :return: matching device profil or default profile if no match
         """
+        select_profile: Profile|None = None
         for profile in self._profiles:
             if manufacturer.upper().startswith(profile.manufacturer.upper()):
                 if profile.model:
                     if model.upper().startswith(profile.model.upper()):
-                        return profile
+                        select_profile = profile
+                        break
                     continue
-                return profile
-        _LOG.info("No matching device profile found for %s %s: using default profile", manufacturer, model)
-        return self._default_profile
+                select_profile = profile
+                break
+        if select_profile is None:
+            _LOG.info("No matching device profile found for %s %s: using default profile", manufacturer, model)
+            select_profile = self._default_profile
+
+        if use_chromecast:
+            select_profile = select_profile.__copy__()
+            select_profile.features.extend(CHROMECAST_FEATURES)
+
+        return select_profile
 
 
 def _convert_features(values: list[str]) -> list[media_player.Features]:
