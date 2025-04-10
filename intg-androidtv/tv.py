@@ -761,9 +761,11 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self._media_artist = status.artist if status.artist else ""
             update[MediaAttr.MEDIA_ARTIST] = self._media_artist
         if status.title != self._media_title:
-            _LOG.debug("[%s] Chromecast Media info updated : %s", self.log_id, status)
+            current_title = self.media_title
             self._media_title = status.title if status.title else ""
-            update[MediaAttr.MEDIA_TITLE] = self.media_title
+            if current_title != self.media_title:
+                _LOG.debug("[%s] Chromecast Media info updated : %s", self.log_id, status)
+                update[MediaAttr.MEDIA_TITLE] = self.media_title
         current_time = int(status.current_time) if status.current_time else 0
         duration = int(status.duration) if status.duration else 0
         chanded_duration = False
