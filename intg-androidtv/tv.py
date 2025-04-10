@@ -553,7 +553,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._atv.disconnect()
         if self._chromecast and self._chromecast.socket_client.is_alive():
             try:
-                self._chromecast.disconnect(timeout=CONNECTION_TIMEOUT)
+                self._chromecast.disconnect(timeout=0)
             except Exception:
                 pass
         self._state = DeviceState.DISCONNECTED
