@@ -341,6 +341,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         """Return media title."""
         if self._media_title and self._media_title != "":
             return self._media_title
+        if self._media_app in apps.IdMappings:
+            return apps.IdMappings[self._media_app]
         return self._media_app
 
     def _backoff(self) -> float:
