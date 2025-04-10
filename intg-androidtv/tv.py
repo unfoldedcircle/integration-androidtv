@@ -497,16 +497,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     retry_wait=CONNECTION_TIMEOUT,
                 )
             try:
+                self._chromecast.register_status_listener(self)
+                self._chromecast.socket_client.media_controller.register_status_listener(self)
+                self._chromecast.register_connection_listener(self)
                 if not self._chromecast.socket_client.is_alive():
-                    # We need to re-register the listeners as they may be cleaned at disconnect
-                    # but also clean them first just in case
-                    # pylint: disable=protected-access
-                    self._chromecast.socket_client._connection_listeners.clear()
-                    self._chromecast.socket_client.receiver_controller._status_listeners.clear()
-                    self._chromecast.socket_client.media_controller._status_listeners.clear()
-                    self._chromecast.register_status_listener(self)
-                    self._chromecast.socket_client.media_controller.register_status_listener(self)
-                    self._chromecast.register_connection_listener(self)
                     self._chromecast.wait(timeout=CONNECTION_TIMEOUT)
                     _LOG.info("[%s] Chromecast connecting", self.log_id)
                 else:
@@ -748,7 +742,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def new_media_status(self, status: MediaStatus) -> None:
         """Receive new media status event from Google cast."""
-        # _LOG.debug("[%s] Update from Chromecast info : %s", self.log_id, status)
+        _LOG.debug("[%s] Update from Chromecast info : %s", self.log_id, status)
         update = {}
         if (
             status.player_state
