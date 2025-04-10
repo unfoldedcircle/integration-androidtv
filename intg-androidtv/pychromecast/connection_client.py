@@ -628,6 +628,10 @@ class ConnectionClient(asyncio.Protocol, CastStatusListener):
             self._report_connection_status(
                 ConnectionStatus(CONNECTION_STATUS_LOST, NetworkAddress(self.host, self.port), None)
             )
+            if self._transport:
+                self._transport.close()
+                self._transport = None
+
             try:
                 await self.initialize_connection()
             except ChromecastConnectionError:
