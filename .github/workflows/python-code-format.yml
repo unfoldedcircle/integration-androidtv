@@ -46,7 +46,7 @@ jobs:
           python -m flake8 intg-androidtv --count --show-source --statistics
       - name: Check code formatting with isort
         run: |
-          python -m isort intg-androidtv/. --check --verbose --skip
+          python -m isort intg-androidtv/. --check --verbose
       - name: Check code formatting with black
         run: |
           python -m black intg-androidtv --check --verbose --line-length 120 --exclude=pychromecast
