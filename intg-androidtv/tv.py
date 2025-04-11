@@ -153,6 +153,7 @@ def async_handle_atvlib_errors(
             return await func(self, *args, **kwargs)
         except (CannotConnect, ConnectionClosed) as ex:
             _LOG.error("[%s] Cannot send command: %s", self.log_id, ex)
+            # pylint: disable=W0212
             self._loop.create_task(self.connect())
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
         except InvalidAuth as ex:
