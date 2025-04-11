@@ -153,6 +153,7 @@ def async_handle_atvlib_errors(
             return await func(self, *args, **kwargs)
         except (CannotConnect, ConnectionClosed) as ex:
             _LOG.error("[%s] Cannot send command: %s", self.log_id, ex)
+            self._loop.create_task(self.connect())
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
         except InvalidAuth as ex:
             _LOG.error("[%s] Cannot send command: %s", self.log_id, ex)
@@ -490,27 +491,33 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self.events.emit(Events.CONNECTED, self._identifier)
 
         # Connect to Chromecast if supported
+        self._chromecast_connect()
+        return True
+
+    def _chromecast_connect(self):
         if self._device_config.use_chromecast:
-            if self._chromecast is None:
-                self._chromecast = pychromecast.get_chromecast_from_host(
-                    host=(self._atv.host, None, None, None, None),
-                    tries=10,
-                    timeout=CONNECTION_TIMEOUT,
-                    retry_wait=CONNECTION_TIMEOUT,
-                )
+            try:
+                if self._chromecast:
+                    self._chromecast.disconnect(timeout = 0)
+                    self._chromecast = None
+            except Exception:
+                pass
+            self._chromecast = pychromecast.get_chromecast_from_host(
+                host=(self._atv.host, None, None, None, None),
+                tries=10,
+                timeout=CONNECTION_TIMEOUT,
+                retry_wait=CONNECTION_TIMEOUT,
+            )
+
             try:
                 self._chromecast.register_status_listener(self)
                 self._chromecast.socket_client.media_controller.register_status_listener(self)
                 self._chromecast.register_connection_listener(self)
-                if not self._chromecast.socket_client.is_alive():
-                    self._chromecast.wait(timeout=CONNECTION_TIMEOUT)
-                    _LOG.info("[%s] Chromecast connecting", self.log_id)
-                else:
-                    _LOG.info("[%s] Chromecast already connected", self.log_id)
+                _LOG.info("[%s] Chromecast connecting", self.log_id)
+                self._chromecast.wait(timeout=CONNECTION_TIMEOUT)
+                _LOG.info("[%s] Chromecast connected", self.log_id)
             except (RequestTimeout, RuntimeError):
                 _LOG.info("[%s] Device is not active or Chromecast is not supported on this devices", self.log_id)
-
-        return True
 
     async def _handle_connection_failure(self, connect_duration: float, ex):
         self._connection_attempts += 1
@@ -567,11 +574,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if is_on:
             update[MediaAttr.STATE] = media_player.States.ON.value
             # Chromecast service is not accessible when the device is in standby
-            try:
-                if self._chromecast and not self._chromecast.socket_client.is_alive():
-                    self._chromecast.wait(timeout=CONNECTION_TIMEOUT)
-            except (RequestTimeout, RuntimeError) as ex:
-                _LOG.info("[%s] Chromecast connection error %s", self.log_id, ex)
+            self._chromecast_connect()
         else:
             update[MediaAttr.STATE] = media_player.States.OFF.value
         self.events.emit(Events.UPDATE, self._identifier, update)
@@ -744,7 +747,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def new_media_status(self, status: MediaStatus) -> None:
         """Receive new media status event from Google cast."""
-        _LOG.debug("[%s] Update from Chromecast info : %s", self.log_id, status)
+        # For debugging, too verbose
+        # _LOG.debug("[%s] Update from Chromecast info : %s", self.log_id, status)
         update = {}
         if (
             status.player_state
