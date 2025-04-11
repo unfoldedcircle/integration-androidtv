@@ -499,7 +499,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._device_config.use_chromecast:
             try:
                 if self._chromecast:
-                    self._chromecast.disconnect(timeout = 0)
+                    self._chromecast.disconnect(timeout=0)
                     self._chromecast = None
             except Exception:
                 pass
