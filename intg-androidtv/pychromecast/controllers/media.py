@@ -4,11 +4,10 @@ on the Chromecast.
 """
 
 import abc
-import asyncio
+from datetime import datetime
+from dataclasses import dataclass
 import logging
 import threading
-from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
 from ..config import APP_MEDIA_RECEIVER
@@ -151,7 +150,11 @@ class MediaStatus:
             and self.player_state == MEDIA_PLAYER_STATE_PLAYING
         ):
             # Add time since last update
-            return self.current_time + self.playback_rate * (datetime.utcnow() - self.last_updated).total_seconds()
+            return (
+                self.current_time
+                + self.playback_rate
+                * (datetime.utcnow() - self.last_updated).total_seconds()
+            )
         # Not playing, return last reported seek time
         return self.current_time
 
@@ -322,13 +325,17 @@ class MediaStatus:
         self.media_session_id = status_data.get("mediaSessionId", self.media_session_id)
         self.playback_rate = status_data.get("playbackRate", self.playback_rate)
         self.player_state = status_data.get("playerState", self.player_state)
-        self.supported_media_commands = status_data.get("supportedMediaCommands", self.supported_media_commands)
+        self.supported_media_commands = status_data.get(
+            "supportedMediaCommands", self.supported_media_commands
+        )
         self.volume_level = volume_data.get("level", self.volume_level)
         self.volume_muted = volume_data.get("muted", self.volume_muted)
         self.media_custom_data = media_data.get("customData", self.media_custom_data)
         self.media_metadata = media_data.get("metadata", self.media_metadata)
         self.subtitle_tracks = media_data.get("tracks", self.subtitle_tracks)
-        self.current_subtitle_tracks = status_data.get("activeTrackIds", self.current_subtitle_tracks)
+        self.current_subtitle_tracks = status_data.get(
+            "activeTrackIds", self.current_subtitle_tracks
+        )
         self.last_updated = datetime.utcnow()
 
     def __repr__(self) -> str:
@@ -546,7 +553,9 @@ class BaseMediaPlayer(QuickPlayController):
         media_type = kwargs.pop("media_type", "video/mp4")
 
         response_handler = WaitResponse(timeout, f"quick play {media_id}")
-        self.play_media(media_id, media_type, **kwargs, callback_function=response_handler.callback)
+        self.play_media(
+            media_id, media_type, **kwargs, callback_function=response_handler.callback
+        )
         await response_handler.wait_response()
 
 
@@ -592,19 +601,27 @@ class MediaController(BaseMediaPlayer):
 
     def update_status(self, *, callback_function: CallbackType | None = None) -> None:
         """Send message to update the status."""
-        self.send_message({MESSAGE_TYPE: TYPE_GET_STATUS}, callback_function=callback_function)
+        self.send_message(
+            {MESSAGE_TYPE: TYPE_GET_STATUS}, callback_function=callback_function
+        )
 
-    def _send_command(self, command: dict, callback_function: CallbackType | None) -> None:
+    def _send_command(
+        self, command: dict, callback_function: CallbackType | None
+    ) -> None:
         """Send a command to the Chromecast on media channel."""
         if self.status is None or self.status.media_session_id is None:
-            self.logger.warning("%s command requested but no session is active.", command[MESSAGE_TYPE])
+            self.logger.warning(
+                "%s command requested but no session is active.", command[MESSAGE_TYPE]
+            )
             if callback_function:
                 callback_function(False, None)
             return
 
         command["mediaSessionId"] = self.status.media_session_id
 
-        self.send_message(command, callback_function=callback_function, inc_session_id=True)
+        self.send_message(
+            command, callback_function=callback_function, inc_session_id=True
+        )
 
     async def play(self, timeout: float = 10.0) -> None:
         """Send the PLAY command."""
@@ -645,7 +662,6 @@ class MediaController(BaseMediaPlayer):
             },
             response_handler.callback,
         )
-
         await response_handler.wait_response()
 
     async def set_playback_rate(self, playback_rate: float, timeout: float = 10.0) -> None:
@@ -663,13 +679,17 @@ class MediaController(BaseMediaPlayer):
     async def queue_next(self, timeout: float = 10.0) -> None:
         """Send the QUEUE_NEXT command."""
         response_handler = WaitResponse(timeout, "queue next")
-        self._send_command({MESSAGE_TYPE: TYPE_QUEUE_UPDATE, "jump": 1}, response_handler.callback)
+        self._send_command(
+            {MESSAGE_TYPE: TYPE_QUEUE_UPDATE, "jump": 1}, response_handler.callback
+        )
         await response_handler.wait_response()
 
     async def queue_prev(self, timeout: float = 10.0) -> None:
         """Send the QUEUE_PREV command."""
         response_handler = WaitResponse(timeout, "queue prev")
-        self._send_command({MESSAGE_TYPE: TYPE_QUEUE_UPDATE, "jump": -1}, response_handler.callback)
+        self._send_command(
+            {MESSAGE_TYPE: TYPE_QUEUE_UPDATE, "jump": -1}, response_handler.callback
+        )
         await response_handler.wait_response()
 
     async def enable_subtitle(self, track_id: int, timeout: float = 10.0) -> None:

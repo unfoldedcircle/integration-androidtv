@@ -4,10 +4,10 @@ Controller to interface with the Yle Areena app namespace.
 
 from typing import Any
 
+from . import CallbackType
+from .media import BaseMediaPlayer, STREAM_TYPE_BUFFERED, TYPE_LOAD, MESSAGE_TYPE
 from ..config import APP_YLEAREENA
 from ..response_handler import WaitResponse
-from . import CallbackType
-from .media import MESSAGE_TYPE, STREAM_TYPE_BUFFERED, TYPE_LOAD, BaseMediaPlayer
 
 
 class YleAreenaController(BaseMediaPlayer):

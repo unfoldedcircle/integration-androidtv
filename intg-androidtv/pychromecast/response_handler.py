@@ -61,7 +61,9 @@ class WaitResponse:
             raise RequestFailed(self._request)
 
 
-def chain_on_success(on_success: AcceptsCallbackFunc, callback_function: CallbackType | None) -> CallbackType:
+def chain_on_success(
+    on_success: AcceptsCallbackFunc, callback_function: CallbackType | None
+) -> CallbackType:
     """Helper to chain callbacks."""
 
     def _callback(msg_sent: bool, response: dict | None) -> None:

@@ -146,7 +146,9 @@ class ReceiverController(BaseController):
     ) -> None:
         """Sends a message to the Chromecast to update the status."""
         self.logger.debug("Receiver:Updating status")
-        self.send_message({MESSAGE_TYPE: TYPE_GET_STATUS}, callback_function=callback_function)
+        self.send_message(
+            {MESSAGE_TYPE: TYPE_GET_STATUS}, callback_function=callback_function
+        )
 
     def launch_app(
         self,
@@ -193,7 +195,9 @@ class ReceiverController(BaseController):
                     and not self._launch_error_listeners
                     and retry_on_cancelled_error
                 ):
-                    self.logger.info("Receiver:Launching app %s failed, retrying once", app_id)
+                    self.logger.info(
+                        "Receiver:Launching app %s failed, retrying once", app_id
+                    )
                     self._send_launch_message(
                         app_id,
                         force_launch,
@@ -308,7 +312,9 @@ class ReceiverController(BaseController):
             try:
                 listener.new_cast_status(self.status)
             except Exception:  # pylint: disable=broad-except
-                self.logger.exception("Exception thrown when calling cast status listener")
+                self.logger.exception(
+                    "Exception thrown when calling cast status listener"
+                )
 
     @staticmethod
     def _parse_launch_error(data: dict) -> LaunchFailure:
@@ -318,7 +324,9 @@ class ReceiverController(BaseController):
         :type data: dict
         :rtype: LaunchFailure
         """
-        return LaunchFailure(data.get(ERROR_REASON, None), data.get(APP_ID), data.get(REQUEST_ID))
+        return LaunchFailure(
+            data.get(ERROR_REASON, None), data.get(APP_ID), data.get(REQUEST_ID)
+        )
 
     def _process_launch_error(self, data: dict) -> None:
         """
@@ -333,7 +341,9 @@ class ReceiverController(BaseController):
             try:
                 listener.new_launch_error(launch_failure)
             except Exception:  # pylint: disable=broad-except
-                self.logger.exception("Exception thrown when calling launch error listener")
+                self.logger.exception(
+                    "Exception thrown when calling launch error listener"
+                )
 
     def tear_down(self) -> None:
         """Called when controller is destroyed."""
