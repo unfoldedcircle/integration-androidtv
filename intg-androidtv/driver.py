@@ -9,6 +9,7 @@ This module implements a Remote Two integration driver for Android TV devices.
 import asyncio
 import logging
 import os
+import sys
 from typing import Any
 
 import setup_flow
@@ -16,11 +17,15 @@ import tv
 import ucapi
 from profiles import DeviceProfile, Profile
 from ucapi import MediaPlayer, media_player
+from ucapi.media_player import Attributes as MediaAttr
 
 import config
 
 _LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
-_LOOP = asyncio.get_event_loop()
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+_LOOP = asyncio.new_event_loop()
+asyncio.set_event_loop(_LOOP)
 
 # Global variables
 api = ucapi.IntegrationAPI(_LOOP)
@@ -109,6 +114,7 @@ async def on_unsubscribe_entities(entity_ids) -> None:
         _configured_android_tvs[entity_id].events.remove_all_listeners()
 
 
+# pylint: disable=too-many-return-statements
 async def media_player_cmd_handler(
     entity: MediaPlayer, cmd_id: str, params: dict[str, Any] | None
 ) -> ucapi.StatusCodes:
@@ -146,6 +152,16 @@ async def media_player_cmd_handler(
         if params is None or "source" not in params:
             return ucapi.StatusCodes.BAD_REQUEST
         return await android_tv.select_source(params["source"])
+    if cmd_id == media_player.Commands.VOLUME_UP:
+        return await android_tv.volume_up()
+    if cmd_id == media_player.Commands.VOLUME_DOWN:
+        return await android_tv.volume_down()
+    if cmd_id == media_player.Commands.MUTE_TOGGLE:
+        return await android_tv.volume_mute_toggle()
+    if cmd_id == media_player.Commands.VOLUME:
+        return await android_tv.volume_set(params.get("volume"))
+    if cmd_id == media_player.Commands.SEEK:
+        return await android_tv.media_seek(params.get("media_position", 0))
 
     return await android_tv.send_media_player_command(cmd_id)
 
@@ -218,43 +234,56 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
         _LOG.debug("[%s] device update: %s", device.name if device else atv_id, update)
 
     old_state = (
-        configured_entity.attributes["state"]
-        if "state" in configured_entity.attributes
+        configured_entity.attributes[MediaAttr.STATE]
+        if MediaAttr.STATE in configured_entity.attributes
         else media_player.States.UNKNOWN
     )
 
-    if "state" in update:
-        if update["state"] == "ON":
-            attributes[media_player.Attributes.STATE] = media_player.States.ON
-        elif update["state"] == "PLAYING":
-            attributes[media_player.Attributes.STATE] = media_player.States.PLAYING
-        else:
-            attributes[media_player.Attributes.STATE] = media_player.States.OFF
+    if MediaAttr.STATE in update and update[MediaAttr.STATE] != old_state:
+        attributes[MediaAttr.STATE] = update[MediaAttr.STATE]
 
-    if "title" in update:
-        attributes[media_player.Attributes.MEDIA_TITLE] = update["title"]
+    if MediaAttr.MEDIA_TITLE in update:
+        attributes[MediaAttr.MEDIA_TITLE] = update[MediaAttr.MEDIA_TITLE]
 
-    if "volume" in update:
-        attributes[media_player.Attributes.VOLUME] = update["volume"]
+    if MediaAttr.MEDIA_ALBUM in update:
+        attributes[MediaAttr.MEDIA_ALBUM] = update[MediaAttr.MEDIA_ALBUM]
 
-    if "muted" in update:
-        attributes[media_player.Attributes.MUTED] = update["muted"]
+    if MediaAttr.MEDIA_ARTIST in update:
+        attributes[MediaAttr.MEDIA_ARTIST] = update[MediaAttr.MEDIA_ARTIST]
 
-    if "source_list" in update:
-        attributes[media_player.Attributes.SOURCE_LIST] = update["source_list"]
+    if MediaAttr.MEDIA_POSITION in update:
+        attributes[MediaAttr.MEDIA_POSITION] = update[MediaAttr.MEDIA_POSITION]
 
-    if "source" in update:
-        attributes[media_player.Attributes.SOURCE] = update["source"]
+    if MediaAttr.MEDIA_DURATION in update:
+        attributes[MediaAttr.MEDIA_DURATION] = update[MediaAttr.MEDIA_DURATION]
+
+    if MediaAttr.MEDIA_IMAGE_URL in update:
+        attributes[MediaAttr.MEDIA_IMAGE_URL] = update[MediaAttr.MEDIA_IMAGE_URL]
+
+    if MediaAttr.VOLUME in update:
+        attributes[MediaAttr.VOLUME] = update[MediaAttr.VOLUME]
+
+    if MediaAttr.MUTED in update:
+        attributes[MediaAttr.MUTED] = update[MediaAttr.MUTED]
+
+    if MediaAttr.SOURCE_LIST in update:
+        attributes[MediaAttr.SOURCE_LIST] = update[MediaAttr.SOURCE_LIST]
+
+    if MediaAttr.SOURCE in update:
+        attributes[MediaAttr.SOURCE] = update[MediaAttr.SOURCE]
 
     if attributes:
-        if "state" not in attributes and old_state in (media_player.States.UNAVAILABLE, media_player.States.UNKNOWN):
+        if MediaAttr.STATE not in attributes and old_state in (
+            media_player.States.UNAVAILABLE,
+            media_player.States.UNKNOWN,
+        ):
             attributes[media_player.Attributes.STATE] = media_player.States.ON
 
         api.configured_entities.update_attributes(entity_id, attributes)
 
 
 def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -> None:
-    profile = device_profile.match(device.manufacturer, device.model)
+    profile = device_profile.match(device.manufacturer, device.model, device.use_chromecast)
 
     # the device should not yet be configured, but better be safe
     if device.id in _configured_android_tvs:
@@ -262,11 +291,9 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         android_tv.disconnect()
     else:
         android_tv = tv.AndroidTv(
-            config.devices.certfile(device.id),
-            config.devices.keyfile(device.id),
-            device.address,
-            device.name,
-            device.id,
+            certfile=config.devices.certfile(device.id),
+            keyfile=config.devices.keyfile(device.id),
+            device_config=device,
             profile=profile,
             loop=_LOOP,
         )
@@ -278,11 +305,12 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
 
         _configured_android_tvs[device.id] = android_tv
         _LOG.info(
-            "[%s] Configured Android TV device %s with profile: %s %s",
+            "[%s] Configured Android TV device %s with profile and features : %s %s %s",
             device.name,
             device.id,
             profile.manufacturer,
             profile.model,
+            profile.features,
         )
 
     async def start_connection():
@@ -318,6 +346,11 @@ def _register_available_entities(device: config.AtvDevice, profile: Profile) -> 
             media_player.Attributes.VOLUME: 0,
             media_player.Attributes.MUTED: False,
             media_player.Attributes.MEDIA_TITLE: "",
+            media_player.Attributes.MEDIA_ALBUM: "",
+            media_player.Attributes.MEDIA_ARTIST: "",
+            media_player.Attributes.MEDIA_POSITION: 0,
+            media_player.Attributes.MEDIA_DURATION: 0,
+            media_player.Attributes.MEDIA_IMAGE_URL: "",
         },
         device_class=media_player.DeviceClasses.TV,
         options=options,
@@ -372,6 +405,7 @@ async def main():
     logging.getLogger("profiles").setLevel(level)
     logging.getLogger("setup_flow").setLevel(level)
     logging.getLogger("androidtvremote2").setLevel(level)
+    # logging.getLogger("pychromecast").setLevel(level)
 
     profile_path = os.path.join(api.config_dir_path, "profiles")
     device_profile.load(profile_path)
