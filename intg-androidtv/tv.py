@@ -506,12 +506,12 @@ class AndroidTv:
                     break
 
         # Priority 3: Fallback to Google Play lookup
-        if self.use_external_metadata:
-            try:
-                from external_metadata import get_app_name
-                update["title"] = get_app_name(current_app)
-            except Exception as e:
-                _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
+        # if self.use_external_metadata:
+        try:
+            from external_metadata import get_app_name
+            update["source"] = get_app_name(current_app)
+        except Exception as e:
+            _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
 
         # TODO verify "idle" apps, probably best to make them configurable
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
