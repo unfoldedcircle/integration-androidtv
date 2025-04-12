@@ -29,8 +29,6 @@ from profiles import KeyPress, Profile
 from pyee import AsyncIOEventEmitter
 from ucapi import media_player
 
-from ucapi import media_player
-
 from config import AtvDevice
 
 _LOG = logging.getLogger(__name__)

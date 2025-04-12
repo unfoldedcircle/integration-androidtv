@@ -6,9 +6,9 @@ from io import BytesIO
 from pathlib import Path
 from typing import Dict
 
-from PIL import Image
-import requests
 import google_play_scraper
+import requests
+from PIL import Image
 
 _LOG = logging.getLogger(__name__)
 
