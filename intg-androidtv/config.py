@@ -165,15 +165,6 @@ class Devices:
         except ValueError:
             pass
         return False
-    
-    def set_device_option(self, atv_id: str, key: str, value: str) -> None:
-        """Set an optional setting on a specific device (like use_external_metadata)."""
-        for item in self._config:
-            if item.id == atv_id:
-                setattr(item, key, value)
-                self.store()
-                return
-        _LOG.warning("Device with ID %s not found when setting option '%s'", atv_id, key)
 
     def remove_certificates(self, atv_id: str) -> bool:
         """Remove the certificate and key files of a given Android TV instance."""
