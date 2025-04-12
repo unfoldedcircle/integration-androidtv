@@ -254,7 +254,7 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
 
 
 def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -> None:
-    profile = device_profile.match(device.manufacturer, device.model, device.use_external_metadata)
+    profile = device_profile.match(device.manufacturer, device.model)
 
     # the device should not yet be configured, but better be safe
     if device.id in _configured_android_tvs:
@@ -262,6 +262,7 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         android_tv.disconnect()
     else:
         android_tv = tv.AndroidTv(
+            certfile=config.devices.certfile(device.id),
             keyfile=config.devices.keyfile(device.id),
             device_config=device,
             profile=profile,

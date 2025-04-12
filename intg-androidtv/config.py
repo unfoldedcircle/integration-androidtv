@@ -13,8 +13,6 @@ import os
 from dataclasses import dataclass
 from typing import Iterator
 
-from tv import AndroidTv
-
 _LOG = logging.getLogger(__name__)
 
 _CFG_FILENAME = "config.json"
