@@ -491,22 +491,12 @@ class AndroidTv:
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
         update = {"source": current_app}
 
-        updated = False
         # Priority 1: Use direct ID mappings
         if current_app in apps.IdMappings:
             update["source"] = apps.IdMappings[current_app]
-            updated = True
 
-        # Priority 2: Fuzzy name matching
-        else:
-            for query, app in apps.NameMatching.items():
-                if query in current_app:
-                    update["source"] = app
-                    updated = True
-                    break
-
-        # Priority 3: Fallback to Google Play lookup
-        if self._device_config.use_external_metadata and not updated:
+        # Priority 2: Attempt to use external library if enabled
+        elif self._device_config.use_external_metadata:
             try:
                 from external_metadata import get_app_name
                 update["source"] = get_app_name(current_app)
@@ -515,6 +505,13 @@ class AndroidTv:
             except Exception as e:
                 _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
 
+        # Priority 3: Final attempt at offline fuzzy name matching
+        else:
+            for query, app in apps.NameMatching.items():
+                if query in current_app:
+                    update["source"] = app
+                    break
+                
         # TODO verify "idle" apps, probably best to make them configurable
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update["state"] = media_player.States.ON.value
