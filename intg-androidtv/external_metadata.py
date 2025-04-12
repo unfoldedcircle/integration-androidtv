@@ -15,7 +15,7 @@ CACHE_SUBDIR = "cache"
 
 
 def get_cache_file_path() -> Path:
-    config_home = Path(os.environ.get("UC_CONFIG_HOME", "."))
+    config_home = Path(os.environ.get("UC_DATA_HOME", "."))
     cache_dir = config_home / CACHE_SUBDIR
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir / CACHE_FILENAME
