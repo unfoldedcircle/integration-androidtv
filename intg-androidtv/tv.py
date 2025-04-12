@@ -515,6 +515,9 @@ class AndroidTv:
         # TODO verify "idle" apps, probably best to make them configurable
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update["state"] = media_player.States.ON.value
+            update["title"] = "Android TV Home"
+        elif current_app in ("com.google.android.backdrop"):
+            update["state"] = media_player.States.STANDBY.value
             update["title"] = ""
         else:
             update["state"] = media_player.States.PLAYING.value
