@@ -30,15 +30,14 @@ class AtvDevice:
     """Friendly name of the device."""
     address: str
     """IP address of device."""
-    manufacturer: str
+    manufacturer: str = ""
     """Device manufacturer name."""
-    model: str
+    model: str = ""
     """Device model name."""
-    use_external_metadata: bool = False
-    """Use External Metadata."""
     auth_error: bool = False
     """Authentication error, device requires pairing."""
-
+    use_external_metadata: bool = False
+    """Enable External Metadata."""
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
     """Python dataclass json encoder."""
@@ -130,8 +129,8 @@ class Devices:
                 item.name = atv.name
                 item.manufacturer = atv.manufacturer
                 item.model = atv.model
-                item.use_external_metadata = atv.use_external_metadata
                 item.auth_error = atv.auth_error
+                item.use_external_metadata = atv.use_external_metadata
                 return self.store()
         return False
 
@@ -228,8 +227,8 @@ class Devices:
                     item.get("address"),
                     item.get("manufacturer", ""),
                     item.get("model", ""),
-                    item.get("use_external_metadata", False),
                     item.get("auth_error", False),
+                    item.get("use_external_metadata", False),
                 )
                 self._config.append(atv)
             return True
@@ -254,6 +253,8 @@ class Devices:
 
     async def migrate(self) -> bool:
         """Migrate configuration if required."""
+        from tv import AndroidTv
+
         result = True
         for item in self._config:
             # don't force certificate migration: default certs might be a leftover from a previous pairing attempt
@@ -264,12 +265,13 @@ class Devices:
                     item.name,
                     item.id,
                 )
-                android_tv = AndroidTv(self.certfile(item.id), self.keyfile(item.id), item.address, item.name, item.id)
+                android_tv = AndroidTv(self.certfile(item.id), self.keyfile(item.id), item)
                 if await android_tv.init(10) and await android_tv.connect(10):
                     if device_info := android_tv.device_info:
                         item.manufacturer = android_tv.device_info
                         item.manufacturer = device_info.get("manufacturer", "")
                         item.model = device_info.get("model", "")
+                        item.use_external_metadata = device_info.get("use_external_metadata", False)
 
                         _LOG.info(
                             "Updating device configuration '%s' (%s) with: manufacturer=%s, model=%s",

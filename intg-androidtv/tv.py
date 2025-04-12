@@ -29,6 +29,8 @@ from profiles import KeyPress, Profile
 from pyee import AsyncIOEventEmitter
 from ucapi import media_player
 
+from config import AtvDevice
+
 _LOG = logging.getLogger(__name__)
 
 CONNECTION_TIMEOUT: float = 10.0
@@ -136,9 +138,7 @@ class AndroidTv:
         self,
         certfile: str,
         keyfile: str,
-        host: str,
-        name: str,
-        identifier: str | None = None,
+        device_config: AtvDevice,
         profile: Profile | None = None,
         loop: AbstractEventLoop | None = None,
     ):
@@ -147,14 +147,13 @@ class AndroidTv:
 
         :param certfile: filename that contains the client certificate in PEM format.
         :param keyfile: filename that contains the public key in PEM format.
-        :param host: IP address of the Android TV.
-        :param name: Name of the Android TV device.
-        :param identifier: Device identifier if known, otherwise init() has to be called.
+        :param device_config: device configuration of the Android TV.
         :param profile: Device profile used for command mappings.
         :param loop: event loop. Used for connections and futures.
         """
+        self._device_config = device_config
         self._state: DeviceState = DeviceState.IDLE
-        self._name: str = name
+        self._name: str = device_config.name
         self._loop: AbstractEventLoop = loop or asyncio.get_running_loop()
         self.events = AsyncIOEventEmitter(self._loop)
 
@@ -163,10 +162,10 @@ class AndroidTv:
             client_name=name,
             certfile=certfile,
             keyfile=keyfile,
-            host=host,
+            host=device_config.address,
             loop=self._loop,
         )
-        self._identifier: str | None = identifier
+        self._identifier: str | None = device_config.id
         self._profile: Profile | None = profile
         self._connection_attempts: int = 0
         self._reconnect_delay: float = MIN_RECONNECT_DELAY
@@ -504,12 +503,14 @@ class AndroidTv:
                     break
 
         # Priority 3: Fallback to Google Play lookup
-        # if self.use_external_metadata:
-        try:
-            from external_metadata import get_app_name
-            update["source"] = get_app_name(current_app)
-        except Exception as e:
-            _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
+        if self._device_config.use_external_metadata:
+            try:
+                from external_metadata import get_app_name
+                update["source"] = get_app_name(current_app)
+                _LOG.debug("[%s] Updated source using external metadata: %s", self.log_id, update["source"])
+
+            except Exception as e:
+                _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
 
         # TODO verify "idle" apps, probably best to make them configurable
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):

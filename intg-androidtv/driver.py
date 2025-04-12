@@ -254,7 +254,7 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
 
 
 def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -> None:
-    profile = device_profile.match(device.manufacturer, device.model)
+    profile = device_profile.match(device.manufacturer, device.model, device.use_external_metadata)
 
     # the device should not yet be configured, but better be safe
     if device.id in _configured_android_tvs:
@@ -262,11 +262,8 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         android_tv.disconnect()
     else:
         android_tv = tv.AndroidTv(
-            config.devices.certfile(device.id),
-            config.devices.keyfile(device.id),
-            device.address,
-            device.name,
-            device.id,
+            keyfile=config.devices.keyfile(device.id),
+            device_config=device,
             profile=profile,
             loop=_LOOP,
         )
@@ -278,11 +275,12 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
 
         _configured_android_tvs[device.id] = android_tv
         _LOG.info(
-            "[%s] Configured Android TV device %s with profile: %s %s",
+            "[%s] Configured Android TV device %s with profile and features : %s %s %s",
             device.name,
             device.id,
             profile.manufacturer,
             profile.model,
+            profile.features,
         )
 
     async def start_connection():
@@ -372,6 +370,7 @@ async def main():
     logging.getLogger("profiles").setLevel(level)
     logging.getLogger("setup_flow").setLevel(level)
     logging.getLogger("androidtvremote2").setLevel(level)
+    logging.getLogger("external_metadata").setLevel(level)
 
     profile_path = os.path.join(api.config_dir_path, "profiles")
     device_profile.load(profile_path)

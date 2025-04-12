@@ -15,7 +15,7 @@ CACHE_SUBDIR = "external_metadata_cache"
 
 
 def get_cache_file_path() -> Path:
-    config_home = Path(os.environ.get("UC_DATA_HOME", "."))
+    config_home = Path(os.environ.get("UC_DATA_HOME", "./data"))
     cache_dir = config_home / CACHE_SUBDIR
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir / CACHE_FILENAME
