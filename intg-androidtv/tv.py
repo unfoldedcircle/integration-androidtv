@@ -495,7 +495,8 @@ class AndroidTv:
 
         # Priority 1: Use direct ID mappings
         if current_app in apps.IdMappings:
-            update["source"] = apps.IdMappings[current_app]
+            update["source"] = apps.IdMappings[current_app]['name']
+            update["media_image_url"] = apps.IdMappings[current_app]['media_image_url']
 
         # Priority 2: Attempt to use external library if enabled
         elif self._device_config.use_external_metadata:
@@ -516,6 +517,7 @@ class AndroidTv:
             for query, app in apps.NameMatching.items():
                 if query in current_app:
                     update["source"] = app
+                    update["media_image_url"] = ""
                     break
                 
         # TODO verify "idle" apps, probably best to make them configurable

@@ -10,11 +10,13 @@ from PIL import Image
 import requests 
 import google_play_scraper 
 
+_LOG = logging.getLogger(__name__)
+
 CACHE_FILENAME = "app_dict.json"
 CACHE_SUBDIR = "external_cache"
 ICON_SIZE = (90, 90)
 
-
+# Cache
 def get_cache_file_path() -> Path:
     config_home = Path(os.environ.get("UC_DATA_HOME", "./data"))
     cache_dir = config_home / CACHE_SUBDIR
@@ -38,7 +40,7 @@ def save_cache(cache: Dict[str, Dict[str, str]]) -> None:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(cache, f, indent=2)
 
-
+# Metadata Fetch
 def get_app_metadata(package_id: str) -> dict:
     """
     Returns metadata for a package ID, including app name and base64-encoded icon (if available).
@@ -49,10 +51,10 @@ def get_app_metadata(package_id: str) -> dict:
 
     try:
         app = google_play_scraper.app(package_id)
-        name = app.get("title", package_id)
+        name = app.get("title")
         icon_url = app.get("icon")
-
         icon_data_uri = None
+        
         if icon_url:
             try:
                 response = requests.get(icon_url, timeout=5)
