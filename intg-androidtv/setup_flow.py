@@ -382,7 +382,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
 
     certfile = config.devices.default_certfile()
     keyfile = config.devices.default_keyfile()
-    _pairing_android_tv = tv.AndroidTv(certfile, keyfile, AtvDevice(address=choice, name=name, id="", use_external_metadata=False))
+    _pairing_android_tv = tv.AndroidTv(certfile, keyfile, AtvDevice(address=choice, name=name, id="", use_external_metadata=_use_external_metadata))
     _LOG.info("Chosen Android TV: %s. Start pairing process...", choice)
 
     res = await _pairing_android_tv.init(20)
@@ -450,7 +450,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         id=_pairing_android_tv.identifier,
         name=_pairing_android_tv.name,
         address=_pairing_android_tv.address,
-        use_external_metadata=_use_external_metadata
+        use_external_metadata=_use_external_metadata,
         manufacturer=device_info.get("manufacturer", ""),
         model=device_info.get("model", ""),
     )
