@@ -25,6 +25,7 @@ from ucapi import (
 )
 
 import config
+from config import AtvDevice
 
 _LOG = logging.getLogger(__name__)
 
