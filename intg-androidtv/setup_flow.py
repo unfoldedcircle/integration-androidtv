@@ -455,6 +455,9 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         model=device_info.get("model", ""),
     )
 
+    config.devices.add_or_update(device)  # triggers AndroidTv instance creation
+    config.devices.store()
+
     # ATV device connection will be triggered with subscribe_entities request
     _pairing_android_tv = None
     await asyncio.sleep(1)
