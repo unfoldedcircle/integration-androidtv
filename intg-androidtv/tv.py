@@ -29,6 +29,8 @@ from profiles import KeyPress, Profile
 from pyee import AsyncIOEventEmitter
 from ucapi import media_player
 
+from ucapi import media_player
+
 from config import AtvDevice
 
 _LOG = logging.getLogger(__name__)
@@ -498,9 +500,13 @@ class AndroidTv:
         # Priority 2: Attempt to use external library if enabled
         elif self._device_config.use_external_metadata:
             try:
-                from external_metadata import get_app_name
-                update["source"] = get_app_name(current_app)
-                _LOG.debug("[%s] Updated source using external metadata: %s", self.log_id, update["source"])
+                from external_metadata import get_app_metadata
+                metadata = get_app_metadata(current_app)
+                update["source"] = metadata["name"]
+                if "media_image_url" in metadata and metadata["media_image_url"]:
+                    update["media_image_url"] = metadata["media_image_url"]
+                else:
+                    update["media_image_url"] = ""
 
             except Exception as e:
                 _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)

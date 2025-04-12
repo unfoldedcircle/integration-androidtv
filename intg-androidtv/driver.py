@@ -228,6 +228,8 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
             attributes[media_player.Attributes.STATE] = media_player.States.ON
         elif update["state"] == "PLAYING":
             attributes[media_player.Attributes.STATE] = media_player.States.PLAYING
+        elif update["state"] == "STANDBY":
+            attributes[media_player.Attributes.STATE] = media_player.States.STANDBY
         else:
             attributes[media_player.Attributes.STATE] = media_player.States.OFF
 
@@ -245,6 +247,9 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
 
     if "source" in update:
         attributes[media_player.Attributes.SOURCE] = update["source"]
+
+    if "media_image_url" in update:
+        attributes[media_player.Attributes.MEDIA_IMAGE_URL] = update["media_image_url"]
 
     if attributes:
         if "state" not in attributes and old_state in (media_player.States.UNAVAILABLE, media_player.States.UNKNOWN):
