@@ -491,19 +491,22 @@ class AndroidTv:
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
         update = {"source": current_app}
 
+        updated = False
         # Priority 1: Use direct ID mappings
         if current_app in apps.IdMappings:
             update["source"] = apps.IdMappings[current_app]
+            updated = True
 
         # Priority 2: Fuzzy name matching
         else:
             for query, app in apps.NameMatching.items():
                 if query in current_app:
                     update["source"] = app
+                    updated = True
                     break
 
         # Priority 3: Fallback to Google Play lookup
-        if self._device_config.use_external_metadata:
+        if self._device_config.use_external_metadata and not updated:
             try:
                 from external_metadata import get_app_name
                 update["source"] = get_app_name(current_app)
