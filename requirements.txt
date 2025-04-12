@@ -2,3 +2,5 @@ androidtvremote2==0.1.1
 ucapi==0.2.0
 pyee~=11.1
 google_play_scraper==1.2.7
+pillow
+requests
