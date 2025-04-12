@@ -1,20 +1,3 @@
-#  {"en": "Would you like to use External metadata for this device?"},
-#             [
-#                 {
-#                     "id": "use_external_metadata",
-#                     "label": {"en": "Use External metadata"},
-#                     "field": {
-#                         "dropdown": {
-#                             "value": "False",
-#                             "items": [
-#                                 {"id": "True", "label": {"en": "Yes"}},
-#                                 {"id": "False", "label": {"en": "No"}},
-#                             ],
-#                         }
-#                     },
-#                 }
-#             ],
-
 """
 Setup flow for Android TV Remote integration.
 
@@ -428,7 +411,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
     res = await _pairing_android_tv.finish_pairing(msg.input_values["pin"])
     _pairing_android_tv.disconnect()
 
-    device_info = None
+    device_info = {}
 
     # Connect again to retrieve device identifier (with init()) and additional device information (with connect())
     if res == ucapi.StatusCodes.OK:
@@ -436,8 +419,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         res = ucapi.StatusCodes.SERVER_ERROR
         timeout = tv.CONNECTION_TIMEOUT
         if await _pairing_android_tv.init(timeout) and await _pairing_android_tv.connect(timeout):
-            device_info = _pairing_android_tv.device_info
-            # Now rename the certificate files so that they are unique per device (with the identifier = mac address)
+            device_info = _pairing_android_tv.device_info or {}
             if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier, True):
                 res = ucapi.StatusCodes.OK
         _pairing_android_tv.disconnect()
@@ -448,9 +430,6 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         _pairing_android_tv = None
         return _setup_error_from_device_state(state)
 
-    if not device_info:
-        device_info = {}
-
     device = AtvDevice(
         _pairing_android_tv.identifier,
         _pairing_android_tv.name,
@@ -458,15 +437,13 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         device_info.get("manufacturer", ""),
         device_info.get("model", ""),
     )
-    config.devices.add_or_update(device)  # triggers AndroidTv instance creation
-    config.devices.store()
 
     # ATV device connection will be triggered with subscribe_entities request
 
     # _pairing_android_tv = None
     await asyncio.sleep(1)
 
-    _LOG.info("[%s] Setup successfully completed for %s", device.name, device.id)
+    _LOG.info("[%s] Inital init successfully completed for %s", device.name, device.id)
     
     _setup_step = SetupSteps.USE_EXTERNAL_METADATA
 
@@ -478,7 +455,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
                 "label": {"en": "Use external metadata (e.g., Google Play names)"},
                 "field": {
                     "dropdown": {
-                        "value": "true",
+                        "value": "false",
                         "items": [
                             {"id": "true", "label": {"en": "Yes"}},
                             {"id": "false", "label": {"en": "No"}}
@@ -510,10 +487,26 @@ async def handle_use_external_metadata(msg: UserDataResponse) -> SetupComplete |
         _LOG.error("No device instance available during external metadata step.")
         return SetupError()
 
-    selected = msg.input_values.get("use_external_metadata", "false") == "true"
-    _LOG.info("[%s] User selected use_external_metadata: %s", _pairing_android_tv.log_id, selected)
+    use_external_metadata = msg.input_values.get("use_external_metadata", "false") == "true"
+    _LOG.debug("[%s] User selected use_external_metadata: %s", _pairing_android_tv.log_id, use_external_metadata)
+    device_info = _pairing_android_tv.device_info or {}
+    
+    device = AtvDevice(
+        id=_pairing_android_tv.identifier,
+        name=_pairing_android_tv.name,
+        address=_pairing_android_tv.address,
+        manufacturer=device_info.get("manufacturer", ""),
+        model=device_info.get("model", ""),
+        use_external_metadata=use_external_metadata,
+    )
 
-    config.devices.set_device_option(_pairing_android_tv.identifier, "use_external_metadata", selected)
+    config.devices.add_or_update(device)  # triggers AndroidTv instance update
+    config.devices.store()
+
     _pairing_android_tv = None
+    await asyncio.sleep(1)
+
+    _LOG.info("[%s] Setup successfully completed for %s", device.name, device.id)
+
     return SetupComplete()
 

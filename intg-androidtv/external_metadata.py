@@ -10,8 +10,8 @@ import google_play_scraper
 # Cache
 # ------------------------
 
-CACHE_FILENAME = "app_name_cache.json"
-CACHE_SUBDIR = "cache"
+CACHE_FILENAME = "app_dict.json"
+CACHE_SUBDIR = "external_metadata_cache"
 
 
 def get_cache_file_path() -> Path:

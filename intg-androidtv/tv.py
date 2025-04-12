@@ -141,7 +141,6 @@ class AndroidTv:
         identifier: str | None = None,
         profile: Profile | None = None,
         loop: AbstractEventLoop | None = None,
-        use_external_metadata: bool = False,
     ):
         """
         Create instance with given IP address of Android TV device.
@@ -171,7 +170,6 @@ class AndroidTv:
         self._profile: Profile | None = profile
         self._connection_attempts: int = 0
         self._reconnect_delay: float = MIN_RECONNECT_DELAY
-        self.use_external_metadata: bool = use_external_metadata
 
         # Hook up callbacks
         self._atv.add_is_on_updated_callback(self._is_on_updated)
@@ -281,7 +279,7 @@ class AndroidTv:
     def address(self) -> str:
         """Return the IP address of the device."""
         return self._atv.host
-
+    
     @property
     def device_info(self) -> dict[str, str] | None:
         """Device info (manufacturer, model, sw_version)."""
