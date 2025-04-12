@@ -16,6 +16,7 @@ from functools import wraps
 from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
 
 import apps
+import external_metadata
 import discover
 import inputs
 import ucapi
@@ -492,13 +493,25 @@ class AndroidTv:
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
         update = {"source": current_app}
 
+        # Priority 1: Use direct ID mappings
         if current_app in apps.IdMappings:
             update["source"] = apps.IdMappings[current_app]
+
+        # Priority 2: Fuzzy name matching
         else:
             for query, app in apps.NameMatching.items():
                 if query in current_app:
                     update["source"] = app
                     break
+
+            # Priority 3: Fallback to Google Play lookup
+            else:
+                try:
+                    friendly_name = external_metadata.get_app_name(current_app)
+                    update["source"] = friendly_name
+                except Exception as e:
+                    _LOG.warning("[%s] Failed to fetch app name from external metadata for %s: %s", self.log_id, current_app, e)
+
 
         # TODO verify "idle" apps, probably best to make them configurable
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
