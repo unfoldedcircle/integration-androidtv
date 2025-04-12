@@ -37,6 +37,7 @@ class AtvDevice:
     use_external_metadata: bool = False
     """Enable External Metadata."""
 
+
 class _EnhancedJSONEncoder(json.JSONEncoder):
     """Python dataclass json encoder."""
 

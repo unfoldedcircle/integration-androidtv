@@ -280,7 +280,7 @@ class AndroidTv:
     def address(self) -> str:
         """Return the IP address of the device."""
         return self._atv.host
-    
+
     @property
     def device_info(self) -> dict[str, str] | None:
         """Device info (manufacturer, model, sw_version)."""
@@ -495,13 +495,14 @@ class AndroidTv:
 
         # Priority 1: Use direct ID mappings
         if current_app in apps.IdMappings:
-            update["source"] = apps.IdMappings[current_app]['name']
-            update["media_image_url"] = apps.IdMappings[current_app]['media_image_url']
+            update["source"] = apps.IdMappings[current_app]["name"]
+            update["media_image_url"] = apps.IdMappings[current_app]["media_image_url"]
 
         # Priority 2: Attempt to use external library if enabled
         elif self._device_config.use_external_metadata:
             try:
                 from external_metadata import get_app_metadata
+
                 metadata = get_app_metadata(current_app)
                 update["source"] = metadata["name"]
                 if "media_image_url" in metadata and metadata["media_image_url"]:
@@ -519,7 +520,7 @@ class AndroidTv:
                     update["source"] = app
                     update["media_image_url"] = ""
                     break
-                
+
         # TODO verify "idle" apps, probably best to make them configurable
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update["state"] = media_player.States.ON.value

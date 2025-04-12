@@ -294,7 +294,9 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
         # Connect to device and retrieve name
         certfile = config.devices.default_certfile()
         keyfile = config.devices.default_keyfile()
-        use_external_metadata = config.devices.get(address).use_external_metadata if config.devices.get(address) else False
+        use_external_metadata = (
+            config.devices.get(address).use_external_metadata if config.devices.get(address) else False
+        )
         android_tv = tv.AndroidTv(certfile, keyfile, AtvDevice(address=address, name="", id=""))
 
         res = await android_tv.init(20)
@@ -347,13 +349,10 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                 "field": {
                     "dropdown": {
                         "value": "false",
-                        "items": [
-                            {"id": "true", "label": {"en": "Yes"}},
-                            {"id": "false", "label": {"en": "No"}}
-                        ]
+                        "items": [{"id": "true", "label": {"en": "Yes"}}, {"id": "false", "label": {"en": "No"}}],
                     }
-                }
-            }
+                },
+            },
         ],
     )
 
@@ -382,7 +381,9 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
 
     certfile = config.devices.default_certfile()
     keyfile = config.devices.default_keyfile()
-    _pairing_android_tv = tv.AndroidTv(certfile, keyfile, AtvDevice(address=choice, name=name, id="", use_external_metadata=_use_external_metadata))
+    _pairing_android_tv = tv.AndroidTv(
+        certfile, keyfile, AtvDevice(address=choice, name=name, id="", use_external_metadata=_use_external_metadata)
+    )
     _LOG.info("Chosen Android TV: %s. Start pairing process...", choice)
 
     res = await _pairing_android_tv.init(20)
@@ -463,7 +464,6 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     await asyncio.sleep(1)
     _LOG.info("[%s] Setup successfully completed for %s", device.name, device.id)
     return SetupComplete()
-
 
 
 def _setup_error_from_device_state(state: tv.DeviceState) -> SetupError:
