@@ -60,6 +60,7 @@ IdMappings = {
     "tv.wuaki": "Rakuten TV",
     "homedia.sky.sport": "SKY",
     "com.teamsmart.videomanager.tv": "SmartTube",
+    "com.nathnetwork.supersmart": "SuperSmart",
     "nl.rtl.videoland.v2": "Videoland",
     "com.disney.disneyplus": "Disney+",
     "com.netflix.ninja": "Netflix",
