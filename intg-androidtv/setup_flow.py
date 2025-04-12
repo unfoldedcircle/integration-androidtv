@@ -1,3 +1,20 @@
+#  {"en": "Would you like to use External metadata for this device?"},
+#             [
+#                 {
+#                     "id": "use_external_metadata",
+#                     "label": {"en": "Use External metadata"},
+#                     "field": {
+#                         "dropdown": {
+#                             "value": "False",
+#                             "items": [
+#                                 {"id": "True", "label": {"en": "Yes"}},
+#                                 {"id": "False", "label": {"en": "No"}},
+#                             ],
+#                         }
+#                     },
+#                 }
+#             ],
+
 """
 Setup flow for Android TV Remote integration.
 
@@ -38,6 +55,7 @@ class SetupSteps(IntEnum):
     DISCOVER = 2
     DEVICE_CHOICE = 3
     PAIRING_PIN = 4
+    USE_EXTERNAL_METADATA = 5
 
 
 _setup_step = SetupSteps.INIT
@@ -102,6 +120,8 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
             return await handle_device_choice(msg)
         if _setup_step == SetupSteps.PAIRING_PIN and "pin" in msg.input_values:
             return await handle_user_data_pin(msg)
+        if _setup_step == SetupSteps.USE_EXTERNAL_METADATA and "use_external_metadata" in msg.input_values:
+            return await handle_use_external_metadata(msg)
         _LOG.error("No or invalid user response was received: %s", msg)
     elif isinstance(msg, AbortDriverSetup):
         _LOG.info("Setup was aborted with code: %s", msg.error)
@@ -290,7 +310,8 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
         # Connect to device and retrieve name
         certfile = config.devices.default_certfile()
         keyfile = config.devices.default_keyfile()
-        android_tv = tv.AndroidTv(certfile, keyfile, address, "")
+        use_external_metadata = config.devices.get(address).use_external_metadata if config.devices.get(address) else False
+        android_tv = tv.AndroidTv(certfile, keyfile, address, "", use_external_metadata=use_external_metadata)
 
         res = await android_tv.init(20)
         if res is False:
@@ -386,7 +407,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     return _setup_error_from_device_state(_pairing_android_tv.state)
 
 
-async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupError:
+async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | SetupError:
     """
     Process user data pairing pin response in a setup process.
 
@@ -396,6 +417,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     :return: the setup action on how to continue: SetupComplete if a valid Android TV device was chosen.
     """
     global _pairing_android_tv
+    global _setup_step
 
     if _pairing_android_tv is None:
         _LOG.error("Can't handle pairing pin: no device instance! Aborting setup")
@@ -441,11 +463,32 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
 
     # ATV device connection will be triggered with subscribe_entities request
 
-    _pairing_android_tv = None
+    # _pairing_android_tv = None
     await asyncio.sleep(1)
 
     _LOG.info("[%s] Setup successfully completed for %s", device.name, device.id)
-    return SetupComplete()
+    
+    _setup_step = SetupSteps.USE_EXTERNAL_METADATA
+
+    return RequestUserInput(
+        {"en": "Would you like to use external metadata for this device?"},
+        [
+            {
+                "id": "use_external_metadata",
+                "label": {"en": "Use external metadata (e.g., Google Play names)"},
+                "field": {
+                    "dropdown": {
+                        "value": "true",
+                        "items": [
+                            {"id": "true", "label": {"en": "Yes"}},
+                            {"id": "false", "label": {"en": "No"}}
+                        ]
+                    }
+                }
+            }
+        ]
+    )
+
 
 
 def _setup_error_from_device_state(state: tv.DeviceState) -> SetupError:
@@ -458,3 +501,19 @@ def _setup_error_from_device_state(state: tv.DeviceState) -> SetupError:
             error_type = IntegrationSetupError.CONNECTION_REFUSED
 
     return SetupError(error_type=error_type)
+
+async def handle_use_external_metadata(msg: UserDataResponse) -> SetupComplete | SetupError:
+    """Finalise setup by storing external metadata preference."""
+    global _pairing_android_tv
+
+    if not _pairing_android_tv:
+        _LOG.error("No device instance available during external metadata step.")
+        return SetupError()
+
+    selected = msg.input_values.get("use_external_metadata", "false") == "true"
+    _LOG.info("[%s] User selected use_external_metadata: %s", _pairing_android_tv.log_id, selected)
+
+    config.devices.set_device_option(_pairing_android_tv.identifier, "use_external_metadata", selected)
+    _pairing_android_tv = None
+    return SetupComplete()
+

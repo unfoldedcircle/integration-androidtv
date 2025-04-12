@@ -34,6 +34,8 @@ class AtvDevice:
     """Device manufacturer name."""
     model: str
     """Device model name."""
+    use_external_metadata: bool = False
+    """Use External Metadata."""
     auth_error: bool = False
     """Authentication error, device requires pairing."""
 
@@ -128,6 +130,7 @@ class Devices:
                 item.name = atv.name
                 item.manufacturer = atv.manufacturer
                 item.model = atv.model
+                item.use_external_metadata = atv.use_external_metadata
                 item.auth_error = atv.auth_error
                 return self.store()
         return False
@@ -162,6 +165,15 @@ class Devices:
         except ValueError:
             pass
         return False
+    
+    def set_device_option(self, atv_id: str, key: str, value: str) -> None:
+        """Set an optional setting on a specific device (like use_external_metadata)."""
+        for item in self._config:
+            if item.id == atv_id:
+                setattr(item, key, value)
+                self.store()
+                return
+        _LOG.warning("Device with ID %s not found when setting option '%s'", atv_id, key)
 
     def remove_certificates(self, atv_id: str) -> bool:
         """Remove the certificate and key files of a given Android TV instance."""
@@ -225,6 +237,7 @@ class Devices:
                     item.get("address"),
                     item.get("manufacturer", ""),
                     item.get("model", ""),
+                    item.get("use_external_metadata", False),
                     item.get("auth_error", False),
                 )
                 self._config.append(atv)

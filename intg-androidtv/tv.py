@@ -16,7 +16,6 @@ from functools import wraps
 from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
 
 import apps
-import external_metadata
 import discover
 import inputs
 import ucapi
@@ -142,6 +141,7 @@ class AndroidTv:
         identifier: str | None = None,
         profile: Profile | None = None,
         loop: AbstractEventLoop | None = None,
+        use_external_metadata: bool = False,
     ):
         """
         Create instance with given IP address of Android TV device.
@@ -171,6 +171,7 @@ class AndroidTv:
         self._profile: Profile | None = profile
         self._connection_attempts: int = 0
         self._reconnect_delay: float = MIN_RECONNECT_DELAY
+        self.use_external_metadata: bool = use_external_metadata
 
         # Hook up callbacks
         self._atv.add_is_on_updated_callback(self._is_on_updated)
@@ -504,14 +505,13 @@ class AndroidTv:
                     update["source"] = app
                     break
 
-            # Priority 3: Fallback to Google Play lookup
-            else:
-                try:
-                    friendly_name = external_metadata.get_app_name(current_app)
-                    update["source"] = friendly_name
-                except Exception as e:
-                    _LOG.warning("[%s] Failed to fetch app name from external metadata for %s: %s", self.log_id, current_app, e)
-
+        # Priority 3: Fallback to Google Play lookup
+        if self.use_external_metadata:
+            try:
+                from external_metadata import get_app_name
+                update["title"] = get_app_name(current_app)
+            except Exception as e:
+                _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
 
         # TODO verify "idle" apps, probably best to make them configurable
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
