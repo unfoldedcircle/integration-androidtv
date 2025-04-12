@@ -382,7 +382,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
 
     certfile = config.devices.default_certfile()
     keyfile = config.devices.default_keyfile()
-    _pairing_android_tv = tv.AndroidTv(certfile, keyfile, AtvDevice(address=choice, name=name, id="", use_external_metadata=False)
+    _pairing_android_tv = tv.AndroidTv(certfile, keyfile, AtvDevice(address=choice, name=name, id="", use_external_metadata=False))
     _LOG.info("Chosen Android TV: %s. Start pairing process...", choice)
 
     res = await _pairing_android_tv.init(20)
