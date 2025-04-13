@@ -13,6 +13,7 @@ Android TV devices. A standalone service can be used for development or connecti
 - Multiple Android TV devices are supported with version 0.5.0 and newer.
 - Device profiles allow device specific support and custom key bindings, for example double-click or long-press actions.  
   See [command mappings](docs/command_mapping.md) for more information.
+- Optional external metadata lookup using the Google Play Store
 
 ## Standalone Usage
 ### Setup
