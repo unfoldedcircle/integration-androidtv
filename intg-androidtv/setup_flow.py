@@ -38,12 +38,14 @@ class SetupSteps(IntEnum):
     DISCOVER = 2
     DEVICE_CHOICE = 3
     PAIRING_PIN = 4
+    RECONFIGURE = 5
 
 
 _setup_step = SetupSteps.INIT
 _cfg_add_device: bool = False
 _discovered_android_tvs: list[dict[str, str]] = []
 _pairing_android_tv: tv.AndroidTv | None = None
+_reconfigured_device: AtvDevice | None = None
 _use_chromecast: bool = False
 
 # TODO #9 externalize language texts
@@ -76,6 +78,7 @@ _user_input_discovery = RequestUserInput(
 )
 
 
+# pylint: disable=too-many-return-statements
 async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
     """
     Dispatch driver setup requests to corresponding handlers.
@@ -104,6 +107,8 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
             return await handle_device_choice(msg)
         if _setup_step == SetupSteps.PAIRING_PIN and "pin" in msg.input_values:
             return await handle_user_data_pin(msg)
+        if _setup_step == SetupSteps.RECONFIGURE:
+            return await _handle_device_reconfigure(msg)
         _LOG.error("No or invalid user response was received: %s", msg)
     elif isinstance(msg, AbortDriverSetup):
         _LOG.info("Setup was aborted with code: %s", msg.error)
@@ -175,6 +180,16 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
         if dropdown_devices:
             dropdown_actions.append(
                 {
+                    "id": "configure",
+                    "label": {
+                        "en": "Configure selected device",
+                        "fr": "Configurer l'appareil sélectionné",
+                    },
+                },
+            )
+
+            dropdown_actions.append(
+                {
                     "id": "remove",
                     "label": {
                         "en": "Delete selected device",
@@ -183,6 +198,7 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
                     },
                 },
             )
+
             dropdown_actions.append(
                 {
                     "id": "reset",
@@ -239,6 +255,7 @@ async def handle_configuration_mode(msg: UserDataResponse) -> RequestUserInput |
     """
     global _setup_step
     global _cfg_add_device
+    global _reconfigured_device
 
     action = msg.input_values["action"]
 
@@ -255,6 +272,34 @@ async def handle_configuration_mode(msg: UserDataResponse) -> RequestUserInput |
                 return SetupError(error_type=IntegrationSetupError.OTHER)
             config.devices.store()
             return SetupComplete()
+        case "configure":
+            # Reconfigure device if the identifier has changed
+            choice = msg.input_values["choice"]
+            selected_device = config.devices.get(choice)
+            if not selected_device:
+                _LOG.warning("Can not configure device from configuration: %s", choice)
+                return SetupError(error_type=IntegrationSetupError.OTHER)
+
+            _setup_step = SetupSteps.RECONFIGURE
+            _reconfigured_device = selected_device
+            use_chromecast = selected_device.use_chromecast if selected_device.use_chromecast else False
+
+            return RequestUserInput(
+                {
+                    "en": "Configure your Android TV",
+                    "fr": "Configurez votre Android TV",
+                },
+                [
+                    {
+                        "id": "chromecast",
+                        "label": {
+                            "en": "Enable Chromecast features",
+                            "fr": "Activer les fonctionnalités de Chromecast",
+                        },
+                        "field": {"checkbox": {"value": use_chromecast}},
+                    },
+                ],
+            )
         case "reset":
             config.devices.clear()  # triggers device instance removal
         case _:
@@ -460,6 +505,32 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     await asyncio.sleep(1)
 
     _LOG.info("[%s] Setup successfully completed for %s", device.name, device.id)
+    return SetupComplete()
+
+
+async def _handle_device_reconfigure(msg: UserDataResponse) -> SetupComplete | SetupError:
+    """
+    Process reconfiguration of a registered Android TV device.
+
+    :param msg: response data from the requested user data
+    :return: the setup action on how to continue: SetupComplete after updating configuration
+    """
+    # flake8: noqa:F824
+    # pylint: disable=W0602
+    global _reconfigured_device
+
+    if _reconfigured_device is None:
+        return SetupError()
+
+    use_chromecast = msg.input_values.get("chromecast", "false") == "true"
+
+    _LOG.debug("User has changed configuration")
+    _reconfigured_device.use_chromecast = use_chromecast
+
+    config.devices.add_or_update(_reconfigured_device)  # triggers ATV instance update
+    await asyncio.sleep(1)
+    _LOG.info("Setup successfully completed for %s", _reconfigured_device.name)
+
     return SetupComplete()
 
 
