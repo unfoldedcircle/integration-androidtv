@@ -343,7 +343,7 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
             },
             {
                 "id": "external_metadata",
-                "label": {"en": "Enable external metadata (e.g., Google Play names)"},
+                "label": {"en": "Enable external metadata (e.g. Friendly Application Names and Icons)"},
                 "field": {
                     "dropdown": {
                         "value": "false",
