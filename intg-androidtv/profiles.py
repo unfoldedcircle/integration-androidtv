@@ -192,7 +192,6 @@ class DeviceProfile:
                 media_player.Features.SUBTITLE,
                 media_player.Features.RECORD,
                 media_player.Features.STOP,
-                media_player.Features.SEEK,
                 media_player.Features.VOLUME,
                 media_player.Features.VOLUME_UP_DOWN,
                 media_player.Features.MUTE_TOGGLE,
