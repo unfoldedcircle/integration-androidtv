@@ -104,8 +104,6 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
             return await handle_device_choice(msg)
         if _setup_step == SetupSteps.PAIRING_PIN and "pin" in msg.input_values:
             return await handle_user_data_pin(msg)
-        if _setup_step == SetupSteps.USE_EXTERNAL_METADATA and "use_external_metadata" in msg.input_values:
-            return await handle_use_external_metadata(msg)
         _LOG.error("No or invalid user response was received: %s", msg)
     elif isinstance(msg, AbortDriverSetup):
         _LOG.info("Setup was aborted with code: %s", msg.error)
@@ -346,12 +344,7 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
             {
                 "id": "external_metadata",
                 "label": {"en": "Enable external metadata (e.g. Friendly Application Names and Icons)"},
-                "field": {
-                    "dropdown": {
-                        "value": "false",
-                        "items": [{"id": "true", "label": {"en": "Yes"}}, {"id": "false", "label": {"en": "No"}}],
-                    }
-                },
+                "field": {"checkbox": {"value": use_external_metadata}},
             },
         ],
     )

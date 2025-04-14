@@ -62,7 +62,7 @@ def get_app_metadata(package_id: str) -> dict:
                 response = requests.get(icon_url, timeout=5)
                 response.raise_for_status()
                 image = Image.open(BytesIO(response.content))
-                image = image.resize((120, 120))
+                image = image.resize(ICON_SIZE)
                 buffered = BytesIO()
                 image.save(buffered, format="PNG")
                 encoded_icon = base64.b64encode(buffered.getvalue()).decode("utf-8")
