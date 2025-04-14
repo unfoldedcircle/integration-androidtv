@@ -13,8 +13,6 @@ import os
 from dataclasses import dataclass
 from typing import Iterator
 
-from tv import AndroidTv
-
 _LOG = logging.getLogger(__name__)
 
 _CFG_FILENAME = "config.json"
@@ -30,12 +28,14 @@ class AtvDevice:
     """Friendly name of the device."""
     address: str
     """IP address of device."""
-    manufacturer: str
+    manufacturer: str = ""
     """Device manufacturer name."""
-    model: str
+    model: str = ""
     """Device model name."""
     auth_error: bool = False
     """Authentication error, device requires pairing."""
+    use_chromecast: bool = False
+    """Enable Chromecast features."""
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -129,6 +129,7 @@ class Devices:
                 item.manufacturer = atv.manufacturer
                 item.model = atv.model
                 item.auth_error = atv.auth_error
+                item.use_chromecast = atv.use_chromecast
                 return self.store()
         return False
 
@@ -226,6 +227,7 @@ class Devices:
                     item.get("manufacturer", ""),
                     item.get("model", ""),
                     item.get("auth_error", False),
+                    item.get("use_chromecast", False),
                 )
                 self._config.append(atv)
             return True
@@ -250,6 +252,9 @@ class Devices:
 
     async def migrate(self) -> bool:
         """Migrate configuration if required."""
+        # pylint: disable=C0415,R0401
+        from tv import AndroidTv
+
         result = True
         for item in self._config:
             # don't force certificate migration: default certs might be a leftover from a previous pairing attempt
@@ -260,7 +265,7 @@ class Devices:
                     item.name,
                     item.id,
                 )
-                android_tv = AndroidTv(self.certfile(item.id), self.keyfile(item.id), item.address, item.name, item.id)
+                android_tv = AndroidTv(self.certfile(item.id), self.keyfile(item.id), item)
                 if await android_tv.init(10) and await android_tv.connect(10):
                     if device_info := android_tv.device_info:
                         item.manufacturer = android_tv.device_info
