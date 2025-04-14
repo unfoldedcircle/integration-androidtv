@@ -494,17 +494,17 @@ class AndroidTv:
         # Priority 1: Use direct ID mappings
         if current_app in apps.IdMappings:
             update["source"] = apps.IdMappings[current_app]["name"]
-            update["media_image_url"] = apps.IdMappings[current_app]["media_image_url"]
+            update["media_image_url"] = ""
 
         # Priority 2: Attempt to use external library if enabled
-        elif self._device_config.use_external_metadata:
+        if self._device_config.use_external_metadata:
             try:
-                from external_metadata import get_app_metadata
-
-                metadata = get_app_metadata(current_app)
-                update["source"] = metadata["name"]
-                if "media_image_url" in metadata and metadata["media_image_url"]:
-                    update["media_image_url"] = metadata["media_image_url"]
+                from external_metadata import get_app_name, get_app_icon_path
+                app_name = get_app_name(current_app)
+                update["source"] = app_name
+                app_icon_path = get_app_icon_path(current_app)
+                if app_icon_path:
+                    update["media_image_url"] = app_icon_path
                 else:
                     update["media_image_url"] = ""
 

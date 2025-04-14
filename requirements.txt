@@ -3,3 +3,4 @@ ucapi==0.2.0
 pyee~=11.1
 google_play_scraper==1.2.7
 pillow>=11.2.1
+requests>=2.32
