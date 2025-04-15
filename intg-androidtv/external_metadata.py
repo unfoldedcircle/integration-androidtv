@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict
 
 import requests
+import base64
 from PIL import Image
 from io import BytesIO
 import google_play_scraper
@@ -13,7 +14,7 @@ _LOG = logging.getLogger(__name__)
 
 CACHE_ROOT = "external_cache"
 ICON_SUBDIR = "icons"
-ICON_SIZE = (90, 90)
+ICON_SIZE = (120, 120)
 
 # Paths
 def get_cache_root() -> Path:
@@ -70,41 +71,51 @@ def download_and_resize_icon(url: str, package_id: str) -> str | None:
     except Exception as e:
         _LOG.warning(f"Failed to fetch icon for {package_id}: {e}")
         return None
-
-def get_app_metadata(package_id: str) -> Dict[str, str]:
-    """
-    Returns a dictionary with app name and icon path:
-    {
-        "name": "YouTube",
-        "icon": "/absolute/path/to/youtube.png"
-    }
-    """
-    cache = load_cache()
-    if package_id in cache:
-        return cache[package_id]
-
+    
+def encode_icon_to_data_uri(icon_path: str) -> str:
+    try:
+        with open(icon_path, "rb") as f:
+            encoded_icon = base64.b64encode(f.read()).decode("utf-8")
+        return f"data:image/png;base64,{encoded_icon}"
+    except Exception as e:
+        _LOG.warning(f"Failed to encode icon to base64 for {icon_path}: {e}")
+        return ""
+    
+def fetch_google_play_metadata(package_id: str) -> Dict[str, str] | None:
     try:
         app = google_play_scraper.app(package_id)
+
         name = app["title"]
         icon_url = app["icon"]
-
         icon_path = download_and_resize_icon(icon_url, package_id)
-        metadata = {"name": name, "icon": icon_path or ""}
 
-        cache[package_id] = metadata
-        save_cache(cache)
-        return metadata
+
+        return {
+            "name": name,
+            "icon": icon_path or ""
+        }
 
     except Exception as e:
-        _LOG.warning(f"Failed to fetch metadata for {package_id}: {e}")
-        return {"name": package_id, "icon": ""}
+        _LOG.warning(f"Google Play metadata fetch failed for {package_id}: {e}")
+        return None
+    
+def get_app_metadata(package_id: str) -> Dict[str, str]:
+    cache = load_cache()
+    if package_id in cache:
+        icon_path = cache[package_id].get("icon")
+        icon_data_uri = encode_icon_to_data_uri(icon_path) if icon_path else ""
+        return {"name": cache[package_id]["name"], "icon": icon_data_uri}
 
+    # Try Google Play
+    metadata = fetch_google_play_metadata(package_id)
+    # if not metadata:
+        # Additional Fallback option for the future maybe APKPure or another source
+        # metadata = fetch_fallback_metadata(package_id)
 
-# Shorthand Accessors
-def get_app_name(package_id: str) -> str:
-    """Shorthand to get just the app name."""
-    return get_app_metadata(package_id).get("name")
+    if metadata:
+        cache[package_id] = metadata
+        save_cache(cache)
+        icon_data_uri = encode_icon_to_data_uri(metadata["icon"]) if metadata["icon"] else ""
+        return {"name": metadata["name"], "icon": icon_data_uri}
 
-def get_app_icon_path(package_id: str) -> str:
-    """Shorthand to get just the cached icon path."""
-    return get_app_metadata(package_id).get("icon")
+    return {"name": package_id, "icon": ""}

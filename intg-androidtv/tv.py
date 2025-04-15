@@ -489,48 +489,50 @@ class AndroidTv:
     def _current_app_updated(self, current_app: str) -> None:
         """Notify that the current app on Android TV is updated."""
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
-        update = {"source": current_app}
+        update = {"source": current_app, "media_image_url": ""}
 
         # Priority 1: Use direct ID mappings
         if current_app in apps.IdMappings:
-            update["source"] = apps.IdMappings[current_app]["name"]
-            update["media_image_url"] = ""
+            update["source"] = apps.IdMappings[current_app]
 
-        # Priority 2: Attempt to use external library if enabled
-        if self._device_config.use_external_metadata:
-            try:
-                from external_metadata import get_app_name, get_app_icon_path
-                app_name = get_app_name(current_app)
-                update["source"] = app_name
-                app_icon_path = get_app_icon_path(current_app)
-                if app_icon_path:
-                    update["media_image_url"] = app_icon_path
-                else:
-                    update["media_image_url"] = ""
-
-            except Exception as e:
-                _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
-
-        # Priority 3: Final attempt at offline fuzzy name matching
+        # Priority 3: Offline fuzzy name matching
         else:
             for query, app in apps.NameMatching.items():
                 if query in current_app:
                     update["source"] = app
-                    update["media_image_url"] = ""
                     break
 
-        # TODO verify "idle" apps, probably best to make them configurable
+        # Priority 2: Try to enrich with external metadata (if enabled and we have a title)
+        if self._device_config.use_external_metadata:
+            try:
+                from external_metadata import get_app_metadata
+
+                metadata = get_app_metadata(current_app)
+                if metadata:
+                    if metadata.get("name"):
+                        update["source"] = metadata.get("name")
+
+                    if metadata.get("icon"):
+                        update["media_image_url"] = metadata.get("icon")
+                
+            except Exception as e:
+                _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
+
+        # Handle idle apps
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update["state"] = media_player.States.ON.value
             update["title"] = "Android TV Home"
-        elif current_app in ("com.google.android.backdrop"):
+        elif current_app in ("com.google.android.backdrop",):
             update["state"] = media_player.States.STANDBY.value
             update["title"] = ""
+            update["media_image_url"] = ""
         else:
             update["state"] = media_player.States.PLAYING.value
             update["title"] = update["source"]
 
         self.events.emit(Events.UPDATE, self._identifier, update)
+
+
 
     def _volume_info_updated(self, volume_info: dict[str, str | bool]) -> None:
         """Notify that the Android TV volume information is updated."""
