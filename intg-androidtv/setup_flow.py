@@ -284,7 +284,8 @@ async def handle_configuration_mode(msg: UserDataResponse) -> RequestUserInput |
             _setup_step = SetupSteps.RECONFIGURE
             _reconfigured_device = selected_device
             use_chromecast = selected_device.use_chromecast if selected_device.use_chromecast else False
-
+            use_external_metadata = selected_device.use_external_metadata if selected_device.use_external_metadata else False
+            
             return RequestUserInput(
                 {
                     "en": "Configure your Android TV",
@@ -298,6 +299,11 @@ async def handle_configuration_mode(msg: UserDataResponse) -> RequestUserInput |
                             "fr": "Activer les fonctionnalités de Chromecast",
                         },
                         "field": {"checkbox": {"value": use_chromecast}},
+                    },
+                    {
+                        "id": "external_metadata",
+                        "label": {"en": "Enable external metadata (e.g. Friendly Application Names and Icons)"},
+                        "field": {"checkbox": {"value": use_external_metadata}},
                     },
                 ],
             )
@@ -388,16 +394,16 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                 },
             },
             {
-                "id": "external_metadata",
-                "label": {"en": "Enable external metadata (e.g. Friendly Application Names and Icons)"},
-                "field": {"checkbox": {"value": use_external_metadata}},
-            },
-            {
                 "id": "chromecast",
                 "label": {
                     "en": "Enable Chromecast features",
                     "fr": "Activer les fonctionnalités de Chromecast",
                 },
+                "field": {"checkbox": {"value": False}},
+            },
+            {
+                "id": "external_metadata",
+                "label": {"en": "Enable external metadata (e.g. Friendly Application Names and Icons)"},
                 "field": {"checkbox": {"value": False}},
             },
         ],
@@ -430,7 +436,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     certfile = config.devices.default_certfile()
     keyfile = config.devices.default_keyfile()
     _pairing_android_tv = tv.AndroidTv(
-        certfile, keyfile, AtvDevice(address=choice, name=name, id="", use_external_metadata=_use_external_metadata, use_chromecast=False)
+        certfile, keyfile, AtvDevice(address=choice, name=name, id="", use_external_metadata=False, use_chromecast=False)
     )
     _LOG.info("Chosen Android TV: %s. Start pairing process...", choice)
 
