@@ -621,7 +621,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update[MediaAttr.STATE] = media_player.States.ON.value
             if self._media_title is None:
-                update[MediaAttr.MEDIA_TITLE] = ""
+                update[MediaAttr.MEDIA_TITLE] = "Android TV Home"
         elif current_app in ("com.google.android.backdrop", "com.android.systemui"):
             update[MediaAttr.STATE] = media_player.States.STANDBY.value
             if self._media_title is None:
