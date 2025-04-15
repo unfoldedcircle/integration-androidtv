@@ -100,7 +100,10 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
 
     if isinstance(msg, UserDataResponse):
         _LOG.debug("UserDataResponse: %s %s", msg, _setup_step)
-        if _setup_step == SetupSteps.CONFIGURATION_MODE and "action" in msg.input_values:
+        if (
+            _setup_step == SetupSteps.CONFIGURATION_MODE
+            and "action" in msg.input_values
+        ):
             return await handle_configuration_mode(msg)
         if _setup_step == SetupSteps.DISCOVER and "address" in msg.input_values:
             return await _handle_discovery(msg)
@@ -218,7 +221,12 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
             {"en": "Configuration mode", "de": "Konfigurations-Modus"},
             [
                 {
-                    "field": {"dropdown": {"value": dropdown_devices[0]["id"], "items": dropdown_devices}},
+                    "field": {
+                        "dropdown": {
+                            "value": dropdown_devices[0]["id"],
+                            "items": dropdown_devices,
+                        }
+                    },
                     "id": "choice",
                     "label": {
                         "en": "Configured devices",
@@ -227,7 +235,12 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
                     },
                 },
                 {
-                    "field": {"dropdown": {"value": dropdown_actions[0]["id"], "items": dropdown_actions}},
+                    "field": {
+                        "dropdown": {
+                            "value": dropdown_actions[0]["id"],
+                            "items": dropdown_actions,
+                        }
+                    },
                     "id": "action",
                     "label": {
                         "en": "Action",
@@ -244,7 +257,9 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
     return _user_input_discovery
 
 
-async def handle_configuration_mode(msg: UserDataResponse) -> RequestUserInput | SetupComplete | SetupError:
+async def handle_configuration_mode(
+    msg: UserDataResponse,
+) -> RequestUserInput | SetupComplete | SetupError:
     """
     Process user data response in a setup process.
 
@@ -283,9 +298,17 @@ async def handle_configuration_mode(msg: UserDataResponse) -> RequestUserInput |
 
             _setup_step = SetupSteps.RECONFIGURE
             _reconfigured_device = selected_device
-            use_chromecast = selected_device.use_chromecast if selected_device.use_chromecast else False
-            use_external_metadata = selected_device.use_external_metadata if selected_device.use_external_metadata else False
-            
+            use_chromecast = (
+                selected_device.use_chromecast
+                if selected_device.use_chromecast
+                else False
+            )
+            use_external_metadata = (
+                selected_device.use_external_metadata
+                if selected_device.use_external_metadata
+                else False
+            )
+
             return RequestUserInput(
                 {
                     "en": "Configure your Android TV",
@@ -302,7 +325,9 @@ async def handle_configuration_mode(msg: UserDataResponse) -> RequestUserInput |
                     },
                     {
                         "id": "external_metadata",
-                        "label": {"en": "Enable external metadata (e.g. Friendly Application Names and Icons)"},
+                        "label": {
+                            "en": "Enable external metadata (e.g. Friendly Application Names and Icons)"
+                        },
                         "field": {"checkbox": {"value": use_external_metadata}},
                     },
                 ],
@@ -345,9 +370,13 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
         certfile = config.devices.default_certfile()
         keyfile = config.devices.default_keyfile()
         use_external_metadata = (
-            config.devices.get(address).use_external_metadata if config.devices.get(address) else False
+            config.devices.get(address).use_external_metadata
+            if config.devices.get(address)
+            else False
         )
-        android_tv = tv.AndroidTv(certfile, keyfile, AtvDevice(address=address, name="", id=""))
+        android_tv = tv.AndroidTv(
+            certfile, keyfile, AtvDevice(address=address, name="", id="")
+        )
 
         res = await android_tv.init(20)
         if res is False:
@@ -355,10 +384,16 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
 
         existing = config.devices.get(android_tv.identifier)
         if _cfg_add_device and existing and not existing.auth_error:
-            _LOG.info("Manually specified device '%s' %s: already configured", existing.name, android_tv.identifier)
+            _LOG.info(
+                "Manually specified device '%s' %s: already configured",
+                existing.name,
+                android_tv.identifier,
+            )
             # no better error code at the moment
             return SetupError(error_type=IntegrationSetupError.OTHER)
-        dropdown_items.append({"id": address, "label": {"en": f"{android_tv.name} [{address}]"}})
+        dropdown_items.append(
+            {"id": address, "label": {"en": f"{android_tv.name} [{address}]"}}
+        )
     else:
         _LOG.debug("Starting driver setup with Android TV discovery")
         # start discovery
@@ -366,11 +401,18 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
 
         # only add new devices or configured devices requiring new pairing
         for discovered_tv in _discovered_android_tvs:
-            tv_data = {"id": discovered_tv["address"], "label": {"en": discovered_tv["label"]}}
-            existing = config.devices.get_by_name_or_address(discovered_tv["name"], discovered_tv["address"])
+            tv_data = {
+                "id": discovered_tv["address"],
+                "label": {"en": discovered_tv["label"]},
+            }
+            existing = config.devices.get_by_name_or_address(
+                discovered_tv["name"], discovered_tv["address"]
+            )
             if _cfg_add_device and existing and not existing.auth_error:
                 _LOG.info(
-                    "Skipping found device '%s' %s: already configured", discovered_tv["name"], discovered_tv["address"]
+                    "Skipping found device '%s' %s: already configured",
+                    discovered_tv["name"],
+                    discovered_tv["address"],
                 )
                 continue
             dropdown_items.append(tv_data)
@@ -382,10 +424,18 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
     _setup_step = SetupSteps.DEVICE_CHOICE
     # TODO #9 externalize language texts
     return RequestUserInput(
-        title={"en": "Please choose your Android TV", "de": "Bitte Android TV auswählen"},
+        title={
+            "en": "Please choose your Android TV",
+            "de": "Bitte Android TV auswählen",
+        },
         settings=[
             {
-                "field": {"dropdown": {"value": dropdown_items[0]["id"], "items": dropdown_items}},
+                "field": {
+                    "dropdown": {
+                        "value": dropdown_items[0]["id"],
+                        "items": dropdown_items,
+                    }
+                },
                 "id": "choice",
                 "label": {
                     "en": "Choose your Android TV",
@@ -403,7 +453,9 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
             },
             {
                 "id": "external_metadata",
-                "label": {"en": "Enable external metadata (e.g. Friendly Application Names and Icons)"},
+                "label": {
+                    "en": "Enable external metadata (e.g. Friendly Application Names and Icons)"
+                },
                 "field": {"checkbox": {"value": False}},
             },
         ],
@@ -425,7 +477,9 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     global _use_external_metadata
 
     choice = msg.input_values["choice"]
-    _use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
+    _use_external_metadata = (
+        msg.input_values.get("external_metadata", "false") == "true"
+    )
     _use_chromecast = msg.input_values.get("chromecast", "false") == "true"
     name = ""
 
@@ -436,7 +490,15 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     certfile = config.devices.default_certfile()
     keyfile = config.devices.default_keyfile()
     _pairing_android_tv = tv.AndroidTv(
-        certfile, keyfile, AtvDevice(address=choice, name=name, id="", use_external_metadata=False, use_chromecast=False)
+        certfile,
+        keyfile,
+        AtvDevice(
+            address=choice,
+            name=name,
+            id="",
+            use_external_metadata=False,
+            use_chromecast=False,
+        ),
     )
     _LOG.info("Chosen Android TV: %s. Start pairing process...", choice)
 
@@ -456,7 +518,13 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
                 "de": "Bitte gib die auf deinem Android-Fernseher angezeigte PIN ein",
                 "fr": "Veuillez saisir le code PIN affiché sur votre Android TV",
             },
-            [{"field": {"text": {"value": "000000"}}, "id": "pin", "label": {"en": "Android TV PIN"}}],
+            [
+                {
+                    "field": {"text": {"value": "000000"}},
+                    "id": "pin",
+                    "label": {"en": "Android TV PIN"},
+                }
+            ],
         )
 
     return _setup_error_from_device_state(_pairing_android_tv.state)
@@ -486,18 +554,27 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
 
     # Connect again to retrieve device identifier (with init()) and additional device information (with connect())
     if res == ucapi.StatusCodes.OK:
-        _LOG.info("[%s] Pairing done, retrieving device information", _pairing_android_tv.log_id)
+        _LOG.info(
+            "[%s] Pairing done, retrieving device information",
+            _pairing_android_tv.log_id,
+        )
         res = ucapi.StatusCodes.SERVER_ERROR
         timeout = int(tv.CONNECTION_TIMEOUT)
-        if await _pairing_android_tv.init(timeout) and await _pairing_android_tv.connect(timeout):
+        if await _pairing_android_tv.init(
+            timeout
+        ) and await _pairing_android_tv.connect(timeout):
             device_info = _pairing_android_tv.device_info or {}
-            if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier, True):
+            if config.devices.assign_default_certs_to_device(
+                _pairing_android_tv.identifier, True
+            ):
                 res = ucapi.StatusCodes.OK
         _pairing_android_tv.disconnect()
 
     if res != ucapi.StatusCodes.OK:
         state = _pairing_android_tv.state
-        _LOG.info("[%s] Setup failed: %s (state=%s)", _pairing_android_tv.log_id, res, state)
+        _LOG.info(
+            "[%s] Setup failed: %s (state=%s)", _pairing_android_tv.log_id, res, state
+        )
         _pairing_android_tv = None
         return _setup_error_from_device_state(state)
 
@@ -521,7 +598,9 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     return SetupComplete()
 
 
-async def _handle_device_reconfigure(msg: UserDataResponse) -> SetupComplete | SetupError:
+async def _handle_device_reconfigure(
+    msg: UserDataResponse,
+) -> SetupComplete | SetupError:
     """
     Process reconfiguration of a registered Android TV device.
 
