@@ -36,6 +36,8 @@ class AtvDevice:
     """Authentication error, device requires pairing."""
     use_external_metadata: bool = False
     """Enable External Metadata."""
+    use_chromecast: bool = False
+    """Enable Chromecast features."""
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -130,6 +132,7 @@ class Devices:
                 item.model = atv.model
                 item.auth_error = atv.auth_error
                 item.use_external_metadata = atv.use_external_metadata
+                item.use_chromecast = atv.use_chromecast
                 return self.store()
         return False
 
@@ -228,6 +231,7 @@ class Devices:
                     item.get("model", ""),
                     item.get("auth_error", False),
                     item.get("use_external_metadata", False),
+                    item.get("use_chromecast", False),
                 )
                 self._config.append(atv)
             return True
@@ -252,6 +256,7 @@ class Devices:
 
     async def migrate(self) -> bool:
         """Migrate configuration if required."""
+        # pylint: disable=C0415,R0401
         from tv import AndroidTv
 
         result = True

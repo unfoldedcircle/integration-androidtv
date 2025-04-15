@@ -1,6 +1,7 @@
-androidtvremote2==0.1.1
+androidtvremote2==0.2.1
 ucapi==0.2.0
-pyee~=11.1
+pyee~=13.0.0
 google_play_scraper==1.2.7
 pillow>=11.2.1
 requests>=2.32
+pychromecast~=14.0.7

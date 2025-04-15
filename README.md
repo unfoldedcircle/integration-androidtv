@@ -1,6 +1,6 @@
 # Android TV integration for Remote Two/3
 
-Using [androidtvremote2](https://github.com/tronikos/androidtvremote2), [uc-integration-api](https://github.com/aitatoi/integration-python-library) and [google-play-scraper](https://github.com/JoMingyu/google-play-scraper).
+Using [androidtvremote2](https://github.com/tronikos/androidtvremote2), [uc-integration-api](https://github.com/aitatoi/integration-python-library), [pychromecast](https://github.com/home-assistant-libs/pychromecast) and [google-play-scraper](https://github.com/JoMingyu/google-play-scraper).
 
 The integration currently supports almost all features that the androidtvremote2 library provides.
 Button control and ON/OFF states are supported. Unfortunately media image and playing information are not retrievable.
