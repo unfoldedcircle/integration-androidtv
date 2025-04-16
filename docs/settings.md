@@ -12,6 +12,8 @@
   - When using mesh networking or professional networking gear, mDNS may be disabled or only specific mDNS services may
     be allowed.  
     In such cases, please check the manufacturer's documentation on how to enable mDNS or specific mDNS services.
+- When using DHCP: a static IP address reservation for the Android TV devices is recommended.  
+  A fixed IP address can speed up reconnection after the Remote wakes up from standby.
 
 ## Limitations and Known Issues
 
@@ -24,6 +26,8 @@
   - If these don't work, neither will this integration.
 - Not every app will work or supports all keycodes.
   - For example, some IP-TV apps don't support channel-up & down commands.  
+- Retrieving the installed applications is not supported.
+  - The shown apps in the input selection list are a pre-defined list of common applications.
 - Some devices, like TCL, become unavailable after they are turned off, unless you activate the `Screenless service`.  
   - Activate it under: Settings, System, Power and energy: Screenless service
 

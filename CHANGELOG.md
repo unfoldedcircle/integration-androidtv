@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+### Added
+- Google Cast for media info & seeking support. Contributed by @albaintor, thanks! ([#57](https://github.com/unfoldedcircle/integration-androidtv/pull/57))
+  - This is currently a preview feature and must be enabled in the device configuration of the integration setup.
+- myCANAL application ([#55](https://github.com/unfoldedcircle/integration-androidtv/pull/55))
+
+### Changed
+- Add support article link and change setup description in first setup flow screen.
+
 ---
 
 ## v0.6.3 - 2024-12-08

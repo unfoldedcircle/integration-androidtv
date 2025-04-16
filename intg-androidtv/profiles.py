@@ -81,9 +81,6 @@ CHROMECAST_FEATURES = [
     media_player.Features.MEDIA_DURATION,
     media_player.Features.MEDIA_TYPE,
     media_player.Features.SEEK,
-    media_player.Features.VOLUME,
-    media_player.Features.VOLUME_UP_DOWN,
-    media_player.Features.MUTE_TOGGLE,
 ]
 
 
