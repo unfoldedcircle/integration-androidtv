@@ -326,7 +326,8 @@ async def handle_configuration_mode(
                     {
                         "id": "external_metadata",
                         "label": {
-                            "en": "Enable external metadata (e.g. Friendly Application Names and Icons)"
+                            "en": "Enable enhanched metadata (e.g. Friendly Application Names and Icons)",
+                            "fr": "Activer les métadonnées améliorées (par exemple, noms et icônes d'application)",
                         },
                         "field": {"checkbox": {"value": use_external_metadata}},
                     },
