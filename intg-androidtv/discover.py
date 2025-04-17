@@ -24,7 +24,10 @@ async def android_tvs(timeout: int = 10) -> list[dict[str, str]]:
     discovered_android_tvs: list[dict[str, str]] = []
 
     def on_service_state_changed(
-        zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange
+        zeroconf: Zeroconf,
+        service_type: str,
+        name: str,
+        state_change: ServiceStateChange,
     ) -> None:
         if state_change is not ServiceStateChange.Added:
             return
@@ -32,7 +35,9 @@ async def android_tvs(timeout: int = 10) -> list[dict[str, str]]:
         _LOG.info("Found service: %s, %s", service_type, name)
         _ = asyncio.ensure_future(display_service_info(zeroconf, service_type, name))
 
-    async def display_service_info(zeroconf: Zeroconf, service_type: str, name: str) -> None:
+    async def display_service_info(
+        zeroconf: Zeroconf, service_type: str, name: str
+    ) -> None:
         info = AsyncServiceInfo(service_type, name)
         await info.async_request(zeroconf, 3000)
 
@@ -44,7 +49,11 @@ async def android_tvs(timeout: int = 10) -> list[dict[str, str]]:
 
             addresses = info.parsed_scoped_addresses()
             if addresses:
-                discovered_tv = {"name": name_final, "label": f"{name_final} [{addresses[0]}]", "address": addresses[0]}
+                discovered_tv = {
+                    "name": name_final,
+                    "label": f"{name_final} [{addresses[0]}]",
+                    "address": addresses[0],
+                }
                 discovered_android_tvs.append(discovered_tv)
         else:
             _LOG.debug("No info for %s", name)
@@ -55,7 +64,9 @@ async def android_tvs(timeout: int = 10) -> list[dict[str, str]]:
         aiozc = AsyncZeroconf()
         services = ["_androidtvremote2._tcp.local."]
 
-        aiobrowser = AsyncServiceBrowser(aiozc.zeroconf, services, handlers=[on_service_state_changed])
+        aiobrowser = AsyncServiceBrowser(
+            aiozc.zeroconf, services, handlers=[on_service_state_changed]
+        )
 
         await asyncio.sleep(timeout)
         await aiobrowser.async_cancel()
