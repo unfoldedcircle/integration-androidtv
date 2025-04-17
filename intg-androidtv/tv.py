@@ -892,7 +892,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             and status.images[0] != self._media_image_url
         ):
             self._media_image_url = status.images[0]
-            update[MediaAttr.MEDIA_IMAGE_URL] = self._media_image_url
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._media_image_url)
+
+            if(self._media_image_url.url)
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._media_image_url)
             # prevent media image being overwritten with app icon
             self._use_app_url = False
         elif self._media_image_url:
@@ -901,8 +904,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if not self._media_image_url:
             # safe to use media image for app icon
             self._use_app_url = True
-            update[MediaAttr.MEDIA_IMAGE_URL] = self._app_image_url
-            
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._app_image_url)
+
         if update:
             _LOG.debug(
                 "[%s] Update remote with Chromecast info : %s", self.log_id, update
