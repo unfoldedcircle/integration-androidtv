@@ -626,68 +626,78 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _current_app_updated(self, current_app: str) -> None:
-        """Notify that the current app on Android TV is updated."""
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
         update = {MediaAttr.SOURCE: current_app}
         current_title = self.media_title
 
-        # Priority 1: Use direct ID mappings
+        has_id_mapping = False
+        has_name_match = False
+        has_external_metadata = False
+
+        # Priority 1: Offline ID mapping
         if current_app in apps.IdMappings:
             update[MediaAttr.SOURCE] = apps.IdMappings[current_app]
             self._media_app = current_app
+            has_id_mapping = True
 
-        # Priority 3: Offline fuzzy name matching
-        else:
+        # Priority 2: Offline fuzzy name matching
+        elif not has_id_mapping:
             for query, app in apps.NameMatching.items():
                 if query in current_app:
                     update[MediaAttr.SOURCE] = app
                     self._media_app = app
+                    has_name_match = True
                     break
 
-        # Priority 2: Try to enrich with external metadata (if enabled and we have a title)
+        # Priority 3: External metadata
         if self._device_config.use_external_metadata:
             try:
-
                 metadata = get_app_metadata(current_app)
                 if metadata:
                     if metadata.get("name"):
-                        update[MediaAttr.SOURCE] = metadata.get("name")
-                        self._media_app = metadata.get("name")
+                        update[MediaAttr.SOURCE] = metadata["name"]
+                        self._media_app = metadata["name"]
+                        has_external_metadata = True
 
                     if metadata.get("icon"):
-                        self._app_image_url = metadata.get("icon")
+                        self._app_image_url = metadata["icon"]
                         if self._use_app_url:
                             update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
                                 self._app_image_url
                             )
 
-                    if self._media_title is None:
-                        update[MediaAttr.MEDIA_TITLE] = (
-                            metadata.get("name") or update[MediaAttr.SOURCE]
-                        )
-
-                if self._media_title is None or self._media_title == "":
-                    update[MediaAttr.MEDIA_TITLE] = (
-                        metadata.get("name") or update[MediaAttr.SOURCE]
-                    )
+                    if self._media_title is None and metadata.get("name"):
+                        update[MediaAttr.MEDIA_TITLE] = metadata["name"]
 
             except Exception as e:
                 _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
 
-        # TODO verify "idle" apps, probably best to make them configurable
+            # External metadata was enabled but failed or returned no usable icon
+            if self._device_config.use_external_metadata and self._use_app_url:
+                if not self._app_image_url:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = ""
+
+        # State + fallback handling
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update[MediaAttr.STATE] = media_player.States.ON.value
             if self._media_title is None:
                 update[MediaAttr.MEDIA_TITLE] = "Android TV Home"
-        elif current_app in ("com.google.android.backdrop"):
+                update[MediaAttr.SOURCE] = "Android TV Home"
+                update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
+                    "data/external_cache/icons/androidtv.png"
+                )
+        elif current_app in ("com.google.android.backdrop",):
             update[MediaAttr.STATE] = media_player.States.STANDBY.value
-            if self._media_title is None:
-                update[MediaAttr.MEDIA_TITLE] = ""
+            update[MediaAttr.MEDIA_TITLE] = ""
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
+                "data/external_cache/icons/androidtv.png"
+            )
         else:
             update[MediaAttr.STATE] = media_player.States.PLAYING.value
-            if self._media_title is None:
+            if update.get(MediaAttr.MEDIA_TITLE) is None:
                 update[MediaAttr.MEDIA_TITLE] = update[MediaAttr.SOURCE]
 
+        # Update if changed
         if current_title != self.media_title:
             update[MediaAttr.MEDIA_TITLE] = self.media_title
 
