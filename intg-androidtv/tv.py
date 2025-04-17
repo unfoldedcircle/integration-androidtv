@@ -894,8 +894,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self._media_image_url = status.images[0]
             update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._media_image_url)
 
-            if(self._media_image_url.url):
-            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._media_image_url)
+            if not self._media_image_url.url:
+                update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._media_image_url)
             # prevent media image being overwritten with app icon
             self._use_app_url = False
         elif self._media_image_url:
