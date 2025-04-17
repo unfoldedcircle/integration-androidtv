@@ -10,6 +10,7 @@ import asyncio
 import logging
 import os
 import sys
+from copy import copy
 from typing import Any
 
 import setup_flow
@@ -243,7 +244,11 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
 
     if _LOG.isEnabledFor(logging.DEBUG):
         device = config.devices.get(atv_id)
-        _LOG.debug("[%s] device update: %s", device.name if device else atv_id, update)
+        # filter media_image_url property
+        log_upd = copy(update)
+        if MediaAttr.MEDIA_IMAGE_URL in log_upd:
+            log_upd[MediaAttr.MEDIA_IMAGE_URL] = "***"
+        _LOG.debug("[%s] device update: %s", device.name if device else atv_id, log_upd)
 
     old_state = (
         configured_entity.attributes[MediaAttr.STATE]
