@@ -85,10 +85,8 @@ def encode_icon_to_data_uri(icon_path: str) -> str:
     """
     Accepts a local file path or remote URL.
     Returns a base64-encoded PNG data URI.
-    Optionally resizes to a specific height, preserving aspect ratio.
     """
     try:
-        # Load image data
         if is_url(icon_path):
             response = requests.get(icon_path, timeout=10)
             response.raise_for_status()
@@ -96,12 +94,13 @@ def encode_icon_to_data_uri(icon_path: str) -> str:
         else:
             with open(icon_path, "rb") as f:
                 img = Image.open(f)
+                img.load()  # Ensure the image is fully loaded before the file is closed
 
-        # Save to buffer
+        img = img.convert("RGBA")
+
         buffer = BytesIO()
         img.save(buffer, format="PNG")
         encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
-
         return f"data:image/png;base64,{encoded}"
 
     except Exception as e:
