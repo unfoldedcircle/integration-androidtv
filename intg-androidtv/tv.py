@@ -698,14 +698,15 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     def _is_on_updated(self, is_on: bool) -> None:
         """Notify that the Android TV power state is updated."""
         _LOG.info("[%s] is on: %s", self.log_id, is_on)
+        current_app = self._atv.current_app or ""
         if is_on:
             self._chromecast_connect()
-            current_app = self._atv.current_app or ""
             update = self.apply_current_app_metadata(current_app)
             update[MediaAttr.STATE] = media_player.States.ON.value
 
         else:
             update = {MediaAttr.STATE: media_player.States.OFF.value}
+            update = self.apply_current_app_metadata(current_app)
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _current_app_updated(self, current_app: str) -> None:
