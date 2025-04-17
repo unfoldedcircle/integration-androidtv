@@ -80,14 +80,46 @@ def download_and_resize_icon(url: str, package_id: str) -> str | None:
         return None
 
 
-def encode_icon_to_data_uri(icon_path: str) -> str:
+def encode_icon_to_data_uri(icon_path: str, target_height: int = None) -> str:
+    """
+    Accepts a local file path or remote URL.
+    Returns a base64-encoded PNG data URI.
+    Optionally resizes to a specific height, preserving aspect ratio.
+    """
     try:
-        with open(icon_path, "rb") as f:
-            encoded_icon = base64.b64encode(f.read()).decode("utf-8")
-        return f"data:image/png;base64,{encoded_icon}"
+        # Load image
+        if is_url(icon_path):
+            response = requests.get(icon_path, timeout=10)
+            response.raise_for_status()
+            img = Image.open(BytesIO(response.content))
+        else:
+            with open(icon_path, "rb") as f:
+                img = Image.open(f)
+
+        img = img.convert("RGBA")
+
+        # Resize if target height is provided
+        if target_height:
+            width, height = img.size
+            scale = target_height / float(height)
+            new_width = int(width * scale)
+            img = img.resize((new_width, target_height), Image.LANCZOS)
+
+        # Save to buffer
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+        return f"data:image/png;base64,{encoded}"
+
     except Exception as e:
         _LOG.warning(f"Failed to encode icon to base64 for {icon_path}: {e}")
         return ""
+
+
+def is_url(path: str) -> bool:
+    parsed = urlparse(path)
+    return parsed.scheme in ("http", "https")
 
 
 def fetch_google_play_metadata(package_id: str) -> Dict[str, str] | None:
