@@ -5,6 +5,7 @@ import os
 from io import BytesIO
 from pathlib import Path
 from typing import Dict
+from urllib.parse import urlparse
 
 import google_play_scraper
 import requests
@@ -80,14 +81,14 @@ def download_and_resize_icon(url: str, package_id: str) -> str | None:
         return None
 
 
-def encode_icon_to_data_uri(icon_path: str, target_height: int = None) -> str:
+def encode_icon_to_data_uri(icon_path: str) -> str:
     """
     Accepts a local file path or remote URL.
     Returns a base64-encoded PNG data URI.
     Optionally resizes to a specific height, preserving aspect ratio.
     """
     try:
-        # Load image
+        # Load image data
         if is_url(icon_path):
             response = requests.get(icon_path, timeout=10)
             response.raise_for_status()
@@ -95,15 +96,6 @@ def encode_icon_to_data_uri(icon_path: str, target_height: int = None) -> str:
         else:
             with open(icon_path, "rb") as f:
                 img = Image.open(f)
-
-        img = img.convert("RGBA")
-
-        # Resize if target height is provided
-        if target_height:
-            width, height = img.size
-            scale = target_height / float(height)
-            new_width = int(width * scale)
-            img = img.resize((new_width, target_height), Image.LANCZOS)
 
         # Save to buffer
         buffer = BytesIO()
