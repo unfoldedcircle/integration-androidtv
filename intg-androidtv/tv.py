@@ -14,6 +14,7 @@ from asyncio import AbstractEventLoop, timeout
 from enum import IntEnum
 from functools import wraps
 from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
+from external_metadata import get_app_metadata, encode_icon_to_data_uri
 
 import apps
 import discover
@@ -234,11 +235,13 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._media_artist: str | None = None
         self._media_position = 0
         self._media_duration = 0
-        self._last_update_position_time: float = 0
-        self._media_type = METADATA_TYPE_MOVIE
-        self._media_image_url: str | None = None
-        self._player_state = media_player.States.ON
-        self._muted = False
+         self._last_update_position_time: float = 0
+         self._media_type = METADATA_TYPE_MOVIE
+         self._media_image_url: str | None = None
+         self._app_image_url: str = ""
+         self._use_app_url = not device_config.use_chromecast
+         self._player_state = media_player.States.ON
+         self._muted = False
 
     def __del__(self):
         """Destructs instance, disconnect AndroidTVRemote."""
@@ -643,7 +646,6 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         # Priority 2: Try to enrich with external metadata (if enabled and we have a title)
         if self._device_config.use_external_metadata:
             try:
-                from external_metadata import get_app_metadata
 
                 metadata = get_app_metadata(current_app)
                 if metadata:
@@ -651,7 +653,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                         update[MediaAttr.SOURCE] = metadata.get("name")
 
                     if metadata.get("icon"):
-                        update["media_image_url"] = metadata.get("icon")
+                        self._app_image_url = metadata.get("icon")
+                        if self._use_app_url:
+                             update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._app_image_url)
 
             except Exception as e:
                 _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
@@ -889,10 +893,16 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         ):
             self._media_image_url = status.images[0]
             update[MediaAttr.MEDIA_IMAGE_URL] = self._media_image_url
+            # prevent media image being overwritten with app icon
+            self._use_app_url = False
         elif self._media_image_url:
             self._media_image_url = None
-            update[MediaAttr.MEDIA_IMAGE_URL] = ""
 
+        if not self._media_image_url:
+            # safe to use media image for app icon
+            self._use_app_url = True
+            update[MediaAttr.MEDIA_IMAGE_URL] = self._app_image_url
+            
         if update:
             _LOG.debug(
                 "[%s] Update remote with Chromecast info : %s", self.log_id, update
