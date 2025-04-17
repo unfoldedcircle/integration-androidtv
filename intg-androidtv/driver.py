@@ -246,9 +246,9 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
         device = config.devices.get(atv_id)
         # filter media_image_url property
         log_upd = copy(update)
-        if MediaAttr.MEDIA_IMAGE_URL in log_upd:
-            log_upd[MediaAttr.MEDIA_IMAGE_URL] = "***"
-        _LOG.debug("[%s] device update: %s", device.name if device else atv_id, log_upd)
+        # if MediaAttr.MEDIA_IMAGE_URL in log_upd:
+        # log_upd[MediaAttr.MEDIA_IMAGE_URL] = "***"
+        # _LOG.debug("[%s] device update: %s", device.name if device else atv_id, log_upd)
 
     old_state = (
         configured_entity.attributes[MediaAttr.STATE]

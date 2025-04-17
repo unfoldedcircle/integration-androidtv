@@ -652,11 +652,24 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 if metadata:
                     if metadata.get("name"):
                         update[MediaAttr.SOURCE] = metadata.get("name")
+                        self._media_app = metadata.get("name")
 
                     if metadata.get("icon"):
                         self._app_image_url = metadata.get("icon")
                         if self._use_app_url:
-                            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._app_image_url)
+                            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
+                                self._app_image_url
+                            )
+
+                    if self._media_title is None:
+                        update[MediaAttr.MEDIA_TITLE] = (
+                            metadata.get("name") or update[MediaAttr.SOURCE]
+                        )
+
+                if self._media_title is None or self._media_title == "":
+                    update[MediaAttr.MEDIA_TITLE] = (
+                        metadata.get("name") or update[MediaAttr.SOURCE]
+                    )
 
             except Exception as e:
                 _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
@@ -887,25 +900,20 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             )
             update[MediaAttr.MEDIA_TYPE] = self._media_type
 
-        if (
-            status.images
-            and len(status.images) > 0
-            and status.images[0] != self._media_image_url
-        ):
+        if status.images and len(status.images) > 0:
             self._media_image_url = status.images[0]
-            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._media_image_url)
-
-            if not self._media_image_url.url:
-                update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._media_image_url)
-            # prevent media image being overwritten with app icon
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
+                self._media_image_url
+            )
             self._use_app_url = False
-        elif self._media_image_url:
+        else:
             self._media_image_url = None
-
-        if not self._media_image_url:
-            # safe to use media image for app icon
-            self._use_app_url = True
-            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._app_image_url)
+            if self._device_config.use_external_metadata:
+                self._use_app_url = True
+                if self._app_image_url:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
+                        self._app_image_url
+                    )
 
         if update:
             # filter media_image_url property

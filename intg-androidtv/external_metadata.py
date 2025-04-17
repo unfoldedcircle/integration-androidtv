@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 import google_play_scraper
 import requests
 from PIL import Image
+from pychromecast.controllers.media import MediaImage
 
 _LOG = logging.getLogger(__name__)
 
@@ -86,6 +87,13 @@ def encode_icon_to_data_uri(icon_path: str) -> str:
     Accepts a local file path or remote URL.
     Returns a base64-encoded PNG data URI.
     """
+    if isinstance(icon_path, MediaImage):
+        icon_path = icon_path.url
+
+    # Already a base64 data URI
+    if isinstance(icon_path, str) and icon_path.startswith("data:image"):
+        return icon_path
+
     try:
         if is_url(icon_path):
             response = requests.get(icon_path, timeout=10)
