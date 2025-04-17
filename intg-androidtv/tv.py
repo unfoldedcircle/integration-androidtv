@@ -613,7 +613,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self.events.emit(Events.DISCONNECTED, self._identifier)
 
     # Callbacks
-    def _apply_current_app_metadata(self, current_app: str) -> dict:
+    # Callbacks
+    def apply_current_app_metadata(self, current_app: str) -> dict:
         update = {MediaAttr.SOURCE: current_app}
         current_title = self.media_title
 
@@ -659,10 +660,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             except Exception as e:
                 _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
 
-            if self._device_config.use_external_metadata and self._use_app_url:
-                if not self._app_image_url:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = ""
+            if self._use_app_url and not self._app_image_url:
+                update[MediaAttr.MEDIA_IMAGE_URL] = ""
 
+        # Known system apps and idle apps
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update[MediaAttr.STATE] = media_player.States.ON.value
             if self._media_title is None:
@@ -685,15 +686,24 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if current_title != self.media_title:
             update[MediaAttr.MEDIA_TITLE] = self.media_title
 
+        # Handle unknown or invalid app id fallback
+        if not (has_id_mapping or has_name_match or has_external_metadata):
+            _LOG.debug("[%s] No metadata found for app: %s", self.log_id, current_app)
+            if self._media_title is None:
+                update[MediaAttr.MEDIA_TITLE] = current_app
+            update.setdefault(MediaAttr.MEDIA_IMAGE_URL, "")
+
         return update
 
     def _is_on_updated(self, is_on: bool) -> None:
         """Notify that the Android TV power state is updated."""
         _LOG.info("[%s] is on: %s", self.log_id, is_on)
         if is_on:
-            update = self._apply_current_app_metadata(self._atv.current_app or "")
-            update[MediaAttr.STATE] = media_player.States.ON.value
             self._chromecast_connect()
+            current_app = self._atv.current_app or ""
+            update = self.apply_current_app_metadata(current_app)
+            update[MediaAttr.STATE] = media_player.States.ON.value
+
         else:
             update = {MediaAttr.STATE: media_player.States.OFF.value}
         self.events.emit(Events.UPDATE, self._identifier, update)
@@ -701,7 +711,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     def _current_app_updated(self, current_app: str) -> None:
         """Notify that the current app on Android TV is updated."""
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
-        update = self._apply_current_app_metadata(current_app)
+        update = self.apply_current_app_metadata(current_app)
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _volume_info_updated(self, volume_info: dict[str, str | bool]) -> None:
