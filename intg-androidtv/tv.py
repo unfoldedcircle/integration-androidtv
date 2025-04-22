@@ -911,8 +911,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             )
             update[MediaAttr.MEDIA_TYPE] = self._media_type
 
-        if status.images and len(status.images) > 0:
-            self._media_image_url = status.images[0]
+         if status.images and len(status.images) > 0 and status.images[0].url != self._media_image_url
+            self._media_image_url = status.images[0].url
             update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
                 self._media_image_url
             )

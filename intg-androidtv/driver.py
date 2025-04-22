@@ -11,6 +11,7 @@ import logging
 import os
 import sys
 from copy import copy
+from datetime import UTC, datetime
 from typing import Any
 
 import setup_flow
@@ -273,6 +274,7 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
 
     if MediaAttr.MEDIA_POSITION in update:
         attributes[MediaAttr.MEDIA_POSITION] = update[MediaAttr.MEDIA_POSITION]
+        attributes["media_position_updated_at"] = datetime.now(tz=UTC).isoformat()
 
     if MediaAttr.MEDIA_DURATION in update:
         attributes[MediaAttr.MEDIA_DURATION] = update[MediaAttr.MEDIA_DURATION]
