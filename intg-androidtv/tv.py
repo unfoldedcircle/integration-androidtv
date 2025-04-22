@@ -613,66 +613,67 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self.events.emit(Events.DISCONNECTED, self._identifier)
 
     # Callbacks
-    # Callbacks
     def apply_current_app_metadata(self, current_app: str) -> dict:
-        update = {MediaAttr.SOURCE: current_app}
-        current_title = self.media_title
+        update = {}
 
-        has_id_mapping = False
-        has_name_match = False
-        has_external_metadata = False
+        # Track state of data sources
+        offline_name = None
+        offline_match = None
+        external_name = None
+        external_icon = None
 
-        # Priority 1: Offline ID mapping
+        # Try offline ID mapping first
         if current_app in apps.IdMappings:
-            update[MediaAttr.SOURCE] = apps.IdMappings[current_app]
-            self._media_app = current_app
-            has_id_mapping = True
+            offline_name = apps.IdMappings[current_app]
+            self._media_app = offline_name
 
-        # Priority 2: Offline fuzzy name matching
-        elif not has_id_mapping:
-            for query, app in apps.NameMatching.items():
+        # Try fuzzy offline name matching if ID mapping failed
+        if not offline_name:
+            for query, name in apps.NameMatching.items():
                 if query in current_app:
-                    update[MediaAttr.SOURCE] = app
-                    self._media_app = app
-                    has_name_match = True
+                    offline_match = name
+                    self._media_app = name
                     break
 
-        # Priority 3: External metadata
-        if self._device_config.use_external_metadata:
-            try:
-                metadata = get_app_metadata(current_app)
-                if metadata:
-                    if metadata.get("name"):
-                        update[MediaAttr.SOURCE] = metadata["name"]
-                        self._media_app = metadata["name"]
-                        has_external_metadata = True
+        # Try external metadata
+        metadata = (
+            get_app_metadata(current_app)
+            if self._device_config.use_external_metadata
+            else None
+        )
+        if metadata:
+            external_name = metadata.get("name")
+            external_icon = metadata.get("icon")
+            if external_name:
+                self._media_app = external_name
 
-                    if metadata.get("icon"):
-                        self._app_image_url = metadata["icon"]
-                        if self._use_app_url:
-                            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
-                                self._app_image_url
-                            )
+        # Determine final name/title to use
+        name_to_use = offline_name or offline_match or external_name or current_app
+        update[MediaAttr.SOURCE] = name_to_use
+        update[MediaAttr.MEDIA_TITLE] = name_to_use
 
-                    if self._media_title is None and metadata.get("name"):
-                        update[MediaAttr.MEDIA_TITLE] = metadata["name"]
+        # Determine which icon to use
+        icon_to_use = None
+        if self._device_config.use_external_metadata and self._use_app_url:
+            if external_icon:
+                icon_to_use = encode_icon_to_data_uri(external_icon)
+            else:
+                icon_to_use = ""  # Explicitly clear if expected but missing
+        elif self._media_image_url:
+            icon_to_use = encode_icon_to_data_uri(self._media_image_url)
 
-            except Exception as e:
-                _LOG.warning("[%s] Failed to get external metadata: %s", self.log_id, e)
+        if icon_to_use is not None:
+            update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
 
-            if self._use_app_url and not self._app_image_url:
-                update[MediaAttr.MEDIA_IMAGE_URL] = ""
-
-        # Known system apps and idle apps
+        # Special case handling for Android TV system apps
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update[MediaAttr.STATE] = media_player.States.ON.value
-            if self._media_title is None:
-                update[MediaAttr.MEDIA_TITLE] = "Android TV Home"
-                update[MediaAttr.SOURCE] = "Android TV Home"
-                update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
-                    "data/external_cache/icons/androidtv.png"
-                )
-        elif current_app in ("com.google.android.backdrop",):
+            update[MediaAttr.MEDIA_TITLE] = "Android TV Home"
+            update[MediaAttr.SOURCE] = "Android TV Home"
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
+                "data/external_cache/icons/androidtv.png"
+            )
+        elif current_app == "com.google.android.backdrop":
             update[MediaAttr.STATE] = media_player.States.STANDBY.value
             update[MediaAttr.MEDIA_TITLE] = ""
             update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
@@ -680,18 +681,6 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             )
         else:
             update[MediaAttr.STATE] = media_player.States.PLAYING.value
-            if update.get(MediaAttr.MEDIA_TITLE) is None:
-                update[MediaAttr.MEDIA_TITLE] = update[MediaAttr.SOURCE]
-
-        if current_title != self.media_title:
-            update[MediaAttr.MEDIA_TITLE] = self.media_title
-
-        # Handle unknown or invalid app id fallback
-        if not (has_id_mapping or has_name_match or has_external_metadata):
-            _LOG.debug("[%s] No metadata found for app: %s", self.log_id, current_app)
-            if self._media_title is None:
-                update[MediaAttr.MEDIA_TITLE] = current_app
-            update.setdefault(MediaAttr.MEDIA_IMAGE_URL, "")
 
         return update
 
@@ -960,6 +949,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         if current_title != self.media_title:
             update = {MediaAttr.MEDIA_TITLE: self.media_title}
+            
+            current_app = self._atv.current_app or ""
+
             _LOG.debug(
                 "[%s] Update remote with Chromecast info : %s", self.log_id, update
             )
