@@ -1,10 +1,14 @@
 {
+  "com.android.systemui": {
+    "name": "Android TV",
+    "icon": "androidtv.png"
+  },
   "com.google.android.tvlauncher": {
-    "name": "Android TV Home",
-    "icon": "data/external_cache/icons/androidtv.png"
+    "name": "Android TV",
+    "icon": "androidtv.png"
   },
   "com.google.android.backdrop": {
     "name": "Backdrop Daydream",
-    "icon": "data/external_cache/icons/androidtv.png"
+    "icon": "androidtv.png"
   }
 }
