@@ -676,12 +676,14 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         else:
             update[MediaAttr.STATE] = media_player.States.PLAYING.value
-            if not icon_to_use:
-                update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(
-                    "androidtv.png"
-                )
-            else:
-                update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
+            # Skip applying app icon if media image from cast is present
+            if not self._media_image_url:
+                if not icon_to_use:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(
+                        "androidtv.png"
+                    )
+                else:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
 
         # _LOG.debug("%s", update)
 
