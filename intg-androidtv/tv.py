@@ -640,13 +640,18 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             external_icon = metadata.get("icon")
             if external_name:
                 self._media_app = external_name
+            if external_icon:
+                self._app_image_url = external_icon
+
+        _LOG.debug("%s", metadata)
 
         name_to_use = offline_name or offline_match or external_name or current_app
         update[MediaAttr.SOURCE] = name_to_use
-        update[MediaAttr.MEDIA_TITLE] = name_to_use
+        if not self._media_title and not self._media_image_url:
+            update[MediaAttr.MEDIA_TITLE] = name_to_use
 
         icon_to_use = None
-        if self._device_config.use_external_metadata and self._use_app_url:
+        if self._device_config.use_external_metadata or self._use_app_url:
             if external_icon:
                 icon_to_use = external_icon
             else:
@@ -654,29 +659,31 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         elif self._media_image_url:
             icon_to_use = await encode_icon_to_data_uri(self._media_image_url)
 
-        if icon_to_use is not None:
-            update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
-
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update[MediaAttr.STATE] = media_player.States.ON.value
-            update[MediaAttr.MEDIA_TITLE] = "Android TV Home"
-            update[MediaAttr.SOURCE] = "Android TV Home"
+            update[MediaAttr.MEDIA_TITLE] = "Android TV"
+            update[MediaAttr.SOURCE] = "Android TV"
             update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(
                 "androidtv.png"
             )
+
         elif current_app == "com.google.android.backdrop":
             update[MediaAttr.STATE] = media_player.States.STANDBY.value
             update[MediaAttr.MEDIA_TITLE] = ""
             update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(
                 "androidtv.png"
             )
+
         else:
             update[MediaAttr.STATE] = media_player.States.PLAYING.value
-            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(
-                "androidtv.png"
-            )
+            if not icon_to_use:
+                update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(
+                    "androidtv.png"
+                )
+            else:
+                update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
 
-        _LOG.debug("%s", update)
+        # _LOG.debug("%s", update)
 
         return update
 
