@@ -253,9 +253,7 @@ class Devices:
                 return True
 
         # Are there old certificate files to rename?
-        if os.path.exists(self.default_certfile()) or os.path.exists(
-            self.default_keyfile()
-        ):
+        if os.path.exists(self.default_certfile()) or os.path.exists(self.default_keyfile()):
             return True
 
         return False
@@ -275,17 +273,12 @@ class Devices:
                     item.name,
                     item.id,
                 )
-                android_tv = AndroidTv(
-                    self.certfile(item.id), self.keyfile(item.id), item
-                )
+                android_tv = AndroidTv(self.certfile(item.id), self.keyfile(item.id), item)
                 if await android_tv.init(10) and await android_tv.connect(10):
                     if device_info := android_tv.device_info:
-                        item.manufacturer = android_tv.device_info
                         item.manufacturer = device_info.get("manufacturer", "")
                         item.model = device_info.get("model", "")
-                        item.use_external_metadata = device_info.get(
-                            "use_external_metadata", False
-                        )
+                        item.use_external_metadata = device_info.get("use_external_metadata", False)
 
                         _LOG.info(
                             "Updating device configuration '%s' (%s) with: manufacturer=%s, model=%s",
@@ -332,10 +325,7 @@ class Devices:
         if (
             os.path.exists(old_certfile)
             and os.path.exists(old_keyfile)
-            and (
-                force
-                or not (os.path.exists(new_certfile) and os.path.exists(new_keyfile))
-            )
+            and (force or not (os.path.exists(new_certfile) and os.path.exists(new_keyfile)))
         ):
             try:
                 new_file = new_certfile

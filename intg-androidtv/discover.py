@@ -35,9 +35,7 @@ async def android_tvs(timeout: int = 10) -> list[dict[str, str]]:
         _LOG.info("Found service: %s, %s", service_type, name)
         _ = asyncio.ensure_future(display_service_info(zeroconf, service_type, name))
 
-    async def display_service_info(
-        zeroconf: Zeroconf, service_type: str, name: str
-    ) -> None:
+    async def display_service_info(zeroconf: Zeroconf, service_type: str, name: str) -> None:
         info = AsyncServiceInfo(service_type, name)
         await info.async_request(zeroconf, 3000)
 
@@ -64,9 +62,7 @@ async def android_tvs(timeout: int = 10) -> list[dict[str, str]]:
         aiozc = AsyncZeroconf()
         services = ["_androidtvremote2._tcp.local."]
 
-        aiobrowser = AsyncServiceBrowser(
-            aiozc.zeroconf, services, handlers=[on_service_state_changed]
-        )
+        aiobrowser = AsyncServiceBrowser(aiozc.zeroconf, services, handlers=[on_service_state_changed])
 
         await asyncio.sleep(timeout)
         await aiobrowser.async_cancel()

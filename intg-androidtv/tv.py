@@ -118,9 +118,7 @@ _P = ParamSpec("_P")
 # https://github.com/home-assistant/core/blob/fd1f0b0efeb5231d3ee23d1cb2a10cdeff7c23f1/homeassistant/components/denonavr/media_player.py
 def async_handle_atvlib_errors(
     func: Callable[Concatenate[_AndroidTvT, _P], Awaitable[ucapi.StatusCodes | None]],
-) -> Callable[
-    Concatenate[_AndroidTvT, _P], Coroutine[Any, Any, ucapi.StatusCodes | None]
-]:
+) -> Callable[Concatenate[_AndroidTvT, _P], Coroutine[Any, Any, ucapi.StatusCodes | None]]:
     """Log errors occurred when calling an Android TV device.
 
     Decorates methods of AndroidTv class.
@@ -129,32 +127,21 @@ def async_handle_atvlib_errors(
     """
 
     @wraps(func)
-    async def wrapper(
-        self: _AndroidTvT, *args: _P.args, **kwargs: _P.kwargs
-    ) -> ucapi.StatusCodes:
+    async def wrapper(self: _AndroidTvT, *args: _P.args, **kwargs: _P.kwargs) -> ucapi.StatusCodes:
         try:
             # use the same exceptions as the func is throwing (e.g. AndroidTVRemote.send_key_command)
             state = self.state
             if state != DeviceState.CONNECTED:
-                if (
-                    state in (DeviceState.DISCONNECTED, DeviceState.CONNECTING)
-                    or self.is_on is None
-                ):
+                if state in (DeviceState.DISCONNECTED, DeviceState.CONNECTING) or self.is_on is None:
                     raise ConnectionClosed("Disconnected from device")
                 if state in (DeviceState.AUTH_ERROR, DeviceState.PAIRING_ERROR):
-                    raise InvalidAuth(
-                        "Invalid authentication, device requires to be paired again"
-                    )
+                    raise InvalidAuth("Invalid authentication, device requires to be paired again")
                 raise CannotConnect(f"Device connection not active (state={state})")
 
             # workaround for "swallowed commands" since _atv.send_key_command doesn't provide a result
             # pylint: disable=W0212
             if (
-                not (
-                    self._atv
-                    and self._atv._remote_message_protocol
-                    and self._atv._remote_message_protocol.transport
-                )
+                not (self._atv and self._atv._remote_message_protocol and self._atv._remote_message_protocol.transport)
                 or self._atv._remote_message_protocol.transport.is_closing()
             ):
                 _LOG.warning(
@@ -175,9 +162,7 @@ def async_handle_atvlib_errors(
             _LOG.error("[%s] Cannot send command: %s", self.log_id, ex)
             return ucapi.StatusCodes.CONFLICT
         except ValueError as ex:
-            _LOG.error(
-                "[%s] Cannot send command, invalid key_code: %s", self.log_id, ex
-            )
+            _LOG.error("[%s] Cannot send command, invalid key_code: %s", self.log_id, ex)
             return ucapi.StatusCodes.BAD_REQUEST
 
     return wrapper
@@ -258,9 +243,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         :return: True if connected or connecting, False if timeout occurred.
         """
         if self._state in (DeviceState.INITIALIZING, DeviceState.CONNECTING):
-            _LOG.debug(
-                "[%s] Skipping init task: connection task already running", self.log_id
-            )
+            _LOG.debug("[%s] Skipping init task: connection task already running", self.log_id)
             return True
         self._state = DeviceState.INITIALIZING
 
@@ -395,9 +378,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
         except InvalidAuth as ex:
             self._state = DeviceState.AUTH_ERROR
-            _LOG.error(
-                "[%s] Authentication error in start pairing: %s", self.log_id, ex
-            )
+            _LOG.error("[%s] Authentication error in start pairing: %s", self.log_id, ex)
             return ucapi.StatusCodes.UNAUTHORIZED
 
     async def finish_pairing(self, pin: str) -> ucapi.StatusCodes:
@@ -468,9 +449,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 self._reconnect_delay = MIN_RECONNECT_DELAY
             except InvalidAuth:
                 self._state = DeviceState.AUTH_ERROR
-                _LOG.error(
-                    "[%s] Invalid authentication for %s", self.log_id, self._identifier
-                )
+                _LOG.error("[%s] Invalid authentication for %s", self.log_id, self._identifier)
                 self.events.emit(Events.AUTH_ERROR, self._identifier)
                 break
             except (CannotConnect, ConnectionClosed, asyncio.TimeoutError) as ex:
@@ -541,9 +520,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
             try:
                 self._chromecast.register_status_listener(self)
-                self._chromecast.socket_client.media_controller.register_status_listener(
-                    self
-                )
+                self._chromecast.socket_client.media_controller.register_status_listener(self)
                 self._chromecast.register_connection_listener(self)
                 _LOG.info("[%s] Chromecast connecting", self.log_id)
                 self._chromecast.wait(timeout=CONNECTION_TIMEOUT)
@@ -613,7 +590,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self.events.emit(Events.DISCONNECTED, self._identifier)
 
     # Callbacks
-    def apply_current_app_metadata(self, current_app: str) -> dict:
+    def _apply_current_app_metadata(self, current_app: str) -> dict:
         update = {}
 
         # Track state of data sources
@@ -636,11 +613,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     break
 
         # Try external metadata
-        metadata = (
-            get_app_metadata(current_app)
-            if self._device_config.use_external_metadata
-            else None
-        )
+        metadata = get_app_metadata(current_app) if self._device_config.use_external_metadata else None
         if metadata:
             external_name = metadata.get("name")
             external_icon = metadata.get("icon")
@@ -670,15 +643,11 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             update[MediaAttr.STATE] = media_player.States.ON.value
             update[MediaAttr.MEDIA_TITLE] = "Android TV Home"
             update[MediaAttr.SOURCE] = "Android TV Home"
-            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
-                "data/external_cache/icons/androidtv.png"
-            )
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri("data/external_cache/icons/androidtv.png")
         elif current_app == "com.google.android.backdrop":
             update[MediaAttr.STATE] = media_player.States.STANDBY.value
             update[MediaAttr.MEDIA_TITLE] = ""
-            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
-                "data/external_cache/icons/androidtv.png"
-            )
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri("data/external_cache/icons/androidtv.png")
         else:
             update[MediaAttr.STATE] = media_player.States.PLAYING.value
 
@@ -690,18 +659,18 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         current_app = self._atv.current_app or ""
         if is_on:
             self._chromecast_connect()
-            update = self.apply_current_app_metadata(current_app)
+            update = self._apply_current_app_metadata(current_app)
             update[MediaAttr.STATE] = media_player.States.ON.value
 
         else:
-            update = {MediaAttr.STATE: media_player.States.OFF.value}
-            update = self.apply_current_app_metadata(current_app)
+            update = self._apply_current_app_metadata(current_app)
+            update[MediaAttr.STATE] = media_player.States.OFF.value
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _current_app_updated(self, current_app: str) -> None:
         """Notify that the current app on Android TV is updated."""
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
-        update = self.apply_current_app_metadata(current_app)
+        update = self._apply_current_app_metadata(current_app)
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _volume_info_updated(self, volume_info: dict[str, str | bool]) -> None:
@@ -715,9 +684,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         """Notify that the Android TV is ready to receive commands or is unavailable."""
         _LOG.info("[%s] is_available: %s", self.log_id, is_available)
         self._state = DeviceState.CONNECTED if is_available else DeviceState.CONNECTING
-        self.events.emit(
-            Events.CONNECTED if is_available else Events.DISCONNECTED, self.identifier
-        )
+        self.events.emit(Events.CONNECTED if is_available else Events.DISCONNECTED, self.identifier)
 
     def _update_app_list(self) -> None:
         update = {}
@@ -790,9 +757,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         return await self._launch_app(source)
 
     @async_handle_atvlib_errors
-    async def _send_command(
-        self, keycode: int | str, action: KeyPress = KeyPress.SHORT
-    ) -> ucapi.StatusCodes:
+    async def _send_command(self, keycode: int | str, action: KeyPress = KeyPress.SHORT) -> ucapi.StatusCodes:
         """
         Send a key press to Android TV.
 
@@ -847,9 +812,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def new_connection_status(self, status: ConnectionStatus) -> None:
         """Receive new connection status event from Google cast."""
-        _LOG.debug(
-            "[%s] Received Chromecast connection status : %s", self.log_id, status
-        )
+        _LOG.debug("[%s] Received Chromecast connection status : %s", self.log_id, status)
         if status.status == "CONNECTED":
             _LOG.debug("[%s] Chromecast connected", self.log_id)
 
@@ -860,15 +823,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         update = {}
         if (
             status.player_state
-            and GOOGLE_CAST_MEDIA_STATES_MAP.get(
-                status.player_state, media_player.States.PLAYING
-            )
-            != self._player_state
+            and GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING) != self._player_state
         ):
             # PLAYING, PAUSED, IDLE
-            self._player_state = GOOGLE_CAST_MEDIA_STATES_MAP.get(
-                status.player_state, media_player.States.PLAYING
-            )
+            self._player_state = GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING)
             self._last_update_position_time = 0
             update[MediaAttr.STATE] = self._player_state
         if status.album_name != self._media_album:
@@ -881,9 +839,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             current_title = self.media_title
             self._media_title = status.title if status.title else ""
             if current_title != self.media_title:
-                _LOG.debug(
-                    "[%s] Chromecast Media info updated : %s", self.log_id, status
-                )
+                _LOG.debug("[%s] Chromecast Media info updated : %s", self.log_id, status)
                 update[MediaAttr.MEDIA_TITLE] = self.media_title
         current_time = int(status.current_time) if status.current_time else 0
         duration = int(status.duration) if status.duration else 0
@@ -894,8 +850,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             chanded_duration = True
         # Update position every 30 seconds
         if chanded_duration or (
-            current_time != self._media_position
-            and self._last_update_position_time + 30 < time.time()
+            current_time != self._media_position and self._last_update_position_time + 30 < time.time()
         ):
             self._media_position = current_time
             update[MediaAttr.MEDIA_POSITION] = self._media_position
@@ -903,28 +858,21 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self._last_update_position_time = time.time()
         if (
             status.metadata_type
-            and GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO)
-            != self._media_type
+            and GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO) != self._media_type
         ):
-            self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(
-                self._media_type, MediaType.VIDEO
-            )
+            self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(self._media_type, MediaType.VIDEO)
             update[MediaAttr.MEDIA_TYPE] = self._media_type
 
         if status.images and len(status.images) > 0 and status.images[0].url != self._media_image_url:
             self._media_image_url = status.images[0].url
-            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
-                self._media_image_url
-            )
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._media_image_url)
             self._use_app_url = False
         else:
             self._media_image_url = None
             if self._device_config.use_external_metadata:
                 self._use_app_url = True
                 if self._app_image_url:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(
-                        self._app_image_url
-                    )
+                    update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._app_image_url)
 
         if update:
             # filter media_image_url property
@@ -932,9 +880,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 log_upd = copy(update)
                 if MediaAttr.MEDIA_IMAGE_URL in log_upd:
                     log_upd[MediaAttr.MEDIA_IMAGE_URL] = "***"
-                _LOG.debug(
-                    "[%s] Update remote with Chromecast info : %s", self.log_id, log_upd
-                )
+                _LOG.debug("[%s] Update remote with Chromecast info : %s", self.log_id, log_upd)
             self.events.emit(Events.UPDATE, self._identifier, update)
 
     def load_media_failed(self, queue_item_id: int, error_code: int) -> None:
@@ -949,21 +895,15 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         if current_title != self.media_title:
             update = {MediaAttr.MEDIA_TITLE: self.media_title}
-            
-            current_app = self._atv.current_app or ""
 
-            _LOG.debug(
-                "[%s] Update remote with Chromecast info : %s", self.log_id, update
-            )
+            _LOG.debug("[%s] Update remote with Chromecast info : %s", self.log_id, update)
             self.events.emit(Events.UPDATE, self._identifier, update)
 
     async def media_seek(self, position: float) -> ucapi.StatusCodes:
         """Seek the media at the given position."""
         try:
             if self._chromecast:
-                self._chromecast.media_controller.seek(
-                    position, timeout=CONNECTION_TIMEOUT
-                )
+                self._chromecast.media_controller.seek(position, timeout=CONNECTION_TIMEOUT)
                 return ucapi.StatusCodes.OK
         except Exception as ex:
             _LOG.error("[%s] Chromecast error seeking command : %s", self.log_id, ex)
