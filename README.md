@@ -40,9 +40,12 @@ For running a separate integration driver on your network for Remote Two/3, the 
 ### Run
 
 ```shell
-UC_CONFIG_HOME=./config python3 intg-androidtv/driver.py
+UC_CONFIG_HOME=./config UC_DATA_HOME=./data python3 intg-androidtv/driver.py
 ```
 
+- Environment variables:
+  - `UC_CONFIG_HOME`: configuration directory for device settings, certificates and profiles.
+  - `UC_DATA_HOME`: data directory to store metadata images.
 - See available [environment variables](https://github.com/unfoldedcircle/integration-python-library#environment-variables)
   in the Python integration library to control certain runtime features like listening interface and configuration directory.
 - The client name used for the client certificate can be set in ENV variable `UC_CLIENT_NAME`.

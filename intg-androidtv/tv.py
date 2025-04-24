@@ -5,6 +5,8 @@ This module implements the Android TV communication of the Remote Two integratio
 :license: Mozilla Public License Version 2.0, see LICENSE for more details.
 """
 
+# pylint: disable=too-many-lines
+
 import asyncio
 import logging
 import os
@@ -62,6 +64,8 @@ MIN_RECONNECT_DELAY: float = 0.5
 BACKOFF_FACTOR: float = 1.5
 
 LONG_PRESS_DELAY: float = 0.8
+
+HOMESCREEN_IMAGE = None
 
 
 class Events(IntEnum):
@@ -591,7 +595,24 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     # Callbacks
     async def _apply_current_app_metadata(self, current_app: str) -> dict:
+        global HOMESCREEN_IMAGE
+
         update = {}
+        # one-time initialization
+        if HOMESCREEN_IMAGE is None:
+            HOMESCREEN_IMAGE = ""
+            HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://icons/androidtv.png")
+
+        # Special handling for homescreen & Android TV system apps: show pre-defined icon
+        homescreen_app = apps.is_homescreen_app(current_app)
+        if homescreen_app or apps.is_standby_app(current_app):
+            update[MediaAttr.SOURCE] = apps.IdMappings[current_app]
+            update[MediaAttr.MEDIA_TITLE] = ""
+            update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
+            update[MediaAttr.STATE] = (
+                media_player.States.ON.value if homescreen_app else media_player.States.STANDBY.value
+            )
+            return update
 
         # Track state of data sources
         offline_name = None
@@ -613,7 +634,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     break
 
         # Try external metadata
-        metadata = await get_app_metadata(current_app) if self._device_config.use_external_metadata else None
+        metadata = (
+            await get_app_metadata(current_app) if current_app and self._device_config.use_external_metadata else None
+        )
         if metadata:
             external_name = metadata.get("name")
             external_icon = metadata.get("icon")
@@ -626,6 +649,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         # Determine final name/title to use
         name_to_use = offline_name or offline_match or external_name or current_app
+        # TODO why set name to both source & media title fields?
         update[MediaAttr.SOURCE] = name_to_use
         if not self._media_title and not self._media_image_url:
             update[MediaAttr.MEDIA_TITLE] = name_to_use
@@ -640,24 +664,13 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         elif self._media_image_url:
             icon_to_use = await encode_icon_to_data_uri(self._media_image_url)
 
-        # Special case handling for Android TV system apps
-        if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
-            update[MediaAttr.STATE] = media_player.States.ON.value
-            update[MediaAttr.MEDIA_TITLE] = "Android TV"
-            update[MediaAttr.SOURCE] = "Android TV"
-            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
-        elif current_app == "com.google.android.backdrop":
-            update[MediaAttr.STATE] = media_player.States.STANDBY.value
-            update[MediaAttr.MEDIA_TITLE] = ""
-            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
-        else:
-            update[MediaAttr.STATE] = media_player.States.PLAYING.value
-            # Skip applying app icon if media image from cast is present
-            if not self._media_image_url:
-                if not icon_to_use:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
-                else:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
+        update[MediaAttr.STATE] = media_player.States.PLAYING.value
+        # Skip applying app icon if media image from cast is present
+        if not self._media_image_url:
+            if not icon_to_use:
+                update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
+            else:
+                update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
 
         return update
 
