@@ -10,6 +10,7 @@ import asyncio
 import logging
 import os
 import sys
+from copy import copy
 from datetime import UTC, datetime
 from typing import Any
 
@@ -232,7 +233,11 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
 
     if _LOG.isEnabledFor(logging.DEBUG):
         device = config.devices.get(atv_id)
-        _LOG.debug("[%s] device update: %s", device.name if device else atv_id, update)
+        # filter media_image_url property
+        log_upd = copy(update)
+        if MediaAttr.MEDIA_IMAGE_URL in log_upd:
+            log_upd[MediaAttr.MEDIA_IMAGE_URL] = "***"
+            _LOG.debug("[%s] device update: %s", device.name if device else atv_id, log_upd)
 
     old_state = (
         configured_entity.attributes[MediaAttr.STATE]
@@ -407,6 +412,7 @@ async def main():
     logging.getLogger("profiles").setLevel(level)
     logging.getLogger("setup_flow").setLevel(level)
     logging.getLogger("androidtvremote2").setLevel(level)
+    logging.getLogger("external_metadata").setLevel(level)
     # logging.getLogger("pychromecast").setLevel(level)
 
     profile_path = os.path.join(api.config_dir_path, "profiles")

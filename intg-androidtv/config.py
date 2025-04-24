@@ -34,6 +34,8 @@ class AtvDevice:
     """Device model name."""
     auth_error: bool = False
     """Authentication error, device requires pairing."""
+    use_external_metadata: bool = False
+    """Enable External Metadata."""
     use_chromecast: bool = False
     """Enable Chromecast features."""
 
@@ -129,6 +131,7 @@ class Devices:
                 item.manufacturer = atv.manufacturer
                 item.model = atv.model
                 item.auth_error = atv.auth_error
+                item.use_external_metadata = atv.use_external_metadata
                 item.use_chromecast = atv.use_chromecast
                 return self.store()
         return False
@@ -184,7 +187,11 @@ class Devices:
             try:
                 os.remove(file)
             except OSError as ex:
-                _LOG.error("Failed to remove certificate file %s: %s", os.path.basename(file), ex)
+                _LOG.error(
+                    "Failed to remove certificate file %s: %s",
+                    os.path.basename(file),
+                    ex,
+                )
 
         self._config = []
 
@@ -227,6 +234,7 @@ class Devices:
                     item.get("manufacturer", ""),
                     item.get("model", ""),
                     item.get("auth_error", False),
+                    item.get("use_external_metadata", False),
                     item.get("use_chromecast", False),
                 )
                 self._config.append(atv)
@@ -268,9 +276,9 @@ class Devices:
                 android_tv = AndroidTv(self.certfile(item.id), self.keyfile(item.id), item)
                 if await android_tv.init(10) and await android_tv.connect(10):
                     if device_info := android_tv.device_info:
-                        item.manufacturer = android_tv.device_info
                         item.manufacturer = device_info.get("manufacturer", "")
                         item.model = device_info.get("model", "")
+                        item.use_external_metadata = device_info.get("use_external_metadata", False)
 
                         _LOG.info(
                             "Updating device configuration '%s' (%s) with: manufacturer=%s, model=%s",
@@ -336,7 +344,11 @@ class Devices:
                 )
                 os.rename(old_keyfile, new_file)
             except OSError as ex:
-                _LOG.error("Error while migrating certificate file %s: %s", os.path.basename(new_file), ex)
+                _LOG.error(
+                    "Error while migrating certificate file %s: %s",
+                    os.path.basename(new_file),
+                    ex,
+                )
                 return False
         return True
 

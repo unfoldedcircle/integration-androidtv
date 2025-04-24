@@ -60,6 +60,7 @@ IdMappings = {
     "tv.wuaki": "Rakuten TV",
     "homedia.sky.sport": "SKY",
     "com.teamsmart.videomanager.tv": "SmartTube",
+    "com.nathnetwork.supersmart": "SuperSmart",
     "nl.rtl.videoland.v2": "Videoland",
     "com.disney.disneyplus": "Disney+",
     "com.netflix.ninja": "Netflix",
@@ -87,6 +88,7 @@ IdMappings = {
 # Used to show which app is currently in the foreground (currently playing)
 NameMatching = {
     "youtube": "YouTube",
+    "videomanager": "YouTube",
     "amazonvideo": "Prime Video",
     "apple": "Apple TV",
     "plex": "Plex",

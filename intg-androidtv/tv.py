@@ -11,6 +11,7 @@ import os
 import socket
 import time
 from asyncio import AbstractEventLoop, timeout
+from copy import copy
 from enum import IntEnum
 from functools import wraps
 from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
@@ -26,6 +27,7 @@ from androidtvremote2 import (
     ConnectionClosed,
     InvalidAuth,
 )
+from external_metadata import encode_icon_to_data_uri, get_app_metadata
 from profiles import KeyPress, Profile
 from pychromecast import CastStatus, CastStatusListener, Chromecast, RequestTimeout
 from pychromecast.controllers.media import (
@@ -222,6 +224,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._last_update_position_time: float = 0
         self._media_type = METADATA_TYPE_MOVIE
         self._media_image_url: str | None = None
+        self._app_image_url: str = ""
+        self._use_app_url = not device_config.use_chromecast
         self._player_state = media_player.States.ON
         self._muted = False
 
@@ -479,7 +483,11 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         def _handle_invalid_auth() -> None:
             self._state = DeviceState.AUTH_ERROR
-            _LOG.error("[%s] Invalid authentication for %s while reconnecting", self.log_id, self._identifier)
+            _LOG.error(
+                "[%s] Invalid authentication for %s while reconnecting",
+                self.log_id,
+                self._identifier,
+            )
             self.events.emit(Events.AUTH_ERROR, self._identifier)
 
         self._atv.keep_reconnecting(_handle_invalid_auth)
@@ -518,7 +526,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 self._chromecast.wait(timeout=CONNECTION_TIMEOUT)
                 _LOG.info("[%s] Chromecast connected", self.log_id)
             except (RequestTimeout, RuntimeError):
-                _LOG.info("[%s] Device is not active or Chromecast is not supported on this devices", self.log_id)
+                _LOG.info(
+                    "[%s] Device is not active or Chromecast is not supported on this devices",
+                    self.log_id,
+                )
 
     async def _handle_connection_failure(self, connect_duration: float, ex):
         self._connection_attempts += 1
@@ -537,17 +548,28 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         # try resolving IP address from device name if we keep failing to connect, maybe the IP address changed
         if self._connection_attempts % 10 == 0:
-            _LOG.debug("[%s] Start resolving IP address for %s...", self.log_id, self._identifier)
+            _LOG.debug(
+                "[%s] Start resolving IP address for %s...",
+                self.log_id,
+                self._identifier,
+            )
             try:
                 discovered = await discover.android_tvs()
                 for item in discovered:
                     if item["name"] == self._name:
                         if self._atv.host != item["address"]:
                             _LOG.info(
-                                "[%s] IP address of %s changed: %s", self.log_id, self._identifier, item["address"]
+                                "[%s] IP address of %s changed: %s",
+                                self.log_id,
+                                self._identifier,
+                                item["address"],
                             )
                             self._atv.host = item["address"]
-                            self.events.emit(Events.IP_ADDRESS_CHANGED, self._identifier, self._atv.host)
+                            self.events.emit(
+                                Events.IP_ADDRESS_CHANGED,
+                                self._identifier,
+                                self._atv.host,
+                            )
                             break
             except Exception as e:
                 # extra safety, otherwise reconnection task is dead
@@ -568,47 +590,87 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self.events.emit(Events.DISCONNECTED, self._identifier)
 
     # Callbacks
+    def _apply_current_app_metadata(self, current_app: str) -> dict:
+        update = {}
+
+        # Track state of data sources
+        offline_name = None
+        offline_match = None
+        external_name = None
+        external_icon = None
+
+        # Try offline ID mapping first
+        if current_app in apps.IdMappings:
+            offline_name = apps.IdMappings[current_app]
+            self._media_app = offline_name
+
+        # Try fuzzy offline name matching if ID mapping failed
+        if not offline_name:
+            for query, name in apps.NameMatching.items():
+                if query in current_app:
+                    offline_match = name
+                    self._media_app = name
+                    break
+
+        # Try external metadata
+        metadata = get_app_metadata(current_app) if self._device_config.use_external_metadata else None
+        if metadata:
+            external_name = metadata.get("name")
+            external_icon = metadata.get("icon")
+            if external_name:
+                self._media_app = external_name
+
+        # Determine final name/title to use
+        name_to_use = offline_name or offline_match or external_name or current_app
+        update[MediaAttr.SOURCE] = name_to_use
+        update[MediaAttr.MEDIA_TITLE] = name_to_use
+
+        # Determine which icon to use
+        icon_to_use = None
+        if self._device_config.use_external_metadata and self._use_app_url:
+            if external_icon:
+                icon_to_use = encode_icon_to_data_uri(external_icon)
+            else:
+                icon_to_use = ""  # Explicitly clear if expected but missing
+        elif self._media_image_url:
+            icon_to_use = encode_icon_to_data_uri(self._media_image_url)
+
+        if icon_to_use is not None:
+            update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
+
+        # Special case handling for Android TV system apps
+        if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
+            update[MediaAttr.STATE] = media_player.States.ON.value
+            update[MediaAttr.MEDIA_TITLE] = "Android TV Home"
+            update[MediaAttr.SOURCE] = "Android TV Home"
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri("data/external_cache/icons/androidtv.png")
+        elif current_app == "com.google.android.backdrop":
+            update[MediaAttr.STATE] = media_player.States.STANDBY.value
+            update[MediaAttr.MEDIA_TITLE] = ""
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri("data/external_cache/icons/androidtv.png")
+        else:
+            update[MediaAttr.STATE] = media_player.States.PLAYING.value
+
+        return update
+
     def _is_on_updated(self, is_on: bool) -> None:
         """Notify that the Android TV power state is updated."""
         _LOG.info("[%s] is on: %s", self.log_id, is_on)
-        update = {}
+        current_app = self._atv.current_app or ""
         if is_on:
-            update[MediaAttr.STATE] = media_player.States.ON.value
-            # Chromecast service is not accessible when the device is in standby
             self._chromecast_connect()
+            update = self._apply_current_app_metadata(current_app)
+            update[MediaAttr.STATE] = media_player.States.ON.value
+
         else:
+            update = self._apply_current_app_metadata(current_app)
             update[MediaAttr.STATE] = media_player.States.OFF.value
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _current_app_updated(self, current_app: str) -> None:
         """Notify that the current app on Android TV is updated."""
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
-        update = {MediaAttr.SOURCE: current_app}
-        current_title = self.media_title
-
-        if current_app in apps.IdMappings:
-            update[MediaAttr.SOURCE] = apps.IdMappings[current_app]
-            self._media_app = current_app
-        else:
-            for query, app in apps.NameMatching.items():
-                if query in current_app:
-                    update[MediaAttr.SOURCE] = app
-                    self._media_app = app
-                    break
-
-        # TODO verify "idle" apps, probably best to make them configurable
-        if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
-            update[MediaAttr.STATE] = media_player.States.ON.value
-            if self._media_title is None:
-                update[MediaAttr.MEDIA_TITLE] = ""
-        else:
-            update[MediaAttr.STATE] = media_player.States.PLAYING.value
-            if self._media_title is None:
-                update[MediaAttr.MEDIA_TITLE] = update[MediaAttr.SOURCE]
-
-        if current_title != self.media_title:
-            update[MediaAttr.MEDIA_TITLE] = self.media_title
-
+        update = self._apply_current_app_metadata(current_app)
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _volume_info_updated(self, volume_info: dict[str, str | bool]) -> None:
@@ -643,13 +705,21 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                  BAD_REQUEST if the ``cmd_id`` is unknown or not supported
         """
         if not self._profile:
-            _LOG.error("[%s] Cannot send command %s: no device profile set", self.log_id, cmd_id)
+            _LOG.error(
+                "[%s] Cannot send command %s: no device profile set",
+                self.log_id,
+                cmd_id,
+            )
             return ucapi.StatusCodes.SERVER_ERROR
 
         if command := self._profile.command(cmd_id):
             return await self._send_command(command.keycode, command.action)
 
-        _LOG.error("[%s] Cannot send command, unknown or unsupported command: %s", self.log_id, cmd_id)
+        _LOG.error(
+            "[%s] Cannot send command, unknown or unsupported command: %s",
+            self.log_id,
+            cmd_id,
+        )
         return ucapi.StatusCodes.BAD_REQUEST
 
     async def turn_on(self) -> ucapi.StatusCodes:
@@ -795,15 +865,22 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         if status.images and len(status.images) > 0 and status.images[0].url != self._media_image_url:
             self._media_image_url = status.images[0].url
-            update[MediaAttr.MEDIA_IMAGE_URL] = self._media_image_url
-        elif not self._media_image_url:
-            self._media_image_url = None
-            update[MediaAttr.MEDIA_IMAGE_URL] = ""
+            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._media_image_url)
+            self._use_app_url = False
         else:
-            update[MediaAttr.MEDIA_IMAGE_URL] = self._media_image_url
+            self._media_image_url = None
+            if self._device_config.use_external_metadata:
+                self._use_app_url = True
+                if self._app_image_url:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._app_image_url)
 
         if update:
-            _LOG.debug("[%s] Update remote with Chromecast info : %s", self.log_id, update)
+            # filter media_image_url property
+            if _LOG.isEnabledFor(logging.DEBUG):
+                log_upd = copy(update)
+                if MediaAttr.MEDIA_IMAGE_URL in log_upd:
+                    log_upd[MediaAttr.MEDIA_IMAGE_URL] = "***"
+                _LOG.debug("[%s] Update remote with Chromecast info : %s", self.log_id, log_upd)
             self.events.emit(Events.UPDATE, self._identifier, update)
 
     def load_media_failed(self, queue_item_id: int, error_code: int) -> None:
@@ -818,6 +895,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         if current_title != self.media_title:
             update = {MediaAttr.MEDIA_TITLE: self.media_title}
+
             _LOG.debug("[%s] Update remote with Chromecast info : %s", self.log_id, update)
             self.events.emit(Events.UPDATE, self._identifier, update)
 

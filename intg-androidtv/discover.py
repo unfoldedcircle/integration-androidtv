@@ -24,7 +24,10 @@ async def android_tvs(timeout: int = 10) -> list[dict[str, str]]:
     discovered_android_tvs: list[dict[str, str]] = []
 
     def on_service_state_changed(
-        zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange
+        zeroconf: Zeroconf,
+        service_type: str,
+        name: str,
+        state_change: ServiceStateChange,
     ) -> None:
         if state_change is not ServiceStateChange.Added:
             return
@@ -44,7 +47,11 @@ async def android_tvs(timeout: int = 10) -> list[dict[str, str]]:
 
             addresses = info.parsed_scoped_addresses()
             if addresses:
-                discovered_tv = {"name": name_final, "label": f"{name_final} [{addresses[0]}]", "address": addresses[0]}
+                discovered_tv = {
+                    "name": name_final,
+                    "label": f"{name_final} [{addresses[0]}]",
+                    "address": addresses[0],
+                }
                 discovered_android_tvs.append(discovered_tv)
         else:
             _LOG.debug("No info for %s", name)

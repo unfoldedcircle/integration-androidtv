@@ -1,0 +1,10 @@
+{
+  "com.google.android.tvlauncher": {
+    "name": "Android TV Home",
+    "icon": "data/external_cache/icons/androidtv.png"
+  },
+  "com.google.android.backdrop": {
+    "name": "Backdrop Daydream",
+    "icon": "data/external_cache/icons/androidtv.png"
+  }
+}
