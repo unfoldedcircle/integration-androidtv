@@ -586,9 +586,11 @@ async def _handle_device_reconfigure(
         return SetupError()
 
     use_chromecast = msg.input_values.get("chromecast", "false") == "true"
+    use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
 
     _LOG.debug("User has changed configuration")
     _reconfigured_device.use_chromecast = use_chromecast
+    _reconfigured_device.use_external_metadata = use_external_metadata
 
     config.devices.add_or_update(_reconfigured_device)  # triggers ATV instance update
     await asyncio.sleep(1)
