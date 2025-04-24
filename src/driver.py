@@ -10,18 +10,18 @@ import asyncio
 import logging
 import os
 import sys
-from copy import copy
 from datetime import UTC, datetime
 from typing import Any
 
-import setup_flow
-import tv
 import ucapi
-from profiles import DeviceProfile, Profile
 from ucapi import MediaPlayer, media_player
 from ucapi.media_player import Attributes as MediaAttr
 
 import config
+import setup_flow
+import tv
+from profiles import DeviceProfile, Profile
+from util import filter_data_img_properties
 
 _LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
 if sys.platform == "win32":
@@ -39,9 +39,7 @@ device_profile = DeviceProfile()
 async def on_connect():
     """When the UCR2 connects, all configured Android TV devices are getting connected."""
     _LOG.debug("Client connect command: connecting device(s)")
-    await api.set_device_state(
-        ucapi.DeviceStates.CONNECTED
-    )  # just to make sure the device state is set
+    await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
     for atv in _configured_android_tvs.values():
         # start background task
         _LOOP.create_task(atv.connect())
@@ -97,9 +95,7 @@ async def on_subscribe_entities(entity_ids) -> None:
                 state = media_player.States.UNAVAILABLE
             else:
                 state = media_player.States.ON if atv.is_on else media_player.States.OFF
-            api.configured_entities.update_attributes(
-                entity_id, {media_player.Attributes.STATE: state}
-            )
+            api.configured_entities.update_attributes(entity_id, {media_player.Attributes.STATE: state})
             _LOOP.create_task(atv.connect())
             continue
 
@@ -107,9 +103,7 @@ async def on_subscribe_entities(entity_ids) -> None:
         if device:
             _add_configured_android_tv(device)
         else:
-            _LOG.error(
-                "Failed to subscribe entity %s: no Android TV instance found", entity_id
-            )
+            _LOG.error("Failed to subscribe entity %s: no Android TV instance found", entity_id)
 
 
 @api.listens_to(ucapi.Events.UNSUBSCRIBE_ENTITIES)
@@ -150,9 +144,7 @@ async def media_player_cmd_handler(
 
     android_tv = _configured_android_tvs[atv_id]
 
-    _LOG.info(
-        "[%s] command: %s %s", android_tv.log_id, cmd_id, params if params else ""
-    )
+    _LOG.info("[%s] command: %s %s", android_tv.log_id, cmd_id, params if params else "")
 
     if cmd_id == media_player.Commands.ON:
         return await android_tv.turn_on()
@@ -186,12 +178,8 @@ async def handle_connected(identifier: str):
         config.devices.update(device)
 
     # TODO is this the correct state?
-    api.configured_entities.update_attributes(
-        identifier, {media_player.Attributes.STATE: media_player.States.STANDBY}
-    )
-    await api.set_device_state(
-        ucapi.DeviceStates.CONNECTED
-    )  # just to make sure the device state is set
+    api.configured_entities.update_attributes(identifier, {media_player.Attributes.STATE: media_player.States.STANDBY})
+    await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
 
 
 async def handle_disconnected(identifier: str):
@@ -245,13 +233,7 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
 
     if _LOG.isEnabledFor(logging.DEBUG):
         device = config.devices.get(atv_id)
-        # filter media_image_url property
-        log_upd = copy(update)
-        if MediaAttr.MEDIA_IMAGE_URL in log_upd:
-            log_upd[MediaAttr.MEDIA_IMAGE_URL] = "***"
-            _LOG.debug(
-                "[%s] device update: %s", device.name if device else atv_id, log_upd
-            )
+        _LOG.debug("[%s] device update: %s", device.name if device else atv_id, filter_data_img_properties(update))
 
     old_state = (
         configured_entity.attributes[MediaAttr.STATE]
@@ -304,9 +286,7 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
 
 
 def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -> None:
-    profile = device_profile.match(
-        device.manufacturer, device.model, device.use_chromecast
-    )
+    profile = device_profile.match(device.manufacturer, device.model, device.use_chromecast)
 
     # the device should not yet be configured, but better be safe
     if device.id in _configured_android_tvs:
@@ -324,9 +304,7 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         android_tv.events.on(tv.Events.DISCONNECTED, handle_disconnected)
         android_tv.events.on(tv.Events.AUTH_ERROR, handle_authentication_error)
         android_tv.events.on(tv.Events.UPDATE, handle_android_tv_update)
-        android_tv.events.on(
-            tv.Events.IP_ADDRESS_CHANGED, handle_android_tv_address_change
-        )
+        android_tv.events.on(tv.Events.IP_ADDRESS_CHANGED, handle_android_tv_address_change)
 
         _configured_android_tvs[device.id] = android_tv
         _LOG.info(
@@ -396,9 +374,7 @@ def on_device_added(device: config.AtvDevice) -> None:
 def on_device_removed(device: config.AtvDevice | None) -> None:
     """Handle a removed device in the configuration."""
     if device is None:
-        _LOG.debug(
-            "Configuration cleared, disconnecting & removing all configured Android TV instances"
-        )
+        _LOG.debug("Configuration cleared, disconnecting & removing all configured Android TV instances")
         for atv in _configured_android_tvs.values():
             atv.disconnect()
             atv.events.remove_all_listeners()
@@ -439,9 +415,7 @@ async def main():
     device_profile.load(profile_path)
 
     # load paired devices
-    config.devices = config.Devices(
-        api.config_dir_path, on_device_added, on_device_removed
-    )
+    config.devices = config.Devices(api.config_dir_path, on_device_added, on_device_removed)
     # best effort migration (if required): network might not be available during startup
     if config.devices.migration_required():
         await config.devices.migrate()

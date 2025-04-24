@@ -54,9 +54,14 @@ With that out of the way, here's the process of creating a pull request and maki
 
 3. Make sure your changes follow the project's code style and the lints pass described in [Code Style](docs/code_guidelines.md).
 
-4. Push to your fork.
+4. Make sure the unit tests still pass and add tests for new or changed logic.
+    ```shell
+    python -m unittest discover tests
+    ```
 
-5. Submit a pull request.
+5. Push to your fork.
+
+6. Submit a pull request.
 
 At this point we will review the PR and give constructive feedback.  
 This is a time for discussion and improvements, and making the necessary changes will be required before we can

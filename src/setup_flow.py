@@ -9,8 +9,6 @@ import asyncio
 import logging
 from enum import IntEnum
 
-import discover
-import tv
 import ucapi
 from ucapi import (
     AbortDriverSetup,
@@ -25,6 +23,8 @@ from ucapi import (
 )
 
 import config
+import discover
+import tv
 from config import AtvDevice
 
 _LOG = logging.getLogger(__name__)
@@ -184,6 +184,7 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
                     "id": "configure",
                     "label": {
                         "en": "Configure selected device",
+                        "de": "Selektiertes Gerät konfigurieren",
                         "fr": "Configurer l'appareil sélectionné",
                     },
                 },
@@ -309,16 +310,18 @@ async def handle_configuration_mode(
                     {
                         "id": "chromecast",
                         "label": {
-                            "en": "Enable Chromecast features",
-                            "fr": "Activer les fonctionnalités de Chromecast",
+                            "en": "Preview feature: Enable Chromecast features",
+                            "de": "Vorschaufunktion: Aktiviere Chromecast-Features",
+                            "fr": "Fonctionnalité en aperçu: Activer les fonctionnalités de Chromecast",
                         },
                         "field": {"checkbox": {"value": use_chromecast}},
                     },
                     {
                         "id": "external_metadata",
                         "label": {
-                            "en": "Enable enhanched metadata (e.g. Friendly Application Names and Icons)",
-                            "fr": "Activer les métadonnées améliorées (par exemple, noms et icônes d'application)",
+                            "en": "Preview feature: Enable external Google Play metadata",
+                            "de": "Vorschaufunktion: Aktiviere externe Google Play Metadaten",
+                            "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes de Google Play",
                         },
                         "field": {"checkbox": {"value": use_external_metadata}},
                     },
@@ -408,6 +411,7 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
         title={
             "en": "Please choose your Android TV",
             "de": "Bitte Android TV auswählen",
+            "fr": "Choisir votre Android TV",
         },
         settings=[
             {
@@ -427,14 +431,19 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
             {
                 "id": "chromecast",
                 "label": {
-                    "en": "Enable Chromecast features",
-                    "fr": "Activer les fonctionnalités de Chromecast",
+                    "en": "Preview feature: Enable Chromecast features",
+                    "de": "Vorschaufunktion: Aktiviere Chromecast-Features",
+                    "fr": "Fonctionnalité en aperçu: Activer les fonctionnalités de Chromecast",
                 },
                 "field": {"checkbox": {"value": False}},
             },
             {
                 "id": "external_metadata",
-                "label": {"en": "Enable external metadata (e.g. Friendly Application Names and Icons)"},
+                "label": {
+                    "en": "Preview feature: Enable external Google Play metadata",
+                    "de": "Vorschaufunktion: Aktiviere externe Google Play Metadaten",
+                    "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes de Google Play",
+                },
                 "field": {"checkbox": {"value": False}},
             },
         ],
