@@ -622,7 +622,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             if external_icon:
                 self._app_image_url = external_icon
 
-        _LOG.debug("%s", metadata)
+        _LOG.debug("App metadata: %s", metadata)
 
         # Determine final name/title to use
         name_to_use = offline_name or offline_match or external_name or current_app
@@ -658,8 +658,6 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
                 else:
                     update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
-
-        # _LOG.debug("%s", update)
 
         return update
 

@@ -49,13 +49,11 @@ def _get_icon_dir() -> Path:
 
 
 def _get_metadata_file_path() -> Path:
-    path = _get_metadata_dir() / "app_metadata.json"
-    return path
+    return _get_metadata_dir() / "app_metadata.json"
 
 
 def _get_icon_path(package_id: str) -> Path:
-    path = _get_icon_dir() / f"{package_id}.png"
-    return path
+    return _get_icon_dir() / f"{package_id}.png"
 
 
 # Cache Management
