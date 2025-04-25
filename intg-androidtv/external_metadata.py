@@ -33,33 +33,28 @@ def _get_cache_root() -> Path:
     config_home = Path(os.environ.get("UC_DATA_HOME", "./data"))
     cache_root = config_home / CACHE_ROOT
     cache_root.mkdir(parents=True, exist_ok=True)
-    _LOG.debug("Cache root path: %s", cache_root)
     return cache_root
 
 
 def _get_metadata_dir() -> Path:
     metadata_dir = _get_cache_root()
     metadata_dir.mkdir(parents=True, exist_ok=True)
-    _LOG.debug("Metadata directory path: %s", metadata_dir)
     return metadata_dir
 
 
 def _get_icon_dir() -> Path:
     icon_dir = _get_cache_root() / ICON_SUBDIR
     icon_dir.mkdir(parents=True, exist_ok=True)
-    _LOG.debug("Icon directory path: %s", icon_dir)
     return icon_dir
 
 
 def _get_metadata_file_path() -> Path:
     path = _get_metadata_dir() / "app_metadata.json"
-    _LOG.debug("Metadata file path: %s", path)
     return path
 
 
 def _get_icon_path(package_id: str) -> Path:
     path = _get_icon_dir() / f"{package_id}.png"
-    _LOG.debug("Icon file path for %s: %s", package_id, path)
     return path
 
 

@@ -55,7 +55,9 @@ from config import AtvDevice
 _LOG = logging.getLogger(__name__)
 
 CONNECTION_TIMEOUT: float = 10.0
+"""Android TV device connection timeout in seconds."""
 BACKOFF_MAX: int = 30
+"""Maximum backoff duration in seconds."""
 MIN_RECONNECT_DELAY: float = 0.5
 BACKOFF_FACTOR: float = 1.5
 
@@ -591,15 +593,18 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     async def _apply_current_app_metadata(self, current_app: str) -> dict:
         update = {}
 
+        # Track state of data sources
         offline_name = None
         offline_match = None
         external_name = None
         external_icon = None
 
+        # Try offline ID mapping first
         if current_app in apps.IdMappings:
             offline_name = apps.IdMappings[current_app]
             self._media_app = offline_name
 
+        # Try fuzzy offline name matching if ID mapping failed
         if not offline_name:
             for query, name in apps.NameMatching.items():
                 if query in current_app:
@@ -607,6 +612,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     self._media_app = name
                     break
 
+        # Try external metadata
         metadata = await get_app_metadata(current_app) if self._device_config.use_external_metadata else None
         if metadata:
             external_name = metadata.get("name")
@@ -618,11 +624,13 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         _LOG.debug("%s", metadata)
 
+        # Determine final name/title to use
         name_to_use = offline_name or offline_match or external_name or current_app
         update[MediaAttr.SOURCE] = name_to_use
         if not self._media_title and not self._media_image_url:
             update[MediaAttr.MEDIA_TITLE] = name_to_use
 
+        # Determine which icon to use
         icon_to_use = None
         if self._device_config.use_external_metadata or self._use_app_url:
             if external_icon:
@@ -632,17 +640,16 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         elif self._media_image_url:
             icon_to_use = await encode_icon_to_data_uri(self._media_image_url)
 
+        # Special case handling for Android TV system apps
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update[MediaAttr.STATE] = media_player.States.ON.value
             update[MediaAttr.MEDIA_TITLE] = "Android TV"
             update[MediaAttr.SOURCE] = "Android TV"
             update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
-
         elif current_app == "com.google.android.backdrop":
             update[MediaAttr.STATE] = media_player.States.STANDBY.value
             update[MediaAttr.MEDIA_TITLE] = ""
             update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
-
         else:
             update[MediaAttr.STATE] = media_player.States.PLAYING.value
             # Skip applying app icon if media image from cast is present
@@ -657,6 +664,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         return update
 
     def _is_on_updated(self, is_on: bool) -> None:
+        """Notify that the Android TV power state is updated."""
         asyncio.create_task(self._handle_is_on_updated(is_on))
 
     async def _handle_is_on_updated(self, is_on: bool):
@@ -673,6 +681,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _current_app_updated(self, current_app: str) -> None:
+        """Notify that the current app on Android TV is updated."""
         asyncio.create_task(self._handle_current_app_updated(current_app))
 
     async def _handle_current_app_updated(self, current_app: str):
@@ -841,6 +850,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             status.player_state
             and GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING) != self._player_state
         ):
+            # PLAYING, PAUSED, IDLE
             self._player_state = GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING)
             self._last_update_position_time = 0
             update[MediaAttr.STATE] = self._player_state
@@ -869,6 +879,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             update[MediaAttr.MEDIA_DURATION] = self._media_duration
             changed_duration = True
 
+        # Update position every 30 seconds
         if changed_duration or (
             current_time != self._media_position and self._last_update_position_time + 30 < time.time()
         ):
@@ -896,6 +907,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._app_image_url)
 
         if update:
+            # filter media_image_url property
             if _LOG.isEnabledFor(logging.DEBUG):
                 log_upd = copy(update)
                 if MediaAttr.MEDIA_IMAGE_URL in log_upd:
