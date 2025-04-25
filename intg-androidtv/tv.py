@@ -590,7 +590,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self.events.emit(Events.DISCONNECTED, self._identifier)
 
     # Callbacks
-    def _apply_current_app_metadata(self, current_app: str) -> dict:
+    async def _apply_current_app_metadata(self, current_app: str) -> dict:
         update = {}
 
         # Track state of data sources
@@ -613,64 +613,78 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     break
 
         # Try external metadata
-        metadata = get_app_metadata(current_app) if self._device_config.use_external_metadata else None
+        metadata = await get_app_metadata(current_app) if self._device_config.use_external_metadata else None
         if metadata:
             external_name = metadata.get("name")
             external_icon = metadata.get("icon")
             if external_name:
                 self._media_app = external_name
+            if external_icon:
+                self._app_image_url = external_icon
+
+        _LOG.debug("App metadata: %s", metadata)
 
         # Determine final name/title to use
         name_to_use = offline_name or offline_match or external_name or current_app
         update[MediaAttr.SOURCE] = name_to_use
-        update[MediaAttr.MEDIA_TITLE] = name_to_use
+        if not self._media_title and not self._media_image_url:
+            update[MediaAttr.MEDIA_TITLE] = name_to_use
 
         # Determine which icon to use
         icon_to_use = None
-        if self._device_config.use_external_metadata and self._use_app_url:
+        if self._device_config.use_external_metadata or self._use_app_url:
             if external_icon:
-                icon_to_use = encode_icon_to_data_uri(external_icon)
+                icon_to_use = external_icon
             else:
-                icon_to_use = ""  # Explicitly clear if expected but missing
+                icon_to_use = ""
         elif self._media_image_url:
-            icon_to_use = encode_icon_to_data_uri(self._media_image_url)
-
-        if icon_to_use is not None:
-            update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
+            icon_to_use = await encode_icon_to_data_uri(self._media_image_url)
 
         # Special case handling for Android TV system apps
         if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
             update[MediaAttr.STATE] = media_player.States.ON.value
-            update[MediaAttr.MEDIA_TITLE] = "Android TV Home"
-            update[MediaAttr.SOURCE] = "Android TV Home"
-            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri("data/external_cache/icons/androidtv.png")
+            update[MediaAttr.MEDIA_TITLE] = "Android TV"
+            update[MediaAttr.SOURCE] = "Android TV"
+            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
         elif current_app == "com.google.android.backdrop":
             update[MediaAttr.STATE] = media_player.States.STANDBY.value
             update[MediaAttr.MEDIA_TITLE] = ""
-            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri("data/external_cache/icons/androidtv.png")
+            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
         else:
             update[MediaAttr.STATE] = media_player.States.PLAYING.value
+            # Skip applying app icon if media image from cast is present
+            if not self._media_image_url:
+                if not icon_to_use:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
+                else:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
 
         return update
 
     def _is_on_updated(self, is_on: bool) -> None:
         """Notify that the Android TV power state is updated."""
+        asyncio.create_task(self._handle_is_on_updated(is_on))
+
+    async def _handle_is_on_updated(self, is_on: bool):
         _LOG.info("[%s] is on: %s", self.log_id, is_on)
         current_app = self._atv.current_app or ""
         if is_on:
             self._chromecast_connect()
-            update = self._apply_current_app_metadata(current_app)
+            update = await self._apply_current_app_metadata(current_app)
             update[MediaAttr.STATE] = media_player.States.ON.value
-
         else:
-            update = self._apply_current_app_metadata(current_app)
+            update = await self._apply_current_app_metadata(current_app)
             update[MediaAttr.STATE] = media_player.States.OFF.value
+
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _current_app_updated(self, current_app: str) -> None:
         """Notify that the current app on Android TV is updated."""
+        asyncio.create_task(self._handle_current_app_updated(current_app))
+
+    async def _handle_current_app_updated(self, current_app: str):
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
-        update = self._apply_current_app_metadata(current_app)
+        update = await self._apply_current_app_metadata(current_app)
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _volume_info_updated(self, volume_info: dict[str, str | bool]) -> None:
@@ -818,9 +832,18 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def new_media_status(self, status: MediaStatus) -> None:
         """Receive new media status event from Google cast."""
-        # For debugging, too verbose
-        # _LOG.debug("[%s] Update from Chromecast info : %s", self.log_id, status)
+        if not self._loop or not self._loop.is_running():
+            _LOG.warning("[%s] No running event loop for handling new media status", self.log_id)
+            return
+
+        try:
+            asyncio.run_coroutine_threadsafe(self._handle_new_media_status(status), self._loop)
+        except Exception as e:
+            _LOG.error("[%s] Failed to schedule media status handler: %s", self.log_id, e)
+
+    async def _handle_new_media_status(self, status: MediaStatus):
         update = {}
+
         if (
             status.player_state
             and GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING) != self._player_state
@@ -829,50 +852,57 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self._player_state = GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING)
             self._last_update_position_time = 0
             update[MediaAttr.STATE] = self._player_state
+
         if status.album_name != self._media_album:
-            self._media_album = status.album_name if status.album_name else ""
+            self._media_album = status.album_name or ""
             update[MediaAttr.MEDIA_ALBUM] = self._media_album
+
         if status.artist != self._media_artist:
-            self._media_artist = status.artist if status.artist else ""
+            self._media_artist = status.artist or ""
             update[MediaAttr.MEDIA_ARTIST] = self._media_artist
+
         if status.title != self._media_title:
             current_title = self.media_title
-            self._media_title = status.title if status.title else ""
+            self._media_title = status.title or ""
             if current_title != self.media_title:
                 _LOG.debug("[%s] Chromecast Media info updated : %s", self.log_id, status)
                 update[MediaAttr.MEDIA_TITLE] = self.media_title
+
         current_time = int(status.current_time) if status.current_time else 0
         duration = int(status.duration) if status.duration else 0
-        chanded_duration = False
+        changed_duration = False
+
         if duration != self._media_duration:
             self._media_duration = duration
             update[MediaAttr.MEDIA_DURATION] = self._media_duration
-            chanded_duration = True
+            changed_duration = True
+
         # Update position every 30 seconds
-        if chanded_duration or (
+        if changed_duration or (
             current_time != self._media_position and self._last_update_position_time + 30 < time.time()
         ):
             self._media_position = current_time
             update[MediaAttr.MEDIA_POSITION] = self._media_position
             update[MediaAttr.MEDIA_DURATION] = self._media_duration
             self._last_update_position_time = time.time()
+
         if (
             status.metadata_type
             and GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO) != self._media_type
         ):
-            self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(self._media_type, MediaType.VIDEO)
+            self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO)
             update[MediaAttr.MEDIA_TYPE] = self._media_type
 
         if status.images and len(status.images) > 0 and status.images[0].url != self._media_image_url:
             self._media_image_url = status.images[0].url
-            update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._media_image_url)
+            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._media_image_url)
             self._use_app_url = False
         else:
             self._media_image_url = None
             if self._device_config.use_external_metadata:
                 self._use_app_url = True
                 if self._app_image_url:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = encode_icon_to_data_uri(self._app_image_url)
+                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._app_image_url)
 
         if update:
             # filter media_image_url property
@@ -881,6 +911,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 if MediaAttr.MEDIA_IMAGE_URL in log_upd:
                     log_upd[MediaAttr.MEDIA_IMAGE_URL] = "***"
                 _LOG.debug("[%s] Update remote with Chromecast info : %s", self.log_id, log_upd)
+
             self.events.emit(Events.UPDATE, self._identifier, update)
 
     def load_media_failed(self, queue_item_id: int, error_code: int) -> None:
@@ -889,13 +920,23 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     def new_cast_status(self, status: CastStatus) -> None:
         """Receive new cast event from Google cast."""
         _LOG.debug("[%s] Received Chromecast cast status : %s", self.log_id, status)
+
+        if not self._loop or not self._loop.is_running():
+            _LOG.warning("[%s] No running event loop for cast status", self.log_id)
+            return
+
+        try:
+            asyncio.run_coroutine_threadsafe(self._handle_new_cast_status(status), self._loop)
+        except Exception as e:
+            _LOG.error("[%s] Failed to schedule cast status handler: %s", self.log_id, e)
+
+    async def _handle_new_cast_status(self, status: CastStatus):
         current_title = self.media_title
         if status.display_name:
             self._media_app = status.display_name
 
         if current_title != self.media_title:
             update = {MediaAttr.MEDIA_TITLE: self.media_title}
-
             _LOG.debug("[%s] Update remote with Chromecast info : %s", self.log_id, update)
             self.events.emit(Events.UPDATE, self._identifier, update)
 
