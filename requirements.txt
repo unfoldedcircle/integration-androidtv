@@ -5,4 +5,4 @@ google_play_scraper==1.2.7
 pillow>=11.2.1
 requests>=2.32
 pychromecast~=14.0.7
-httpx
+httpx~=0.28.1
