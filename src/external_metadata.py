@@ -31,7 +31,6 @@ ICON_SIZE = (120, 120)
 # Paths
 def _get_config_root() -> Path:
     config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
-    _LOG.debug("config home: %s", config_home)
     config_home.mkdir(parents=True, exist_ok=True)
     return config_home
 
@@ -125,7 +124,6 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
 
     Returns a base64-encoded PNG data URI.
     """
-    _LOG.debug("Encoding icon to data URI: %s", icon_name)
     if isinstance(icon_name, MediaImage):
         icon_name = icon_name.url
 
@@ -133,6 +131,7 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
         _LOG.debug("Icon is already a data URI")
         return icon_name
 
+    _LOG.debug("Encoding icon to data URI: %s", icon_name)
     try:
         if _is_url(icon_name):
             async with httpx.AsyncClient() as client:

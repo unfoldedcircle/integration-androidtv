@@ -40,7 +40,7 @@ For running a separate integration driver on your network for Remote Two/3, the 
 ### Run
 
 ```shell
-UC_CONFIG_HOME=./config UC_DATA_HOME=./data python3 intg-androidtv/driver.py
+UC_CONFIG_HOME=./config UC_DATA_HOME=./data python3 src/driver.py
 ```
 
 - Environment variables:
@@ -81,7 +81,7 @@ docker run --rm --name builder \
     docker.io/unfoldedcircle/r2-pyinstaller:3.11.12  \
     bash -c \
       "python -m pip install -r requirements.txt && \
-      pyinstaller --clean --onedir --name intg-androidtv intg-androidtv/driver.py"
+      pyinstaller --clean --onedir --name intg-androidtv src/driver.py"
 ```
 
 ### aarch64 Linux / Mac
@@ -94,7 +94,7 @@ docker run --rm --name builder \
     docker.io/unfoldedcircle/r2-pyinstaller:3.11.12  \
     bash -c \
       "python -m pip install -r requirements.txt && \
-      pyinstaller --clean --onedir --name intg-androidtv intg-androidtv/driver.py"
+      pyinstaller --clean --onedir --name intg-androidtv src/driver.py"
 ```
 
 ## Versioning

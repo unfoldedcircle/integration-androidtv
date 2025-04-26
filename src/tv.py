@@ -13,14 +13,10 @@ import os
 import socket
 import time
 from asyncio import AbstractEventLoop, timeout
-from copy import copy
 from enum import IntEnum
 from functools import wraps
 from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
 
-import apps
-import discover
-import inputs
 import pychromecast
 import ucapi
 from androidtvremote2 import (
@@ -29,8 +25,6 @@ from androidtvremote2 import (
     ConnectionClosed,
     InvalidAuth,
 )
-from external_metadata import encode_icon_to_data_uri, get_app_metadata
-from profiles import KeyPress, Profile
 from pychromecast import CastStatus, CastStatusListener, Chromecast, RequestTimeout
 from pychromecast.controllers.media import (
     MEDIA_PLAYER_STATE_BUFFERING,
@@ -52,7 +46,13 @@ from ucapi import media_player
 from ucapi.media_player import Attributes as MediaAttr
 from ucapi.media_player import MediaType
 
+import apps
+import discover
+import inputs
 from config import AtvDevice
+from external_metadata import encode_icon_to_data_uri, get_app_metadata
+from profiles import KeyPress, Profile
+from util import filter_data_img_properties
 
 _LOG = logging.getLogger(__name__)
 
@@ -638,14 +638,14 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             await get_app_metadata(current_app) if current_app and self._device_config.use_external_metadata else None
         )
         if metadata:
+            if _LOG.isEnabledFor(logging.DEBUG):
+                _LOG.debug("App metadata: %s", filter_data_img_properties(metadata))
             external_name = metadata.get("name")
             external_icon = metadata.get("icon")
             if external_name:
                 self._media_app = external_name
             if external_icon:
                 self._app_image_url = external_icon
-
-        _LOG.debug("App metadata: %s", metadata)
 
         # Determine final name/title to use
         name_to_use = offline_name or offline_match or external_name or current_app
@@ -918,12 +918,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._app_image_url)
 
         if update:
-            # filter media_image_url property
             if _LOG.isEnabledFor(logging.DEBUG):
-                log_upd = copy(update)
-                if MediaAttr.MEDIA_IMAGE_URL in log_upd:
-                    log_upd[MediaAttr.MEDIA_IMAGE_URL] = "***"
-                _LOG.debug("[%s] Update remote with Chromecast info : %s", self.log_id, log_upd)
+                _LOG.debug(
+                    "[%s] Update remote with Chromecast info : %s", self.log_id, filter_data_img_properties(update)
+                )
 
             self.events.emit(Events.UPDATE, self._identifier, update)
 

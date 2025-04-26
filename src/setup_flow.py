@@ -9,8 +9,6 @@ import asyncio
 import logging
 from enum import IntEnum
 
-import discover
-import tv
 import ucapi
 from ucapi import (
     AbortDriverSetup,
@@ -25,6 +23,8 @@ from ucapi import (
 )
 
 import config
+import discover
+import tv
 from config import AtvDevice
 
 _LOG = logging.getLogger(__name__)
