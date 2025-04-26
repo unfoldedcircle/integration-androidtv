@@ -10,18 +10,18 @@ import asyncio
 import logging
 import os
 import sys
-from copy import copy
 from datetime import UTC, datetime
 from typing import Any
 
-import setup_flow
-import tv
 import ucapi
-from profiles import DeviceProfile, Profile
 from ucapi import MediaPlayer, media_player
 from ucapi.media_player import Attributes as MediaAttr
 
 import config
+import setup_flow
+import tv
+from profiles import DeviceProfile, Profile
+from util import filter_data_img_properties
 
 _LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
 if sys.platform == "win32":
@@ -233,11 +233,7 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
 
     if _LOG.isEnabledFor(logging.DEBUG):
         device = config.devices.get(atv_id)
-        # filter media_image_url property
-        log_upd = copy(update)
-        if MediaAttr.MEDIA_IMAGE_URL in log_upd:
-            log_upd[MediaAttr.MEDIA_IMAGE_URL] = "***"
-            _LOG.debug("[%s] device update: %s", device.name if device else atv_id, log_upd)
+        _LOG.debug("[%s] device update: %s", device.name if device else atv_id, filter_data_img_properties(update))
 
     old_state = (
         configured_entity.attributes[MediaAttr.STATE]

@@ -25,13 +25,19 @@ _LOG = logging.getLogger(__name__)
 
 CACHE_ROOT = "external_cache"
 ICON_SUBDIR = "icons"
-ICON_SIZE = (120, 120)
+ICON_SIZE = (240, 240)
 
 
 # Paths
+def _get_config_root() -> Path:
+    config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
+    config_home.mkdir(parents=True, exist_ok=True)
+    return config_home
+
+
 def _get_cache_root() -> Path:
-    config_home = Path(os.environ.get("UC_DATA_HOME", "./data"))
-    cache_root = config_home / CACHE_ROOT
+    data_home = Path(os.environ.get("UC_DATA_HOME", "./data"))
+    cache_root = data_home / CACHE_ROOT
     cache_root.mkdir(parents=True, exist_ok=True)
     return cache_root
 
@@ -52,8 +58,14 @@ def _get_metadata_file_path() -> Path:
     return _get_metadata_dir() / "app_metadata.json"
 
 
-def _get_icon_path(package_id: str) -> Path:
-    return _get_icon_dir() / f"{package_id}.png"
+def _get_icon_name(package_id: str) -> str:
+    return f"{package_id}.png"
+
+
+def _get_icon_path(icon_name: str) -> Path:
+    if icon_name.startswith("config://"):
+        return _get_config_root() / icon_name[9:]
+    return _get_icon_dir() / icon_name
 
 
 # Cache Management
@@ -92,10 +104,11 @@ async def _download_and_resize_icon(url: str, package_id: str) -> str | None:
         def resize_image() -> str:
             img = Image.open(img_bytes)
             img = img.resize(ICON_SIZE, Resampling.LANCZOS)
-            icon_path = _get_icon_path(package_id)
+            icon_name = _get_icon_name(package_id)
+            icon_path = _get_icon_path(icon_name)
             img.save(icon_path, format="PNG")
-            _LOG.debug("Saved resized icon to %s", icon_path)
-            return icon_path.name
+            _LOG.debug("Saved resized icon %s", icon_name)
+            return icon_name
 
         filename = await asyncio.to_thread(resize_image)
         return filename
@@ -111,7 +124,6 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
 
     Returns a base64-encoded PNG data URI.
     """
-    _LOG.debug("Encoding icon to data URI: %s", icon_name)
     if isinstance(icon_name, MediaImage):
         icon_name = icon_name.url
 
@@ -119,6 +131,7 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
         _LOG.debug("Icon is already a data URI")
         return icon_name
 
+    _LOG.debug("Encoding icon to data URI: %s", icon_name)
     try:
         if _is_url(icon_name):
             async with httpx.AsyncClient() as client:
@@ -137,9 +150,9 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
             return await asyncio.to_thread(encode_image)
 
         def load_and_encode() -> str:
-            icon_path = _get_icon_dir() / icon_name
+            icon_path = _get_icon_path(icon_name)
             if not icon_path.exists():
-                raise FileNotFoundError(f"Icon not found: {icon_path}")
+                raise FileNotFoundError(f"Icon not found: {icon_name}")
             with open(icon_path, "rb") as f:
                 img = Image.open(f)
                 img.load()
@@ -162,6 +175,8 @@ def _is_url(path: str) -> bool:
 
 
 async def _fetch_google_play_metadata(package_id: str) -> Dict[str, str] | None:
+    if not package_id:
+        return None
     _LOG.debug("Fetching metadata for %s from Google Play", package_id)
     try:
         app = await asyncio.to_thread(google_play_scraper.app, package_id)

@@ -1,5 +1,18 @@
 """Application link and identifier mappings."""
 
+
+def is_homescreen_app(app_id: str) -> bool:
+    """Check if the app is a homescreen app."""
+    # make sure each app_id is defined in IdMappings below!
+    return app_id in ["com.android.systemui", "com.google.android.tvlauncher", "com.google.android.apps.tv.launcherx"]
+
+
+def is_standby_app(app_id: str) -> bool:
+    """Check if the app is a standby app."""
+    # make sure each app_id is defined in IdMappings below!
+    return app_id in ["com.google.android.backdrop", "com.google.android.apps.tv.dreamx"]
+
+
 # Application launch links
 Apps = {
     "Youtube": {"url": "https://www.youtube.com"},
@@ -41,6 +54,8 @@ IdMappings = {
     "com.google.android.backdrop": "Backdrop Daydream",
     "com.google.android.apps.tv.dreamx": "Backdrop Daydream",
     "com.google.android.katniss": "Google app",
+    "com.android.systemui": "Android TV",
+    "com.google.android.tvlauncher": "Android TV",
     "com.google.android.apps.tv.launcherx": "Android TV",
     "com.google.android.gms": "Google Play services",
     "com.android.vending": "Google Play Store",

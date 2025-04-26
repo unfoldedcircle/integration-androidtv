@@ -40,9 +40,12 @@ For running a separate integration driver on your network for Remote Two/3, the 
 ### Run
 
 ```shell
-UC_CONFIG_HOME=./config python3 intg-androidtv/driver.py
+UC_CONFIG_HOME=./config UC_DATA_HOME=./data python3 src/driver.py
 ```
 
+- Environment variables:
+  - `UC_CONFIG_HOME`: configuration directory for device settings, certificates and profiles.
+  - `UC_DATA_HOME`: data directory to store metadata images.
 - See available [environment variables](https://github.com/unfoldedcircle/integration-python-library#environment-variables)
   in the Python integration library to control certain runtime features like listening interface and configuration directory.
 - The client name used for the client certificate can be set in ENV variable `UC_CLIENT_NAME`.
@@ -78,7 +81,7 @@ docker run --rm --name builder \
     docker.io/unfoldedcircle/r2-pyinstaller:3.11.12  \
     bash -c \
       "python -m pip install -r requirements.txt && \
-      pyinstaller --clean --onedir --name intg-androidtv intg-androidtv/driver.py"
+      pyinstaller --clean --onedir --name intg-androidtv src/driver.py"
 ```
 
 ### aarch64 Linux / Mac
@@ -91,7 +94,7 @@ docker run --rm --name builder \
     docker.io/unfoldedcircle/r2-pyinstaller:3.11.12  \
     bash -c \
       "python -m pip install -r requirements.txt && \
-      pyinstaller --clean --onedir --name intg-androidtv intg-androidtv/driver.py"
+      pyinstaller --clean --onedir --name intg-androidtv src/driver.py"
 ```
 
 ## Versioning

@@ -7,6 +7,7 @@
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
       <env name="UC_CONFIG_HOME" value="$PROJECT_DIR$/config" />
+      <env name="UC_DATA_HOME" value="$PROJECT_DIR$/data" />
       <env name="UC_INTEGRATION_HTTP_PORT" value="8888" />
     </envs>
     <option name="SDK_HOME" value="" />
@@ -25,7 +26,7 @@
         <ENTRY IS_ENABLED="true" PARSER="runconfig" IS_EXECUTABLE="false" />
       </ENTRIES>
     </EXTENSION>
-    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/intg-androidtv/driver.py" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/driver.py" />
     <option name="PARAMETERS" value="" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />

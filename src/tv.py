@@ -5,20 +5,18 @@ This module implements the Android TV communication of the Remote Two integratio
 :license: Mozilla Public License Version 2.0, see LICENSE for more details.
 """
 
+# pylint: disable=too-many-lines
+
 import asyncio
 import logging
 import os
 import socket
 import time
 from asyncio import AbstractEventLoop, timeout
-from copy import copy
 from enum import IntEnum
 from functools import wraps
 from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
 
-import apps
-import discover
-import inputs
 import pychromecast
 import ucapi
 from androidtvremote2 import (
@@ -27,8 +25,6 @@ from androidtvremote2 import (
     ConnectionClosed,
     InvalidAuth,
 )
-from external_metadata import encode_icon_to_data_uri, get_app_metadata
-from profiles import KeyPress, Profile
 from pychromecast import CastStatus, CastStatusListener, Chromecast, RequestTimeout
 from pychromecast.controllers.media import (
     MEDIA_PLAYER_STATE_BUFFERING,
@@ -50,7 +46,13 @@ from ucapi import media_player
 from ucapi.media_player import Attributes as MediaAttr
 from ucapi.media_player import MediaType
 
+import apps
+import discover
+import inputs
 from config import AtvDevice
+from external_metadata import encode_icon_to_data_uri, get_app_metadata
+from profiles import KeyPress, Profile
+from util import filter_data_img_properties
 
 _LOG = logging.getLogger(__name__)
 
@@ -62,6 +64,8 @@ MIN_RECONNECT_DELAY: float = 0.5
 BACKOFF_FACTOR: float = 1.5
 
 LONG_PRESS_DELAY: float = 0.8
+
+HOMESCREEN_IMAGE = None
 
 
 class Events(IntEnum):
@@ -591,7 +595,24 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     # Callbacks
     async def _apply_current_app_metadata(self, current_app: str) -> dict:
+        global HOMESCREEN_IMAGE
+
         update = {}
+        # one-time initialization
+        if HOMESCREEN_IMAGE is None:
+            HOMESCREEN_IMAGE = ""
+            HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://icons/androidtv.png")
+
+        # Special handling for homescreen & Android TV system apps: show pre-defined icon
+        homescreen_app = apps.is_homescreen_app(current_app)
+        if homescreen_app or apps.is_standby_app(current_app):
+            update[MediaAttr.SOURCE] = apps.IdMappings[current_app]
+            update[MediaAttr.MEDIA_TITLE] = ""
+            update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
+            update[MediaAttr.STATE] = (
+                media_player.States.ON.value if homescreen_app else media_player.States.STANDBY.value
+            )
+            return update
 
         # Track state of data sources
         offline_name = None
@@ -613,8 +634,12 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     break
 
         # Try external metadata
-        metadata = await get_app_metadata(current_app) if self._device_config.use_external_metadata else None
+        metadata = (
+            await get_app_metadata(current_app) if current_app and self._device_config.use_external_metadata else None
+        )
         if metadata:
+            if _LOG.isEnabledFor(logging.DEBUG):
+                _LOG.debug("App metadata: %s", filter_data_img_properties(metadata))
             external_name = metadata.get("name")
             external_icon = metadata.get("icon")
             if external_name:
@@ -622,10 +647,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             if external_icon:
                 self._app_image_url = external_icon
 
-        _LOG.debug("App metadata: %s", metadata)
-
         # Determine final name/title to use
         name_to_use = offline_name or offline_match or external_name or current_app
+        # TODO why set name to both source & media title fields?
         update[MediaAttr.SOURCE] = name_to_use
         if not self._media_title and not self._media_image_url:
             update[MediaAttr.MEDIA_TITLE] = name_to_use
@@ -640,24 +664,13 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         elif self._media_image_url:
             icon_to_use = await encode_icon_to_data_uri(self._media_image_url)
 
-        # Special case handling for Android TV system apps
-        if current_app in ("com.google.android.tvlauncher", "com.android.systemui"):
-            update[MediaAttr.STATE] = media_player.States.ON.value
-            update[MediaAttr.MEDIA_TITLE] = "Android TV"
-            update[MediaAttr.SOURCE] = "Android TV"
-            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
-        elif current_app == "com.google.android.backdrop":
-            update[MediaAttr.STATE] = media_player.States.STANDBY.value
-            update[MediaAttr.MEDIA_TITLE] = ""
-            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
-        else:
-            update[MediaAttr.STATE] = media_player.States.PLAYING.value
-            # Skip applying app icon if media image from cast is present
-            if not self._media_image_url:
-                if not icon_to_use:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri("androidtv.png")
-                else:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
+        update[MediaAttr.STATE] = media_player.States.PLAYING.value
+        # Skip applying app icon if media image from cast is present
+        if not self._media_image_url:
+            if not icon_to_use:
+                update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
+            else:
+                update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
 
         return update
 
@@ -826,9 +839,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def new_connection_status(self, status: ConnectionStatus) -> None:
         """Receive new connection status event from Google cast."""
-        _LOG.debug("[%s] Received Chromecast connection status : %s", self.log_id, status)
-        if status.status == "CONNECTED":
-            _LOG.debug("[%s] Chromecast connected", self.log_id)
+        _LOG.info("[%s] Received Chromecast connection status : %s", self.log_id, status)
 
     def new_media_status(self, status: MediaStatus) -> None:
         """Receive new media status event from Google cast."""
@@ -905,12 +916,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._app_image_url)
 
         if update:
-            # filter media_image_url property
             if _LOG.isEnabledFor(logging.DEBUG):
-                log_upd = copy(update)
-                if MediaAttr.MEDIA_IMAGE_URL in log_upd:
-                    log_upd[MediaAttr.MEDIA_IMAGE_URL] = "***"
-                _LOG.debug("[%s] Update remote with Chromecast info : %s", self.log_id, log_upd)
+                _LOG.debug(
+                    "[%s] Update remote with Chromecast info : %s", self.log_id, filter_data_img_properties(update)
+                )
 
             self.events.emit(Events.UPDATE, self._identifier, update)
 
