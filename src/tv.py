@@ -839,9 +839,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def new_connection_status(self, status: ConnectionStatus) -> None:
         """Receive new connection status event from Google cast."""
-        _LOG.debug("[%s] Received Chromecast connection status : %s", self.log_id, status)
-        if status.status == "CONNECTED":
-            _LOG.debug("[%s] Chromecast connected", self.log_id)
+        _LOG.info("[%s] Received Chromecast connection status : %s", self.log_id, status)
 
     def new_media_status(self, status: MediaStatus) -> None:
         """Receive new media status event from Google cast."""
