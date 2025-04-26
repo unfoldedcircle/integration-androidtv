@@ -25,7 +25,7 @@ _LOG = logging.getLogger(__name__)
 
 CACHE_ROOT = "external_cache"
 ICON_SUBDIR = "icons"
-ICON_SIZE = (120, 120)
+ICON_SIZE = (240, 240)
 
 
 # Paths
