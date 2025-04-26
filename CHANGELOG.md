@@ -11,13 +11,14 @@ _Changes in the next release_
 ### Added
 - Google Cast for media info & seeking support. Contributed by @albaintor, thanks! ([#57](https://github.com/unfoldedcircle/integration-androidtv/pull/57))
   - This is currently a preview feature and must be enabled in the device configuration of the integration setup.
-- External app name and icon metadata from Google Play. Contributed by @thomasm789, thanks! ([#60](https://github.com/unfoldedcircle/integration-androidtv/pull/60)).
+- External app name and icon metadata from Google Play. Contributed by @thomasm789, thanks! ([#60](https://github.com/unfoldedcircle/integration-androidtv/pull/60), [#66](https://github.com/unfoldedcircle/integration-androidtv/pull/66)).
 - myCANAL application ([#55](https://github.com/unfoldedcircle/integration-androidtv/pull/55)).
 - Set media player attribute "media_position_updated_at" ([feature-and-bug-tracker#443](https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/443)).
 
 ### Changed
 - Add a support article link and change the setup description in the first setup flow screen.
 - Update the embedded Python runtime to 3.11.12 and upgrade common Python libraries like zeroconf and websockets.
+- Project structure refactoring and initial unit tests [#66](https://github.com/unfoldedcircle/integration-androidtv/pull/66).
 
 ---
 
