@@ -105,4 +105,4 @@ config.json
 *.pem
 licenses.json
 tools/licenses.md
-/data/external_cache/icons/
+/data/
