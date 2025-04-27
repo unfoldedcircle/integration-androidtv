@@ -20,6 +20,7 @@ import httpx
 from PIL import Image
 from PIL.Image import Resampling
 from pychromecast.controllers.media import MediaImage
+from sanitize_filename import sanitize
 
 _LOG = logging.getLogger(__name__)
 
@@ -59,13 +60,13 @@ def _get_metadata_file_path() -> Path:
 
 
 def _get_icon_name(package_id: str) -> str:
-    return f"{package_id}.png"
+    return sanitize(f"{package_id}.png")
 
 
 def _get_icon_path(icon_name: str) -> Path:
     if icon_name.startswith("config://"):
-        return _get_config_root() / icon_name[9:]
-    return _get_icon_dir() / icon_name
+        return _get_config_root() / sanitize(icon_name[9:])
+    return _get_icon_dir() / sanitize(icon_name)
 
 
 # Cache Management

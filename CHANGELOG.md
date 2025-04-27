@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+### Changed
+- Sanitize metadata icon filename for file operations. 
+
 ---
 
 ## v0.7.0 - 2025-04-26
