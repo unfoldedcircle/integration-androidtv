@@ -601,7 +601,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         # one-time initialization
         if HOMESCREEN_IMAGE is None:
             HOMESCREEN_IMAGE = ""
-            HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://icons/androidtv.png")
+            HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://androidtv.png")
 
         # Special handling for homescreen & Android TV system apps: show pre-defined icon
         homescreen_app = apps.is_homescreen_app(current_app)

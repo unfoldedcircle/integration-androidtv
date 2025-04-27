@@ -65,7 +65,7 @@ def _get_icon_name(package_id: str) -> str:
 
 def _get_icon_path(icon_name: str) -> Path:
     if icon_name.startswith("config://"):
-        return _get_config_root() / sanitize(icon_name[9:])
+        return _get_config_root() / "icons" / sanitize(icon_name[9:])
     return _get_icon_dir() / sanitize(icon_name)
 
 
