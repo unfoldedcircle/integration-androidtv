@@ -10,7 +10,7 @@ _Changes in the next release_
 
 ---
 
-## v0.7.1 - 2025-04-27
+## v0.7.2 - 2025-04-27
 ### Changed
 - Sanitize metadata icon filename for file operations.
 
