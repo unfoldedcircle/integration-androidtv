@@ -12,6 +12,7 @@ from adb_shell.adb_device_async import AdbDeviceTcpAsync
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 from adb_shell.auth.keygen import keygen
 import os
+from pathlib import Path
 
 import ucapi
 from ucapi import (
@@ -661,49 +662,46 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
             return SetupError(error_type=IntegrationSetupError.AUTHORIZATION_ERROR)
 
         _LOG.debug("ADB authorisation confirmed")
-        from apps import Apps
+    from apps import Apps
 
+    if _use_adb:
         adb_apps = await get_installed_apps(adb_device)  # dict[str, dict[str, str]]
         all_apps = {**Apps, **adb_apps}  # ADB apps override Apps if same name
-
-
-        _LOG.debug("Retrieved apps: %s", all_apps)
         await adb_device.close()
-
-        _setup_step = SetupSteps.APP_SELECTION
-        return RequestUserInput(
-            title={
-                "en": "Select visible apps",
-                "de": "Wähle sichtbare Apps",
-                "fr": "Sélectionnez les applications visibles",
-            },
-            settings=[
-                {
-                    "id": "visible_apps",
-                    "label": {
-                        "en": "Choose apps to show",
-                        "de": "Wähle Apps zur Anzeige",
-                        "fr": "Choisir les applications à afficher",
-                    },
-                    "field": {
-                        "multichoice": {
-                            "items": [
-                                {
-                                    "id": package,
-                                    "label": {"en": details.get("name", package)}
-                                }
-                                for package, details in sorted(all_apps.items())
-                            ],
-                            "value": [],
-                        }
-                    },
-                }
-            ],
-        )
-
     else:
-        _LOG.debug("ADB is not enabled, skipping to setup completion")
-        return await handle_setup_completion(res)
+        all_apps = Apps
+
+    _LOG.debug("Retrieved apps: %s", all_apps)
+
+    _setup_step = SetupSteps.APP_SELECTION
+    return RequestUserInput(
+        title={
+            "en": "Select visible apps",
+            "de": "Wähle sichtbare Apps",
+            "fr": "Sélectionnez les applications visibles",
+        },
+        settings=[
+            {
+                "id": "visible_apps",
+                "label": {
+                    "en": "Choose apps to show",
+                    "de": "Wähle Apps zur Anzeige",
+                    "fr": "Choisir les applications à afficher",
+                },
+                "field": {
+                    "multichoice": {
+                        "items": [
+                            {
+                                "id": 'test',
+                                "label": {"en": 'test'}
+                            }
+                        ],
+                        "value": [],
+                    }
+                },
+            }
+        ],
+    )
 
 async def handle_setup_completion(res) -> SetupComplete:
     global _pairing_android_tv
@@ -785,6 +783,11 @@ async def handle_setup_completion(res) -> SetupComplete:
 #         ],
 #     )
 #
+def _get_config_root() -> Path:
+    config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
+    config_home.mkdir(parents=True, exist_ok=True)
+    return config_home
+
 async def _handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupError:
     from pathlib import Path
     import json
@@ -793,8 +796,7 @@ async def _handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupE
     if not isinstance(app_ids, list):
         return SetupError()
 
-    config_root = Path(config.devices.config_root())  # assuming your config exposes this
-    apps_file = config_root / "apps.json"
+    apps_file = _get_config_root() / "apps.json"
     try:
         apps_file.write_text(json.dumps(app_ids, indent=2))
     except Exception as e:
