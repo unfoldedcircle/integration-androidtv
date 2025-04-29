@@ -695,6 +695,11 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
                                 "id": 'test',
                                 "label": {"en": 'test'}
                             }
+                        #     {
+                        #         "id": package,
+                        #         "label": {"en": details.get("name", package)}
+                        #     }
+                        # for package, details in sorted(all_apps.items())
                         ],
                         "value": [],
                     }
