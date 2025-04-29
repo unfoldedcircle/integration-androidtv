@@ -47,6 +47,7 @@ class SetupSteps(IntEnum):
     APP_SELECTION = 6
     RECONFIGURE = 7
 
+
 _setup_step = SetupSteps.INIT
 _cfg_add_device: bool = False
 _discovered_android_tvs: list[dict[str, str]] = []
@@ -344,7 +345,8 @@ async def handle_configuration_mode(
                             "fr": "Fonctionnalité en aperçu: Activer la connexion ADB (pour la navigation dans les applications)",
                         },
                         "field": {"checkbox": {"value": use_adb}},
-                    },                ],
+                    },
+                ],
             )
         case "reset":
             config.devices.clear()  # triggers device instance removal
@@ -610,6 +612,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
 
 import logging
 
+
 async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | SetupComplete | SetupError:
     """
     Process user data pairing pin response in a setup process.
@@ -691,15 +694,12 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
                 "field": {
                     "multichoice": {
                         "items": [
-                            {
-                                "id": 'test',
-                                "label": {"en": 'test'}
-                            }
-                        #     {
-                        #         "id": package,
-                        #         "label": {"en": details.get("name", package)}
-                        #     }
-                        # for package, details in sorted(all_apps.items())
+                            {"id": "test", "label": {"en": "test"}}
+                            #     {
+                            #         "id": package,
+                            #         "label": {"en": details.get("name", package)}
+                            #     }
+                            # for package, details in sorted(all_apps.items())
                         ],
                         "value": [],
                     }
@@ -707,6 +707,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
             }
         ],
     )
+
 
 async def handle_setup_completion(res) -> SetupComplete:
     global _pairing_android_tv
@@ -742,7 +743,7 @@ async def handle_setup_completion(res) -> SetupComplete:
         model=device_info.get("model", ""),
         use_external_metadata=_use_external_metadata,
         use_chromecast=_use_chromecast,
-        use_adb=_use_adb
+        use_adb=_use_adb,
     )
     _LOG.debug("Created AtvDevice: %s", device)
 
@@ -758,6 +759,7 @@ async def handle_setup_completion(res) -> SetupComplete:
     _pairing_android_tv = None
 
     return SetupComplete()
+
 
 #
 # async def handle_app_selection(msg: UserDataResponse) -> SetupAction:
@@ -792,6 +794,7 @@ def _get_config_root() -> Path:
     config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
     config_home.mkdir(parents=True, exist_ok=True)
     return config_home
+
 
 async def _handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupError:
     from pathlib import Path

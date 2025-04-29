@@ -44,14 +44,13 @@ async def adb_connect(device_id: str, host: str, port: int = 5555) -> Optional[A
         print(f"ADB connection failed to {host}:{port} — {e}")
         return None
 
+
 async def get_installed_apps(device: AdbDeviceTcpAsync) -> Dict[str, Dict[str, str]]:
     """Retrieve list of installed non-system apps in structured format."""
     output = await device.shell("pm list packages -3 -e")
     packages = sorted(line.replace("package:", "").strip() for line in output.splitlines())
-    return {
-        package: {"url": f"market://launch?id={package}"}
-        for package in packages
-    }
+    return {package: {"url": f"market://launch?id={package}"} for package in packages}
+
 
 async def is_authorised(device: AdbDeviceTcpAsync) -> bool:
     try:
@@ -59,6 +58,7 @@ async def is_authorised(device: AdbDeviceTcpAsync) -> bool:
         return "ADB_OK" in result
     except Exception:
         return False
+
 
 async def test_connection(device_id: str, host: str) -> None:
     device = await adb_connect(device_id, host)
@@ -77,6 +77,7 @@ async def test_connection(device_id: str, host: str) -> None:
 
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) != 3:
         print("Usage: python adb_tv.py <device_id> <host>")
     else:
