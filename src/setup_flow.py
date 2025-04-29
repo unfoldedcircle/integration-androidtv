@@ -7,14 +7,14 @@ Setup flow for Android TV Remote integration.
 
 import asyncio
 import logging
-from enum import IntEnum
-from adb_shell.adb_device_async import AdbDeviceTcpAsync
-from adb_shell.auth.sign_pythonrsa import PythonRSASigner
-from adb_shell.auth.keygen import keygen
 import os
+from enum import IntEnum
 from pathlib import Path
 
 import ucapi
+from adb_shell.adb_device_async import AdbDeviceTcpAsync
+from adb_shell.auth.keygen import keygen
+from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 from ucapi import (
     AbortDriverSetup,
     DriverSetupRequest,
@@ -27,11 +27,11 @@ from ucapi import (
     UserDataResponse,
 )
 
+import adb_tv
 import config
 import discover
 import tv
 from config import AtvDevice
-import adb_tv
 
 _LOG = logging.getLogger(__name__)
 
@@ -651,7 +651,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
             _LOG.error("ADB setup failed: 'use_adb' not found in input values")
             return SetupError()
 
-        from adb_tv import adb_connect, is_authorised, get_installed_apps
+        from adb_tv import adb_connect, get_installed_apps, is_authorised
 
         device_id = _pairing_android_tv.identifier
         ip_address = _pairing_android_tv.address
@@ -797,8 +797,8 @@ def _get_config_root() -> Path:
 
 
 async def _handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupError:
-    from pathlib import Path
     import json
+    from pathlib import Path
 
     app_ids = msg.input_values.get("visible_apps", [])
     if not isinstance(app_ids, list):
