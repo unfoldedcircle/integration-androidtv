@@ -10,6 +10,10 @@ _Changes in the next release_
 
 ---
 
+## v0.7.2 - 2025-04-27
+### Changed
+- Sanitize metadata icon filename for file operations.
+
 ## v0.7.0 - 2025-04-26
 ### Added
 - Google Cast for media info & seeking support. Contributed by @albaintor, thanks! ([#57](https://github.com/unfoldedcircle/integration-androidtv/pull/57))

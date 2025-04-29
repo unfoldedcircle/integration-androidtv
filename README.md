@@ -1,22 +1,28 @@
 # Android TV integration for Remote Two/3
 
-Using [androidtvremote2](https://github.com/tronikos/androidtvremote2), [uc-integration-api](https://github.com/aitatoi/integration-python-library), [pychromecast](https://github.com/home-assistant-libs/pychromecast) and [google-play-scraper](https://github.com/JoMingyu/google-play-scraper).
+Using [androidtvremote2](https://github.com/tronikos/androidtvremote2), [uc-integration-api](https://github.com/aitatoi/integration-python-library),
+[pychromecast](https://github.com/home-assistant-libs/pychromecast) and [google-play-scraper](https://github.com/JoMingyu/google-play-scraper).
 
-The integration currently supports almost all features that the androidtvremote2 library provides.
+The integration currently supports almost all features that the `androidtvremote2` library provides.
 Button control and ON/OFF states are supported. With the optional Google Cast support, media playing information can be 
 retrieved from supported apps.  
 The application source list is limited to a predefined list, as retrieving the installed apps is not possible.
 
-This integration is included in the Remote Two and Remote 3 firmware and no external service must be run to connect with
+This integration is included in the Remote Two and Remote 3 firmware, and no external service must be run to connect with
 Android TV devices. It can be run as an external integration for development
 
 - [Requirements and setting](docs/settings.md).
 - Multiple Android TV devices are supported with version 0.5.0 and newer.
 - A [media player entity](https://github.com/unfoldedcircle/core-api/blob/main/doc/entities/entity_media_player.md)
   is exposed per Android TV device to the Remote.
-- Device profiles allow device specific support and custom key bindings, for example double-click or long-press actions.  
+- Device profiles allow device-specific support and custom key bindings, for example, double-click or long-press actions.  
   See [command mappings](docs/command_mapping.md) for more information.
-- Optional external metadata lookup using the Google Play Store
+
+Preview features:
+- Optional external metadata lookup using the Google Play Store for friendly application name and icon.
+- Google Cast support to retrieve media-playing information.
+
+The preview features are not enabled by default. They can be enabled in the device configuration of the setup flow.
 
 ## Standalone Usage
 ### Setup
