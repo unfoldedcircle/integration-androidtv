@@ -8,6 +8,10 @@ Setup flow for Android TV Remote integration.
 import asyncio
 import logging
 from enum import IntEnum
+from adb_shell.adb_device_async import AdbDeviceTcpAsync
+from adb_shell.auth.sign_pythonrsa import PythonRSASigner
+from adb_shell.auth.keygen import keygen
+import os
 
 import ucapi
 from ucapi import (
@@ -26,6 +30,7 @@ import config
 import discover
 import tv
 from config import AtvDevice
+import adb_tv
 
 _LOG = logging.getLogger(__name__)
 
@@ -38,8 +43,8 @@ class SetupSteps(IntEnum):
     DISCOVER = 2
     DEVICE_CHOICE = 3
     PAIRING_PIN = 4
-    RECONFIGURE = 5
-
+    APP_SELECTION = 6
+    RECONFIGURE = 7
 
 _setup_step = SetupSteps.INIT
 _cfg_add_device: bool = False
@@ -48,6 +53,8 @@ _pairing_android_tv: tv.AndroidTv | None = None
 _use_external_metadata: bool = False
 _reconfigured_device: AtvDevice | None = None
 _use_chromecast: bool = False
+_use_adb: bool = False
+_adb_device_id: str = ""
 
 # TODO #9 externalize language texts
 _user_input_discovery = RequestUserInput(
@@ -108,6 +115,8 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
             return await handle_device_choice(msg)
         if _setup_step == SetupSteps.PAIRING_PIN and "pin" in msg.input_values:
             return await handle_user_data_pin(msg)
+        if _setup_step == SetupSteps.APP_SELECTION and "app_selection" in msg.input_values:
+            return await _handle_app_selection(msg)
         if _setup_step == SetupSteps.RECONFIGURE:
             return await _handle_device_reconfigure(msg)
         _LOG.error("No or invalid user response was received: %s", msg)
@@ -300,6 +309,7 @@ async def handle_configuration_mode(
             use_external_metadata = (
                 selected_device.use_external_metadata if selected_device.use_external_metadata else False
             )
+            use_adb = selected_device.use_adb if selected_device.use_adb else False
 
             return RequestUserInput(
                 {
@@ -325,7 +335,15 @@ async def handle_configuration_mode(
                         },
                         "field": {"checkbox": {"value": use_external_metadata}},
                     },
-                ],
+                    {
+                        "id": "adb",
+                        "label": {
+                            "en": "Preview feature: Enable ADB connection (for app list)",
+                            "de": "Vorschaufunktion: Aktiviere ADB Verbindung (für App-Browsing)",
+                            "fr": "Fonctionnalité en aperçu: Activer la connexion ADB (pour la navigation dans les applications)",
+                        },
+                        "field": {"checkbox": {"value": use_adb}},
+                    },                ],
             )
         case "reset":
             config.devices.clear()  # triggers device instance removal
@@ -446,6 +464,15 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                 },
                 "field": {"checkbox": {"value": False}},
             },
+            {
+                "id": "adb",
+                "label": {
+                    "en": "Preview feature: Enable ADB connection (for app list)",
+                    "de": "Vorschaufunktion: Aktiviere ADB Verbindung (für App-Browsing)",
+                    "fr": "Fonctionnalité en aperçu: Activer la connexion ADB (pour la navigation dans les applications)",
+                },
+                "field": {"checkbox": {"value": False}},
+            },
         ],
     )
 
@@ -463,10 +490,12 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     global _use_chromecast
     global _setup_step
     global _use_external_metadata
+    global _use_adb
 
     choice = msg.input_values["choice"]
     _use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
     _use_chromecast = msg.input_values.get("chromecast", "false") == "true"
+    _use_adb = msg.input_values.get("adb", "false") == "true"
     name = ""
 
     for discovered_tv in _discovered_android_tvs:
@@ -484,6 +513,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
             id="",
             use_external_metadata=False,
             use_chromecast=False,
+            use_adb=False,
         ),
     )
     _LOG.info("Chosen Android TV: %s. Start pairing process...", choice)
@@ -516,7 +546,70 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     return _setup_error_from_device_state(_pairing_android_tv.state)
 
 
-async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupError:
+# async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupError:
+#     """
+#     Process user data pairing pin response in a setup process.
+#
+#     Driver setup callback to provide requested user data during the setup process.
+#
+#     :param msg: response data from the requested user data
+#     :return: the setup action on how to continue: SetupComplete if a valid Android TV device was chosen.
+#     """
+#     global _pairing_android_tv
+#
+#     if _pairing_android_tv is None:
+#         _LOG.error("Can't handle pairing pin: no device instance! Aborting setup")
+#         return SetupError()
+#
+#     _LOG.info("[%s] User has entered the PIN", _pairing_android_tv.log_id)
+#
+#     res = await _pairing_android_tv.finish_pairing(msg.input_values["pin"])
+#     _pairing_android_tv.disconnect()
+#
+#     device_info = None
+#
+#     # Connect again to retrieve device identifier (with init()) and additional device information (with connect())
+#     if res == ucapi.StatusCodes.OK:
+#         _LOG.info(
+#             "[%s] Pairing done, retrieving device information",
+#             _pairing_android_tv.log_id,
+#         )
+#         res = ucapi.StatusCodes.SERVER_ERROR
+#         timeout = int(tv.CONNECTION_TIMEOUT)
+#         if await _pairing_android_tv.init(timeout) and await _pairing_android_tv.connect(timeout):
+#             device_info = _pairing_android_tv.device_info or {}
+#             if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier, True):
+#                 res = ucapi.StatusCodes.OK
+#         _pairing_android_tv.disconnect()
+#
+#     if res != ucapi.StatusCodes.OK:
+#         state = _pairing_android_tv.state
+#         _LOG.info("[%s] Setup failed: %s (state=%s)", _pairing_android_tv.log_id, res, state)
+#         _pairing_android_tv = None
+#         return _setup_error_from_device_state(state)
+#
+#     device = AtvDevice(
+#         id=_pairing_android_tv.identifier,
+#         name=_pairing_android_tv.name,
+#         address=_pairing_android_tv.address,
+#         use_external_metadata=_use_external_metadata,
+#         use_chromecast=_use_chromecast,
+#         manufacturer=device_info.get("manufacturer", ""),
+#         model=device_info.get("model", ""),
+#     )
+#
+#     config.devices.add_or_update(device)  # triggers AndroidTv instance creation
+#     config.devices.store()
+#
+#     # ATV device connection will be triggered with subscribe_entities request
+#     _pairing_android_tv = None
+#     await asyncio.sleep(1)
+#     _LOG.info("[%s] Setup successfully completed for %s", device.name, device.id)
+#     return SetupComplete()
+
+import logging
+
+async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | SetupComplete | SetupError:
     """
     Process user data pairing pin response in a setup process.
 
@@ -527,6 +620,8 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     """
     global _pairing_android_tv
 
+    _LOG.debug("Entered handle_user_data_pin with msg: %s", msg)
+
     if _pairing_android_tv is None:
         _LOG.error("Can't handle pairing pin: no device instance! Aborting setup")
         return SetupError()
@@ -534,23 +629,101 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     _LOG.info("[%s] User has entered the PIN", _pairing_android_tv.log_id)
 
     res = await _pairing_android_tv.finish_pairing(msg.input_values["pin"])
+    _LOG.debug("[%s] finish_pairing result: %s", _pairing_android_tv.log_id, res)
+
     _pairing_android_tv.disconnect()
+    _LOG.debug("[%s] Disconnected after pairing attempt", _pairing_android_tv.log_id)
 
-    device_info = None
-
-    # Connect again to retrieve device identifier (with init()) and additional device information (with connect())
     if res == ucapi.StatusCodes.OK:
-        _LOG.info(
-            "[%s] Pairing done, retrieving device information",
-            _pairing_android_tv.log_id,
-        )
+        _LOG.info("[%s] Pairing done, retrieving device information", _pairing_android_tv.log_id)
         res = ucapi.StatusCodes.SERVER_ERROR
         timeout = int(tv.CONNECTION_TIMEOUT)
-        if await _pairing_android_tv.init(timeout) and await _pairing_android_tv.connect(timeout):
+        _LOG.debug("[%s] Attempting to initialize and connect with timeout: %d", _pairing_android_tv.log_id, timeout)
+
+    if _use_adb:
+        _LOG.debug("ADB is enabled, proceeding with ADB setup")
+
+        if not msg.input_values.get("adb", False):
+            _LOG.error("ADB setup failed: 'use_adb' not found in input values")
+            return SetupError()
+
+        from adb_tv import adb_connect, is_authorised, get_installed_apps
+
+        device_id = _pairing_android_tv.identifier
+        ip_address = _pairing_android_tv.address
+        _LOG.debug("Attempting ADB setup for device_id: %s, ip_address: %s", device_id, ip_address)
+
+        adb_device = await adb_connect(device_id, ip_address)
+        if not adb_device:
+            return SetupError(error_type=IntegrationSetupError.AUTHORIZATION_ERROR)
+
+        if not await is_authorised(adb_device):
+            return SetupError(error_type=IntegrationSetupError.AUTHORIZATION_ERROR)
+
+        _LOG.debug("ADB authorisation confirmed")
+        from apps import Apps
+
+        adb_apps = await get_installed_apps(adb_device)  # dict[str, dict[str, str]]
+        all_apps = {**Apps, **adb_apps}  # ADB apps override Apps if same name
+
+
+        _LOG.debug("Retrieved apps: %s", all_apps)
+        await adb_device.close()
+
+        _setup_step = SetupSteps.APP_SELECTION
+        return RequestUserInput(
+            title={
+                "en": "Select visible apps",
+                "de": "Wähle sichtbare Apps",
+                "fr": "Sélectionnez les applications visibles",
+            },
+            settings=[
+                {
+                    "id": "visible_apps",
+                    "label": {
+                        "en": "Choose apps to show",
+                        "de": "Wähle Apps zur Anzeige",
+                        "fr": "Choisir les applications à afficher",
+                    },
+                    "field": {
+                        "multichoice": {
+                            "items": [
+                                {
+                                    "id": package,
+                                    "label": {"en": details.get("name", package)}
+                                }
+                                for package, details in sorted(all_apps.items())
+                            ],
+                            "value": [],
+                        }
+                    },
+                }
+            ],
+        )
+
+    else:
+        _LOG.debug("ADB is not enabled, skipping to setup completion")
+        return await handle_setup_completion(res)
+
+async def handle_setup_completion(res) -> SetupComplete:
+    global _pairing_android_tv
+
+    device_info = None
+    timeout = int(tv.CONNECTION_TIMEOUT)
+
+    if await _pairing_android_tv.init(timeout):
+        _LOG.debug("[%s] Initialization successful", _pairing_android_tv.log_id)
+        if await _pairing_android_tv.connect(timeout):
+            _LOG.debug("[%s] Connection successful", _pairing_android_tv.log_id)
             device_info = _pairing_android_tv.device_info or {}
+            _LOG.debug("[%s] Retrieved device info: %s", _pairing_android_tv.log_id, device_info)
+
             if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier, True):
                 res = ucapi.StatusCodes.OK
-        _pairing_android_tv.disconnect()
+                _LOG.debug("[%s] Default certificates assigned successfully", _pairing_android_tv.log_id)
+
+    _pairing_android_tv.disconnect()
+    _LOG.debug("[%s] Disconnected after retrieving device information", _pairing_android_tv.log_id)
 
     if res != ucapi.StatusCodes.OK:
         state = _pairing_android_tv.state
@@ -562,19 +735,76 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         id=_pairing_android_tv.identifier,
         name=_pairing_android_tv.name,
         address=_pairing_android_tv.address,
-        use_external_metadata=_use_external_metadata,
-        use_chromecast=_use_chromecast,
         manufacturer=device_info.get("manufacturer", ""),
         model=device_info.get("model", ""),
+        use_external_metadata=_use_external_metadata,
+        use_chromecast=_use_chromecast,
+        use_adb=_use_adb
     )
+    _LOG.debug("Created AtvDevice: %s", device)
 
-    config.devices.add_or_update(device)  # triggers AndroidTv instance creation
+    config.devices.add_or_update(device)
+    _LOG.debug("Device added/updated in configuration")
+
     config.devices.store()
+    _LOG.debug("Configuration stored")
 
-    # ATV device connection will be triggered with subscribe_entities request
-    _pairing_android_tv = None
     await asyncio.sleep(1)
     _LOG.info("[%s] Setup successfully completed for %s", device.name, device.id)
+
+    _pairing_android_tv = None
+
+    return SetupComplete()
+
+#
+# async def handle_app_selection(msg: UserDataResponse) -> SetupAction:
+#     global _pairing_android_tv, _adb_device_id
+#     from adb_tv import get_installed_apps_combined
+#
+#
+#     _setup_step = SetupSteps.APP_SELECTION
+#     ip_address = _pairing_android_tv.address
+#     device_id = _pairing_android_tv.identifier
+#
+#
+#     apps = await get_installed_apps_combined(device_id, ip_address)
+#
+#     return RequestUserInput(
+#         {"en": "Select visible apps"},
+#         [
+#             {
+#                 "id": "visible_apps",
+#                 "label": {"en": "Choose apps to show"},
+#                 "field": {
+#                     "multichoice": {
+#                         "items": [{"id": app, "label": {"en": app}} for app in sorted(apps)],
+#                         "value": [],
+#                     }
+#                 },
+#             }
+#         ],
+#     )
+#
+async def _handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupError:
+    from pathlib import Path
+    import json
+
+    app_ids = msg.input_values.get("visible_apps", [])
+    if not isinstance(app_ids, list):
+        return SetupError()
+
+    config_root = Path(config.devices.config_root())  # assuming your config exposes this
+    apps_file = config_root / "apps.json"
+    try:
+        apps_file.write_text(json.dumps(app_ids, indent=2))
+    except Exception as e:
+        _LOG.error("Failed to write selected apps: %s", e)
+        return SetupError()
+
+    _LOG.info("App selection stored: %s", app_ids)
+
+    await handle_setup_completion()
+    _pairing_android_tv = None
     return SetupComplete()
 
 
@@ -596,10 +826,12 @@ async def _handle_device_reconfigure(
 
     use_chromecast = msg.input_values.get("chromecast", "false") == "true"
     use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
+    use_adb = msg.input_values.get("adb", "false") == "true"
 
     _LOG.debug("User has changed configuration")
     _reconfigured_device.use_chromecast = use_chromecast
     _reconfigured_device.use_external_metadata = use_external_metadata
+    _reconfigured_device.use_adb = use_adb
 
     config.devices.add_or_update(_reconfigured_device)  # triggers ATV instance update
     await asyncio.sleep(1)

@@ -38,6 +38,8 @@ class AtvDevice:
     """Enable External Metadata."""
     use_chromecast: bool = False
     """Enable Chromecast features."""
+    use_adb: bool = False
+    """Enable ADB features."""
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -133,6 +135,7 @@ class Devices:
                 item.auth_error = atv.auth_error
                 item.use_external_metadata = atv.use_external_metadata
                 item.use_chromecast = atv.use_chromecast
+                item.use_adb = atv.use_adb
                 return self.store()
         return False
 
@@ -236,6 +239,7 @@ class Devices:
                     item.get("auth_error", False),
                     item.get("use_external_metadata", False),
                     item.get("use_chromecast", False),
+                    item.get("use_adb", False),
                 )
                 self._config.append(atv)
             return True
