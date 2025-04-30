@@ -29,7 +29,6 @@ CACHE_ROOT = "external_cache"
 ICON_SUBDIR = "icons"
 ICON_SIZE = (240, 240)
 
-
 # Paths
 def _get_metadata_dir() -> Path:
     metadata_dir = _get_cache_root()
