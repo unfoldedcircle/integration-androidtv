@@ -788,15 +788,31 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     async def select_source(self, source: str) -> ucapi.StatusCodes:
         """
-        Select a given source, either a pre-defined app, input or by app-link/id.
+        Select a given source, either a user-defined app (from JSON),
+        an input source (KeyCode), or directly by app-link / id.
 
         :param source: the friendly source name or an app-link / id
         """
-        if source in apps.Apps:
-            return await self._launch_app(apps.Apps[source]["url"])
+        # Load saved apps for this device
+        apps_file = _get_config_root() / f"appslist_{self._identifier}.json"
+        apps_list = {}
+
+        if apps_file.exists():
+            try:
+                with apps_file.open("r", encoding="utf-8") as f:
+                    apps_list = json.load(f)
+            except Exception as e:
+                _LOG.warning("Failed to read apps list for %s: %s", self._identifier, e)
+
+        # Match known friendly app name
+        if source in apps_list:
+            return await self._launch_app(apps_list[source]["url"])
+
+        # Match input source
         if source in inputs.KeyCode:
             return await self._switch_input(source)
 
+        # Fall back to direct launch (e.g. package name or intent URI)
         return await self._launch_app(source)
 
     @async_handle_atvlib_errors

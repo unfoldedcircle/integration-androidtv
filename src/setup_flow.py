@@ -635,7 +635,8 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
             return SetupError(error_type=IntegrationSetupError.AUTHORIZATION_ERROR)
 
         _LOG.debug("ADB authorisation confirmed")
-    from apps import Apps
+
+    from apps import Apps, IdMappings
 
     if _use_adb:
         adb_apps = await get_installed_apps(adb_device)  # dict[str, dict[str, str]]
@@ -650,10 +651,13 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
     settings = []
 
     for package, details in sorted(offline_apps.items()):
-        name = details.get("name", package)
+        # Determine default friendly name
+        mapped_name = IdMappings.get(package)
+        static_name = details.get("name", package)
+        name = mapped_name or static_name
 
         if _use_adb and package in adb_apps:
-            # ADB-specific apps: show both friendly name input and enable checkbox
+            # ADB-specific apps: show checkbox + pre-filled friendly name input
             settings.append(
                 {
                     "id": f"{package}_enabled",
@@ -677,7 +681,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
                 }
             )
         else:
-            # Predefined apps: only checkbox
+            # Static apps: checkbox only
             settings.append(
                 {
                     "id": f"{package}_enabled",
