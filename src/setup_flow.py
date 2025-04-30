@@ -31,7 +31,7 @@ import adb_tv
 import config
 import discover
 import tv
-from config import AtvDevice
+from config import AtvDevice, _get_config_root
 
 _LOG = logging.getLogger(__name__)
 
@@ -713,13 +713,6 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         },
         settings=settings,
     )
-
-
-def _get_config_root() -> Path:
-    config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
-    config_home.mkdir(parents=True, exist_ok=True)
-    return config_home
-
 
 async def handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupError:
     global _pairing_android_tv
