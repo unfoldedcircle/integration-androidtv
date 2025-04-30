@@ -118,7 +118,7 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
         if _setup_step == SetupSteps.PAIRING_PIN and "pin" in msg.input_values:
             return await handle_user_data_pin(msg)
         if _setup_step == SetupSteps.APP_SELECTION and "app_selection" in msg.input_values:
-            return await _handle_app_selection(msg)
+            return await handle_app_selection(msg)
         if _setup_step == SetupSteps.RECONFIGURE:
             return await _handle_device_reconfigure(msg)
         _LOG.error("No or invalid user response was received: %s", msg)
@@ -548,71 +548,6 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
 
     return _setup_error_from_device_state(_pairing_android_tv.state)
 
-
-# async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupError:
-#     """
-#     Process user data pairing pin response in a setup process.
-#
-#     Driver setup callback to provide requested user data during the setup process.
-#
-#     :param msg: response data from the requested user data
-#     :return: the setup action on how to continue: SetupComplete if a valid Android TV device was chosen.
-#     """
-#     global _pairing_android_tv
-#
-#     if _pairing_android_tv is None:
-#         _LOG.error("Can't handle pairing pin: no device instance! Aborting setup")
-#         return SetupError()
-#
-#     _LOG.info("[%s] User has entered the PIN", _pairing_android_tv.log_id)
-#
-#     res = await _pairing_android_tv.finish_pairing(msg.input_values["pin"])
-#     _pairing_android_tv.disconnect()
-#
-#     device_info = None
-#
-#     # Connect again to retrieve device identifier (with init()) and additional device information (with connect())
-#     if res == ucapi.StatusCodes.OK:
-#         _LOG.info(
-#             "[%s] Pairing done, retrieving device information",
-#             _pairing_android_tv.log_id,
-#         )
-#         res = ucapi.StatusCodes.SERVER_ERROR
-#         timeout = int(tv.CONNECTION_TIMEOUT)
-#         if await _pairing_android_tv.init(timeout) and await _pairing_android_tv.connect(timeout):
-#             device_info = _pairing_android_tv.device_info or {}
-#             if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier, True):
-#                 res = ucapi.StatusCodes.OK
-#         _pairing_android_tv.disconnect()
-#
-#     if res != ucapi.StatusCodes.OK:
-#         state = _pairing_android_tv.state
-#         _LOG.info("[%s] Setup failed: %s (state=%s)", _pairing_android_tv.log_id, res, state)
-#         _pairing_android_tv = None
-#         return _setup_error_from_device_state(state)
-#
-#     device = AtvDevice(
-#         id=_pairing_android_tv.identifier,
-#         name=_pairing_android_tv.name,
-#         address=_pairing_android_tv.address,
-#         use_external_metadata=_use_external_metadata,
-#         use_chromecast=_use_chromecast,
-#         manufacturer=device_info.get("manufacturer", ""),
-#         model=device_info.get("model", ""),
-#     )
-#
-#     config.devices.add_or_update(device)  # triggers AndroidTv instance creation
-#     config.devices.store()
-#
-#     # ATV device connection will be triggered with subscribe_entities request
-#     _pairing_android_tv = None
-#     await asyncio.sleep(1)
-#     _LOG.info("[%s] Setup successfully completed for %s", device.name, device.id)
-#     return SetupComplete()
-
-import logging
-
-
 async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | SetupComplete | SetupError:
     """
     Process user data pairing pin response in a setup process.
@@ -670,12 +605,12 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
     if _use_adb:
         adb_apps = await get_installed_apps(adb_device)  # dict[str, dict[str, str]]
         offline_apps = {**Apps, **adb_apps}  # ADB apps override Apps if same name
+        _LOG.debug("Retrieved ADB apps: %s", adb_apps)
         await adb_device.close()
     else:
         offline_apps = Apps
 
     _LOG.debug("Retrieved offline apps: %s", offline_apps)
-    _LOG.debug("Retrieved ADB apps: %s", adb_apps)
 
     settings = []
 
@@ -779,65 +714,39 @@ async def handle_setup_completion(res) -> SetupComplete:
 
     _pairing_android_tv = None
 
-    return SetupComplete()
-
-
-#
-# async def handle_app_selection(msg: UserDataResponse) -> SetupAction:
-#     global _pairing_android_tv, _adb_device_id
-#     from adb_tv import get_installed_apps_combined
-#
-#
-#     _setup_step = SetupSteps.APP_SELECTION
-#     ip_address = _pairing_android_tv.address
-#     device_id = _pairing_android_tv.identifier
-#
-#
-#     apps = await get_installed_apps_combined(device_id, ip_address)
-#
-#     return RequestUserInput(
-#         {"en": "Select visible apps"},
-#         [
-#             {
-#                 "id": "visible_apps",
-#                 "label": {"en": "Choose apps to show"},
-#                 "field": {
-#                     "multichoice": {
-#                         "items": [{"id": app, "label": {"en": app}} for app in sorted(apps)],
-#                         "value": [],
-#                     }
-#                 },
-#             }
-#         ],
-#     )
-#
 def _get_config_root() -> Path:
     config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
     config_home.mkdir(parents=True, exist_ok=True)
     return config_home
 
 
-async def _handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupError:
+async def handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupError:
     import json
-    from pathlib import Path
+    from apps import Apps  # Static apps
 
-    app_ids = msg.input_values.get("visible_apps", [])
-    if not isinstance(app_ids, list):
-        return SetupError()
+    selected_apps = {}
+
+    for field_id, value in msg.input_values.items():
+        if field_id.endswith("_enabled") and value:
+            package = field_id.removesuffix("_enabled")
+            name_field = f"{package}_name"
+            friendly_name = msg.input_values.get(name_field, package)
+
+            # Prefer static app URL if it exists
+            static_entry = Apps.get(friendly_name) or Apps.get(package)
+            url = static_entry["url"] if static_entry else f"market://launch?id={package}"
+
+            selected_apps[friendly_name] = {"url": url}
 
     apps_file = _get_config_root() / "apps.json"
     try:
-        apps_file.write_text(json.dumps(app_ids, indent=2))
+        apps_file.write_text(json.dumps(selected_apps, indent=2))
+        _LOG.info("App selection stored: %s", selected_apps)
+        handle_setup_completion()
+        return SetupComplete()
     except Exception as e:
         _LOG.error("Failed to write selected apps: %s", e)
         return SetupError()
-
-    _LOG.info("App selection stored: %s", app_ids)
-
-    await handle_setup_completion()
-    _pairing_android_tv = None
-    return SetupComplete()
-
 
 async def _handle_device_reconfigure(
     msg: UserDataResponse,
