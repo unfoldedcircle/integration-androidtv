@@ -1,8 +1,13 @@
+"""
+This module provides utilities for interacting with Android TVs via ADB (Android Debug Bridge).
+It includes functions for managing ADB keys, connecting to devices, retrieving installed apps,
+and verifying device authorization.
+"""
+
 import asyncio
 import os
-import re
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from adb_shell.adb_device_async import AdbDeviceTcpAsync
 from adb_shell.auth.keygen import keygen
@@ -13,14 +18,30 @@ ADB_CERTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_adb_key_paths(device_id: str) -> tuple[Path, Path]:
-    """Return the path to the private and public adb keys for a given device."""
+    """
+    Return the paths to the private and public ADB keys for a given device.
+
+    Args:
+        device_id (str): The unique identifier for the device.
+
+    Returns:
+        tuple[Path, Path]: Paths to the private and public key files.
+    """
     priv = ADB_CERTS_DIR / f"adb_{device_id}"
     pub = ADB_CERTS_DIR / f"adb_{device_id}.pub"
     return priv, pub
 
 
 def load_or_generate_adb_keys(device_id: str) -> PythonRSASigner:
-    """Ensure ADB RSA keys exist for the device and return the signer."""
+    """
+    Ensure ADB RSA keys exist for the device and return the signer.
+
+    Args:
+        device_id (str): The unique identifier for the device.
+
+    Returns:
+        PythonRSASigner: The signer object for ADB authentication.
+    """
     priv_path, pub_path = get_adb_key_paths(device_id)
 
     if not priv_path.exists() or not pub_path.exists():
@@ -34,6 +55,17 @@ def load_or_generate_adb_keys(device_id: str) -> PythonRSASigner:
 
 
 async def adb_connect(device_id: str, host: str, port: int = 5555) -> Optional[AdbDeviceTcpAsync]:
+    """
+    Connect to an Android device via ADB.
+
+    Args:
+        device_id (str): The unique identifier for the device.
+        host (str): The IP address or hostname of the device.
+        port (int, optional): The port number for the ADB connection. Defaults to 5555.
+
+    Returns:
+        Optional[AdbDeviceTcpAsync]: The connected ADB device object, or None if the connection fails.
+    """
     signer = load_or_generate_adb_keys(device_id)
     device = AdbDeviceTcpAsync(host, port, default_transport_timeout_s=9.0)
 
@@ -46,39 +78,32 @@ async def adb_connect(device_id: str, host: str, port: int = 5555) -> Optional[A
 
 
 async def get_installed_apps(device: AdbDeviceTcpAsync) -> Dict[str, Dict[str, str]]:
-    """Retrieve list of installed non-system apps in structured format."""
+    """
+    Retrieve a list of installed non-system apps in a structured format.
+
+    Args:
+        device (AdbDeviceTcpAsync): The connected ADB device.
+
+    Returns:
+        Dict[str, Dict[str, str]]: A dictionary of app package names and their metadata.
+    """
     output = await device.shell("pm list packages -3 -e")
     packages = sorted(line.replace("package:", "").strip() for line in output.splitlines())
     return {package: {"url": f"market://launch?id={package}"} for package in packages}
 
 
 async def is_authorised(device: AdbDeviceTcpAsync) -> bool:
+    """
+    Check if the connected device is authorized for ADB communication.
+
+    Args:
+        device (AdbDeviceTcpAsync): The connected ADB device.
+
+    Returns:
+        bool: True if the device is authorized, False otherwise.
+    """
     try:
         result = await device.shell("echo ADB_OK")
         return "ADB_OK" in result
     except Exception:
         return False
-
-
-async def test_connection(device_id: str, host: str) -> None:
-    device = await adb_connect(device_id, host)
-    if not device:
-        return
-
-    if await is_authorised(device):
-        print("ADB authorisation confirmed.")
-        print("Current app:", await get_current_app(device))
-        print("Installed apps:", await get_installed_apps(device))
-    else:
-        print("Device not authorised. Please check the TV for an ADB prompt.")
-
-    await device.close()
-
-
-if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) != 3:
-        print("Usage: python adb_tv.py <device_id> <host>")
-    else:
-        asyncio.run(test_connection(sys.argv[1], sys.argv[2]))

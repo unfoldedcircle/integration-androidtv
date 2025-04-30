@@ -12,9 +12,6 @@ from enum import IntEnum
 from pathlib import Path
 
 import ucapi
-from adb_shell.adb_device_async import AdbDeviceTcpAsync
-from adb_shell.auth.keygen import keygen
-from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 from ucapi import (
     AbortDriverSetup,
     DriverSetupRequest,
@@ -27,7 +24,6 @@ from ucapi import (
     UserDataResponse,
 )
 
-import adb_tv
 import config
 import discover
 import tv
@@ -713,6 +709,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         },
         settings=settings,
     )
+
 
 async def handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupError:
     global _pairing_android_tv
