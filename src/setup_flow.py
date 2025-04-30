@@ -669,12 +669,56 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
 
     if _use_adb:
         adb_apps = await get_installed_apps(adb_device)  # dict[str, dict[str, str]]
-        all_apps = {**Apps, **adb_apps}  # ADB apps override Apps if same name
+        offline_apps = {**Apps, **adb_apps}  # ADB apps override Apps if same name
         await adb_device.close()
     else:
-        all_apps = Apps
+        offline_apps = Apps
 
-    _LOG.debug("Retrieved apps: %s", all_apps)
+    _LOG.debug("Retrieved offline apps: %s", offline_apps)
+    _LOG.debug("Retrieved ADB apps: %s", adb_apps)
+
+    settings = []
+
+    for package, details in sorted(offline_apps.items()):
+        name = details.get("name", package)
+
+        if _use_adb and package in adb_apps:
+            # ADB-specific apps: show both friendly name input and enable checkbox
+            settings.append(
+                {
+                    "id": f"{package}_enabled",
+                    "label": {
+                        "en": f"Enable {package}",
+                        "de": f"Aktiviere {package}",
+                        "fr": f"Activer {package}",
+                    },
+                    "field": {"checkbox": {"value": True}},
+                }
+            )
+            settings.append(
+                {
+                    "id": f"{package}_name",
+                    "label": {
+                        "en": f"Friendly name for {package}",
+                        "de": f"Anzeigename für {package}",
+                        "fr": f"Nom convivial pour {package}",
+                    },
+                    "field": {"text": {"value": name}},
+                }
+            )
+        else:
+            # Predefined apps: only checkbox
+            settings.append(
+                {
+                    "id": f"{package}_enabled",
+                    "label": {
+                        "en": name,
+                        "de": name,
+                        "fr": name,
+                    },
+                    "field": {"checkbox": {"value": True}},
+                }
+            )
 
     _setup_step = SetupSteps.APP_SELECTION
     return RequestUserInput(
@@ -683,31 +727,8 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
             "de": "Wähle sichtbare Apps",
             "fr": "Sélectionnez les applications visibles",
         },
-        settings=[
-            {
-                "id": "visible_apps",
-                "label": {
-                    "en": "Choose apps to show",
-                    "de": "Wähle Apps zur Anzeige",
-                    "fr": "Choisir les applications à afficher",
-                },
-                "field": {
-                    "multichoice": {
-                        "items": [
-                            {"id": "test", "label": {"en": "test"}}
-                            #     {
-                            #         "id": package,
-                            #         "label": {"en": details.get("name", package)}
-                            #     }
-                            # for package, details in sorted(all_apps.items())
-                        ],
-                        "value": [],
-                    }
-                },
-            }
-        ],
+        settings=settings,
     )
-
 
 async def handle_setup_completion(res) -> SetupComplete:
     global _pairing_android_tv
