@@ -637,6 +637,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         _LOG.debug("ADB authorisation confirmed")
 
     from apps import Apps, IdMappings
+    from external_metadata import get_app_metadata
 
     if _use_adb:
         adb_apps = await get_installed_apps(adb_device)  # dict[str, dict[str, str]]
@@ -651,13 +652,21 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
     settings = []
 
     for package, details in sorted(offline_apps.items()):
-        # Determine default friendly name
+        # Start with mapped name or static name
         mapped_name = IdMappings.get(package)
         static_name = details.get("name", package)
         name = mapped_name or static_name
 
+        # Attempt to get external metadata if name is still just package id
+        if _use_external_metadata and not mapped_name:
+            try:
+                metadata = await get_app_metadata(package)
+                name = metadata.get("name", name)
+            except Exception as e:
+                _LOG.warning("Metadata lookup failed for %s: %s", package, e)
+
         if _use_adb and package in adb_apps:
-            # ADB-specific apps: show checkbox + pre-filled friendly name input
+            # ADB-specific apps: checkbox + friendly name input
             settings.append(
                 {
                     "id": f"{package}_enabled",
@@ -681,7 +690,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
                 }
             )
         else:
-            # Static apps: checkbox only
+            # Predefined apps: checkbox only
             settings.append(
                 {
                     "id": f"{package}_enabled",
