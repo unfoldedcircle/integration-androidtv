@@ -44,8 +44,8 @@ class SetupSteps(IntEnum):
     DISCOVER = 2
     DEVICE_CHOICE = 3
     PAIRING_PIN = 4
-    APP_SELECTION = 6
-    RECONFIGURE = 7
+    APP_SELECTION = 5
+    RECONFIGURE = 6
 
 
 _setup_step = SetupSteps.INIT
@@ -57,6 +57,7 @@ _reconfigured_device: AtvDevice | None = None
 _use_chromecast: bool = False
 _use_adb: bool = False
 _adb_device_id: str = ""
+_device_info: dict[str, str] = {}
 
 # TODO #9 externalize language texts
 _user_input_discovery = RequestUserInput(
@@ -117,7 +118,7 @@ async def driver_setup_handler(msg: SetupDriver) -> SetupAction:
             return await handle_device_choice(msg)
         if _setup_step == SetupSteps.PAIRING_PIN and "pin" in msg.input_values:
             return await handle_user_data_pin(msg)
-        if _setup_step == SetupSteps.APP_SELECTION and "app_selection" in msg.input_values:
+        if _setup_step == SetupSteps.APP_SELECTION:
             return await handle_app_selection(msg)
         if _setup_step == SetupSteps.RECONFIGURE:
             return await _handle_device_reconfigure(msg)
@@ -296,6 +297,16 @@ async def handle_configuration_mode(
                 _LOG.warning("Could not remove device from configuration: %s", choice)
                 return SetupError(error_type=IntegrationSetupError.OTHER)
             config.devices.store()
+            adb_cert_path = Path(os.environ.get("UC_CONFIG_HOME", "./config")) / "certs" / f"adb_{choice}"
+            adb_cert_path_pub = Path(os.environ.get("UC_CONFIG_HOME", "./config")) / "certs" / f"adb_{choice}.pub"
+            if adb_cert_path.exists():
+                adb_cert_path.unlink()
+            if adb_cert_path_pub.exists():
+                adb_cert_path_pub.unlink()
+            appslist_path = Path(os.environ.get("UC_CONFIG_HOME", "./config")) / f"appslist_{choice}.json"
+            if appslist_path.exists():
+                appslist_path.unlink()
+            _LOG.info("Device removed from configuration: %s", choice)
             return SetupComplete()
         case "configure":
             # Reconfigure device if the identifier has changed
@@ -558,6 +569,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
     :return: the setup action on how to continue: SetupComplete if a valid Android TV device was chosen.
     """
     global _pairing_android_tv
+    global _setup_step
 
     _LOG.debug("Entered handle_user_data_pin with msg: %s", msg)
 
@@ -578,6 +590,29 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         res = ucapi.StatusCodes.SERVER_ERROR
         timeout = int(tv.CONNECTION_TIMEOUT)
         _LOG.debug("[%s] Attempting to initialize and connect with timeout: %d", _pairing_android_tv.log_id, timeout)
+
+    _device_info = None
+    timeout = int(tv.CONNECTION_TIMEOUT)
+
+    if await _pairing_android_tv.init(timeout):
+        _LOG.debug("[%s] Initialization successful", _pairing_android_tv.log_id)
+        if await _pairing_android_tv.connect(timeout):
+            _LOG.debug("[%s] Connection successful", _pairing_android_tv.log_id)
+            _device_info = _pairing_android_tv.device_info or {}
+            _LOG.debug("[%s] Retrieved device info: %s", _pairing_android_tv.log_id, _device_info)
+
+            if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier, True):
+                res = ucapi.StatusCodes.OK
+                _LOG.debug("[%s] Default certificates assigned successfully", _pairing_android_tv.log_id)
+
+    _pairing_android_tv.disconnect()
+    _LOG.debug("[%s] Disconnected after retrieving device information", _pairing_android_tv.log_id)
+
+    if res != ucapi.StatusCodes.OK:
+        state = _pairing_android_tv.state
+        _LOG.info("[%s] Setup failed: %s (state=%s)", _pairing_android_tv.log_id, res, state)
+        _pairing_android_tv = None
+        return _setup_error_from_device_state(state)
 
     if _use_adb:
         _LOG.debug("ADB is enabled, proceeding with ADB setup")
@@ -627,7 +662,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
                         "de": f"Aktiviere {package}",
                         "fr": f"Activer {package}",
                     },
-                    "field": {"checkbox": {"value": True}},
+                    "field": {"checkbox": {"value": False}},
                 }
             )
             settings.append(
@@ -651,7 +686,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
                         "de": name,
                         "fr": name,
                     },
-                    "field": {"checkbox": {"value": True}},
+                    "field": {"checkbox": {"value": False}},
                 }
             )
 
@@ -665,38 +700,52 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         settings=settings,
     )
 
-async def handle_setup_completion(res) -> SetupComplete:
+def _get_config_root() -> Path:
+    config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
+    config_home.mkdir(parents=True, exist_ok=True)
+    return config_home
+
+
+async def handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupError:
     global _pairing_android_tv
+    global _use_chromecast
+    global _use_external_metadata
+    global _use_adb
+    global _device_info
 
-    device_info = None
-    timeout = int(tv.CONNECTION_TIMEOUT)
+    import json
+    from apps import Apps  # offline apps
 
-    if await _pairing_android_tv.init(timeout):
-        _LOG.debug("[%s] Initialization successful", _pairing_android_tv.log_id)
-        if await _pairing_android_tv.connect(timeout):
-            _LOG.debug("[%s] Connection successful", _pairing_android_tv.log_id)
-            device_info = _pairing_android_tv.device_info or {}
-            _LOG.debug("[%s] Retrieved device info: %s", _pairing_android_tv.log_id, device_info)
+    selected_apps = {}
 
-            if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier, True):
-                res = ucapi.StatusCodes.OK
-                _LOG.debug("[%s] Default certificates assigned successfully", _pairing_android_tv.log_id)
+    for field_id, value in msg.input_values.items():
+        if field_id.endswith("_enabled") and str(value).lower() == "true":
+            package = field_id.removesuffix("_enabled")
+            name_field = f"{package}_name"
+            friendly_name = msg.input_values.get(name_field, package)
 
-    _pairing_android_tv.disconnect()
-    _LOG.debug("[%s] Disconnected after retrieving device information", _pairing_android_tv.log_id)
+            # Prefer static app URL if it exists
+            static_entry = Apps.get(friendly_name) or Apps.get(package)
+            url = static_entry["url"] if static_entry else f"market://launch?id={package}"
 
-    if res != ucapi.StatusCodes.OK:
-        state = _pairing_android_tv.state
-        _LOG.info("[%s] Setup failed: %s (state=%s)", _pairing_android_tv.log_id, res, state)
-        _pairing_android_tv = None
-        return _setup_error_from_device_state(state)
+            selected_apps[friendly_name] = {"url": url}
+
+    filename = f"appslist_{_pairing_android_tv.identifier}.json"
+    apps_file = _get_config_root() / filename
+    try:
+        apps_file.write_text(json.dumps(selected_apps, indent=2))
+        _LOG.info("App selection stored: %s", selected_apps)
+    except Exception as e:
+        _LOG.error("Failed to write selected apps: %s", e)
+        return SetupError()
+
 
     device = AtvDevice(
         id=_pairing_android_tv.identifier,
         name=_pairing_android_tv.name,
         address=_pairing_android_tv.address,
-        manufacturer=device_info.get("manufacturer", ""),
-        model=device_info.get("model", ""),
+        manufacturer=_device_info.get("manufacturer", ""),
+        model=_device_info.get("model", ""),
         use_external_metadata=_use_external_metadata,
         use_chromecast=_use_chromecast,
         use_adb=_use_adb,
@@ -714,39 +763,7 @@ async def handle_setup_completion(res) -> SetupComplete:
 
     _pairing_android_tv = None
 
-def _get_config_root() -> Path:
-    config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
-    config_home.mkdir(parents=True, exist_ok=True)
-    return config_home
-
-
-async def handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupError:
-    import json
-    from apps import Apps  # Static apps
-
-    selected_apps = {}
-
-    for field_id, value in msg.input_values.items():
-        if field_id.endswith("_enabled") and value:
-            package = field_id.removesuffix("_enabled")
-            name_field = f"{package}_name"
-            friendly_name = msg.input_values.get(name_field, package)
-
-            # Prefer static app URL if it exists
-            static_entry = Apps.get(friendly_name) or Apps.get(package)
-            url = static_entry["url"] if static_entry else f"market://launch?id={package}"
-
-            selected_apps[friendly_name] = {"url": url}
-
-    apps_file = _get_config_root() / "apps.json"
-    try:
-        apps_file.write_text(json.dumps(selected_apps, indent=2))
-        _LOG.info("App selection stored: %s", selected_apps)
-        handle_setup_completion()
-        return SetupComplete()
-    except Exception as e:
-        _LOG.error("Failed to write selected apps: %s", e)
-        return SetupError()
+    return SetupComplete()
 
 async def _handle_device_reconfigure(
     msg: UserDataResponse,

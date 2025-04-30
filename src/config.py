@@ -12,11 +12,24 @@ import logging
 import os
 from dataclasses import dataclass
 from typing import Iterator
+from pathlib import Path
 
 _LOG = logging.getLogger(__name__)
 
 _CFG_FILENAME = "config.json"
 
+# Paths
+def _get_config_root() -> Path:
+    config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
+    config_home.mkdir(parents=True, exist_ok=True)
+    return config_home
+
+
+def _get_cache_root() -> Path:
+    data_home = Path(os.environ.get("UC_DATA_HOME", "./data"))
+    cache_root = data_home / CACHE_ROOT
+    cache_root.mkdir(parents=True, exist_ok=True)
+    return cache_root
 
 @dataclass
 class AtvDevice:

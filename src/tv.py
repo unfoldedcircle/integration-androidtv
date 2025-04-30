@@ -54,6 +54,9 @@ from external_metadata import encode_icon_to_data_uri, get_app_metadata
 from profiles import KeyPress, Profile
 from util import filter_data_img_properties
 
+import json
+from config import _get_config_root
+
 _LOG = logging.getLogger(__name__)
 
 CONNECTION_TIMEOUT: float = 10.0
@@ -716,8 +719,21 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     def _update_app_list(self) -> None:
         update = {}
         source_list = []
-        for app in apps.Apps:
-            source_list.append(app)
+
+        filename = f"appslist_{self._identifier}.json"
+        apps_file = _get_config_root() / filename
+
+        if apps_file.exists():
+            try:
+                with apps_file.open("r", encoding="utf-8") as f:
+                    selected_apps = json.load(f)
+                    source_list.extend(selected_apps.keys())
+            except Exception as e:
+                _LOG.warning("Failed to read apps list from %s: %s", apps_file, e)
+        else:
+            _LOG.info("No saved app list found for %s, falling back to default", self._identifier)
+            import apps  # fall back to static apps
+            source_list.extend(apps.Apps.keys())
 
         update[MediaAttr.SOURCE_LIST] = source_list
         self.events.emit(Events.UPDATE, self._identifier, update)
