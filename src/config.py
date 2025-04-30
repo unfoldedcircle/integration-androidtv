@@ -26,11 +26,10 @@ def _get_config_root() -> Path:
     return config_home
 
 
-def _get_cache_root() -> Path:
+def _get_data_root() -> Path:
     data_home = Path(os.environ.get("UC_DATA_HOME", "./data"))
-    cache_root = data_home / CACHE_ROOT
-    cache_root.mkdir(parents=True, exist_ok=True)
-    return cache_root
+    data_home.mkdir(parents=True, exist_ok=True)
+    return data_home
 
 
 @dataclass

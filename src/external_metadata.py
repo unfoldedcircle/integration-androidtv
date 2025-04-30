@@ -21,7 +21,7 @@ from PIL import Image
 from PIL.Image import Resampling
 from pychromecast.controllers.media import MediaImage
 from sanitize_filename import sanitize
-from config import _get_config_root, _get_cache_root
+from config import _get_config_root, _get_data_root
 
 _LOG = logging.getLogger(__name__)
 
@@ -31,13 +31,13 @@ ICON_SIZE = (240, 240)
 
 # Paths
 def _get_metadata_dir() -> Path:
-    metadata_dir = _get_cache_root()
+    metadata_dir = _get_data_root() / CACHE_ROOT
     metadata_dir.mkdir(parents=True, exist_ok=True)
     return metadata_dir
 
 
 def _get_icon_dir() -> Path:
-    icon_dir = _get_cache_root() / ICON_SUBDIR
+    icon_dir = _get_data_root() / CACHE_ROOT / ICON_SUBDIR
     icon_dir.mkdir(parents=True, exist_ok=True)
     return icon_dir
 
