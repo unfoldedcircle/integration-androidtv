@@ -11,12 +11,13 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import Iterator
 from pathlib import Path
+from typing import Iterator
 
 _LOG = logging.getLogger(__name__)
 
 _CFG_FILENAME = "config.json"
+
 
 # Paths
 def _get_config_root() -> Path:
@@ -30,6 +31,7 @@ def _get_cache_root() -> Path:
     cache_root = data_home / CACHE_ROOT
     cache_root.mkdir(parents=True, exist_ok=True)
     return cache_root
+
 
 @dataclass
 class AtvDevice:

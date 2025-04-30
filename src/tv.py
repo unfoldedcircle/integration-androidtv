@@ -8,6 +8,7 @@ This module implements the Android TV communication of the Remote Two integratio
 # pylint: disable=too-many-lines
 
 import asyncio
+import json
 import logging
 import os
 import socket
@@ -49,13 +50,10 @@ from ucapi.media_player import MediaType
 import apps
 import discover
 import inputs
-from config import AtvDevice
+from config import AtvDevice, _get_config_root
 from external_metadata import encode_icon_to_data_uri, get_app_metadata
 from profiles import KeyPress, Profile
 from util import filter_data_img_properties
-
-import json
-from config import _get_config_root
 
 _LOG = logging.getLogger(__name__)
 
@@ -733,6 +731,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         else:
             _LOG.info("No saved app list found for %s, falling back to default", self._identifier)
             import apps  # fall back to static apps
+
             source_list.extend(apps.Apps.keys())
 
         update[MediaAttr.SOURCE_LIST] = source_list

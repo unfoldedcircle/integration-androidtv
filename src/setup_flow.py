@@ -559,6 +559,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
 
     return _setup_error_from_device_state(_pairing_android_tv.state)
 
+
 async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | SetupComplete | SetupError:
     """
     Process user data pairing pin response in a setup process.
@@ -713,6 +714,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         settings=settings,
     )
 
+
 def _get_config_root() -> Path:
     config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
     config_home.mkdir(parents=True, exist_ok=True)
@@ -727,6 +729,7 @@ async def handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupEr
     global _device_info
 
     import json
+
     from apps import Apps  # offline apps
 
     selected_apps = {}
@@ -752,7 +755,6 @@ async def handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupEr
         _LOG.error("Failed to write selected apps: %s", e)
         return SetupError()
 
-
     device = AtvDevice(
         id=_pairing_android_tv.identifier,
         name=_pairing_android_tv.name,
@@ -777,6 +779,7 @@ async def handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupEr
     _pairing_android_tv = None
 
     return SetupComplete()
+
 
 async def _handle_device_reconfigure(
     msg: UserDataResponse,
