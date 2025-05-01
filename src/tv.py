@@ -858,6 +858,12 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._atv.send_launch_app_command(app)
         return ucapi.StatusCodes.OK
 
+    @async_handle_atvlib_errors
+    async def _send_text(self, text: str) -> ucapi.StatusCodes:
+        """Launch an app on Android TV."""
+        self._atv.send_text(text)
+        return ucapi.StatusCodes.OK
+
     async def _switch_input(self, source: str) -> ucapi.StatusCodes:
         """
         TEST FUNCTION: Send a KEYCODE_TV_INPUT_* key.
