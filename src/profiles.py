@@ -263,6 +263,19 @@ class DeviceProfile:
             select_profile = copy.copy(select_profile)
             select_profile.features.extend(CHROMECAST_FEATURES)
 
+        import string
+        for char in string.ascii_uppercase + " ":
+            # Use 'SPACE' as the key name for the space character
+            key = "SPACE" if char == " " else char
+            command_name = f"TEXT_{key}"
+
+            # Append to simple_commands list
+            select_profile.simple_commands.append(command_name)
+
+            # Map the command: space gets ' ', others get lowercase letter
+            command_value = " " if char == " " else char.lower()
+            select_profile.command_map[command_name] = Command(command_value, 'TEXT')
+
         return select_profile
 
 

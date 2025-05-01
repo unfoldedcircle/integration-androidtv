@@ -842,7 +842,15 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         else:
             direction = "SHORT"
 
-        self._atv.send_key_command(keycode, direction)
+        if action == 'TEXT':
+            # Special handling for text input
+            if not isinstance(keycode, str):
+                _LOG.error("[%s] Cannot send command, invalid key_code: %s", self.log_id, keycode)
+                return ucapi.StatusCodes.BAD_REQUEST
+            self._atv.send_text(keycode)
+            return ucapi.StatusCodes.OK
+        else:
+            self._atv.send_key_command(keycode, direction)
 
         if action == KeyPress.DOUBLE_CLICK:
             self._atv.send_key_command(keycode, direction)
