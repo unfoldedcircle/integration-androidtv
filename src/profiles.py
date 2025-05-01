@@ -277,7 +277,10 @@ class DeviceProfile:
             select_profile.command_map[command_name] = Command(command_value, 'TEXT')
 
         select_profile.simple_commands.append('TEXT_BACKSPACE')
-        select_profile.command_map['TEXT_BACKSPACE'] = Command('DEL', 'TEXT')
+        select_profile.command_map['TEXT_BACKSPACE'] = Command('DEL', KeyPress.SHORT)
+
+        select_profile.simple_commands.append('TEXT_ENTER')
+        select_profile.command_map['TEXT_ENTER'] = Command('ENTER', KeyPress.SHORT)
 
         return select_profile
 
