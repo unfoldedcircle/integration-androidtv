@@ -835,13 +835,6 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         :return: OK if scheduled to be sent, other error code in case of an error
 
         """  # noqa
-        if action in (KeyPress.LONG, KeyPress.BEGIN):
-            direction = "START_LONG"
-        elif action == KeyPress.END:
-            direction = "END_LONG"
-        else:
-            direction = "SHORT"
-
         if action == 'TEXT':
             # Special handling for text input
             if not isinstance(keycode, str):
@@ -849,8 +842,15 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 return ucapi.StatusCodes.BAD_REQUEST
             self._atv.send_text(keycode)
             return ucapi.StatusCodes.OK
+
+        if action in (KeyPress.LONG, KeyPress.BEGIN):
+            direction = "START_LONG"
+        elif action == KeyPress.END:
+            direction = "END_LONG"
         else:
-            self._atv.send_key_command(keycode, direction)
+            direction = "SHORT"
+
+        self._atv.send_key_command(keycode, direction)
 
         if action == KeyPress.DOUBLE_CLICK:
             self._atv.send_key_command(keycode, direction)
