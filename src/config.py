@@ -155,19 +155,19 @@ class Devices:
 
     def default_certfile(self) -> str:
         """Return the default certificate file for initializing a device."""
-        return os.path.join(self._data_path, "androidtv_remote_cert.pem")
+        return os.path.join(self._data_path + "/certs", "androidtv_remote_cert.pem")
 
     def default_keyfile(self) -> str:
         """Return the default key file for initializing a device."""
-        return os.path.join(self._data_path, "androidtv_remote_key.pem")
+        return os.path.join(self._data_path + "/certs", "androidtv_remote_key.pem")
 
     def certfile(self, atv_id: str) -> str:
         """Return the certificate file of the device."""
-        return os.path.join(self._data_path, f"androidtv_{atv_id}_remote_cert.pem")
+        return os.path.join(self._data_path + "/certs", f"androidtv_{atv_id}_remote_cert.pem")
 
     def keyfile(self, atv_id: str) -> str:
         """Return the key file of the device."""
-        return os.path.join(self._data_path, f"androidtv_{atv_id}_remote_key.pem")
+        return os.path.join(self._data_path + "/certs", f"androidtv_{atv_id}_remote_key.pem")
 
     def remove(self, atv_id: str) -> bool:
         """Remove the given device configuration."""
