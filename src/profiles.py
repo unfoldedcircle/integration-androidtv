@@ -276,6 +276,9 @@ class DeviceProfile:
             command_value = " " if char == " " else char.lower()
             select_profile.command_map[command_name] = Command(command_value, 'TEXT')
 
+        select_profile.simple_commands.append('TEXT_BACKSPACE')
+        select_profile.command_map['TEXT_BACKSPACE'] = Command('DEL', 'TEXT')
+
         return select_profile
 
 

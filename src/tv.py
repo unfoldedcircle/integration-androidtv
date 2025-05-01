@@ -840,7 +840,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             if not isinstance(keycode, str):
                 _LOG.error("[%s] Cannot send command, invalid key_code: %s", self.log_id, keycode)
                 return ucapi.StatusCodes.BAD_REQUEST
-            self._atv.send_text(keycode)
+            if keycode == 'DEL':
+                self._atv.send_key_command(keycode, 'SHORT')
+            else:
+                self._atv.send_text(keycode)
             return ucapi.StatusCodes.OK
 
         if action in (KeyPress.LONG, KeyPress.BEGIN):
