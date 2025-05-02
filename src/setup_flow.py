@@ -648,12 +648,15 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         # STEP 2: Remove ADB entries that duplicate an offline friendly name
         filtered_adb_apps = {}
         for package, details in adb_apps.items():
-            name_from_mapping = IdMappings.get(package)
-            if name_from_mapping and name_from_mapping in offline_friendly_names:
-                continue  # Duplicate friendly name already exists in offline Apps
             if package in Apps:
-                continue  # Exact package already exists in offline Apps
+                continue  # Already covered offline (exact match)
+            if package in IdMappings:
+                continue  # Already has a mapped friendly name offline
+            friendly = details.get("name", "")
+            if friendly and friendly in IdMappings.values():
+                continue  # Another offline app already uses this friendly name
             filtered_adb_apps[package] = details
+
 
         # STEP 3: Merge with Apps, giving priority to offline Apps
         merged_apps = {**filtered_adb_apps, **Apps}
