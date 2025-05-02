@@ -11,11 +11,25 @@ import json
 import logging
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterator
 
 _LOG = logging.getLogger(__name__)
 
 _CFG_FILENAME = "config.json"
+
+
+# Paths
+def _get_config_root() -> Path:
+    config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
+    config_home.mkdir(parents=True, exist_ok=True)
+    return config_home
+
+
+def _get_data_root() -> Path:
+    data_home = Path(os.environ.get("UC_DATA_HOME", "./data"))
+    data_home.mkdir(parents=True, exist_ok=True)
+    return data_home
 
 
 @dataclass
@@ -38,6 +52,8 @@ class AtvDevice:
     """Enable External Metadata."""
     use_chromecast: bool = False
     """Enable Chromecast features."""
+    use_adb: bool = False
+    """Enable ADB features."""
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -133,6 +149,7 @@ class Devices:
                 item.auth_error = atv.auth_error
                 item.use_external_metadata = atv.use_external_metadata
                 item.use_chromecast = atv.use_chromecast
+                item.use_adb = atv.use_adb
                 return self.store()
         return False
 
@@ -236,6 +253,7 @@ class Devices:
                     item.get("auth_error", False),
                     item.get("use_external_metadata", False),
                     item.get("use_chromecast", False),
+                    item.get("use_adb", False),
                 )
                 self._config.append(atv)
             return True

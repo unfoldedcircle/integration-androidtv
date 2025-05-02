@@ -8,6 +8,7 @@ This module implements the Android TV communication of the Remote Two integratio
 # pylint: disable=too-many-lines
 
 import asyncio
+import json
 import logging
 import os
 import socket
@@ -49,7 +50,7 @@ from ucapi.media_player import MediaType
 import apps
 import discover
 import inputs
-from config import AtvDevice
+from config import AtvDevice, _get_config_root
 from external_metadata import encode_icon_to_data_uri, get_app_metadata
 from profiles import KeyPress, Profile
 from util import filter_data_img_properties
@@ -716,8 +717,22 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     def _update_app_list(self) -> None:
         update = {}
         source_list = []
-        for app in apps.Apps:
-            source_list.append(app)
+
+        filename = f"appslist_{self._identifier}.json"
+        apps_file = _get_config_root() / filename
+
+        if apps_file.exists():
+            try:
+                with apps_file.open("r", encoding="utf-8") as f:
+                    selected_apps = json.load(f)
+                    source_list.extend(selected_apps.keys())
+            except Exception as e:
+                _LOG.warning("Failed to read apps list from %s: %s", apps_file, e)
+        else:
+            _LOG.info("No saved app list found for %s, falling back to default", self._identifier)
+            import apps  # fall back to static apps
+
+            source_list.extend(apps.Apps.keys())
 
         update[MediaAttr.SOURCE_LIST] = source_list
         self.events.emit(Events.UPDATE, self._identifier, update)
@@ -772,15 +787,31 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     async def select_source(self, source: str) -> ucapi.StatusCodes:
         """
-        Select a given source, either a pre-defined app, input or by app-link/id.
+        Select a given source, either a user-defined app (from JSON),
+        an input source (KeyCode), or directly by app-link / id.
 
         :param source: the friendly source name or an app-link / id
         """
-        if source in apps.Apps:
-            return await self._launch_app(apps.Apps[source]["url"])
+        # Load saved apps for this device
+        apps_file = _get_config_root() / f"appslist_{self._identifier}.json"
+        apps_list = {}
+
+        if apps_file.exists():
+            try:
+                with apps_file.open("r", encoding="utf-8") as f:
+                    apps_list = json.load(f)
+            except Exception as e:
+                _LOG.warning("Failed to read apps list for %s: %s", self._identifier, e)
+
+        # Match known friendly app name
+        if source in apps_list:
+            return await self._launch_app(apps_list[source]["url"])
+
+        # Match input source
         if source in inputs.KeyCode:
             return await self._switch_input(source)
 
+        # Fall back to direct launch (e.g. package name or intent URI)
         return await self._launch_app(source)
 
     @async_handle_atvlib_errors
