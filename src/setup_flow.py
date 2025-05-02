@@ -636,45 +636,75 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
     from apps import Apps, IdMappings
     from external_metadata import get_app_metadata
 
+    # STEP 1: Resolve canonical friendly names used in offline mappings
+    offline_friendly_names = set(IdMappings.values())
+    offline_package_ids = set(Apps.keys())
+
     if _use_adb:
-        adb_apps = await get_installed_apps(adb_device)  # dict[str, dict[str, str]]
-        offline_apps = {**Apps, **adb_apps}  # ADB apps override Apps if same name
+        adb_apps = await get_installed_apps(adb_device)
         _LOG.debug("Retrieved ADB apps: %s", adb_apps)
         await adb_device.close()
+
+        # STEP 2: Remove ADB entries that duplicate an offline friendly name
+        filtered_adb_apps = {}
+        for package, details in adb_apps.items():
+            name_from_mapping = IdMappings.get(package)
+            if name_from_mapping and name_from_mapping in offline_friendly_names:
+                continue  # Duplicate friendly name already exists in offline Apps
+            if package in Apps:
+                continue  # Exact package already exists in offline Apps
+            filtered_adb_apps[package] = details
+
+        # STEP 3: Merge with Apps, giving priority to offline Apps
+        merged_apps = {**filtered_adb_apps, **Apps}
     else:
-        offline_apps = Apps
+        merged_apps = Apps
 
-    _LOG.debug("Retrieved offline apps: %s", offline_apps)
+    _LOG.debug("Merged apps (offline preferred): %s", merged_apps)
 
-    settings = []
+    # STEP 4: Build app list for rendering
+    app_entries = []
 
-    for package, details in sorted(offline_apps.items()):
-        # Start with mapped name or static name
+    for package, details in merged_apps.items():
         mapped_name = IdMappings.get(package)
         static_name = details.get("name", package)
         name = mapped_name or static_name
+        editable = False
 
-        # Attempt to get external metadata if name is still just package id
         if _use_external_metadata and not mapped_name:
             try:
                 metadata = await get_app_metadata(package)
-                name = metadata.get("name", name)
+                if metadata.get("name"):
+                    name = metadata["name"]
+                    editable = True  # Only editable if name came from metadata
             except Exception as e:
                 _LOG.warning("Metadata lookup failed for %s: %s", package, e)
 
-        if _use_adb and package in adb_apps:
-            # ADB-specific apps: checkbox + friendly name input
-            settings.append(
-                {
-                    "id": f"{package}_enabled",
-                    "label": {
-                        "en": f"Enable {package}",
-                        "de": f"Aktiviere {package}",
-                        "fr": f"Activer {package}",
-                    },
-                    "field": {"checkbox": {"value": False}},
-                }
-            )
+        is_unfriendly = name.startswith("com.") or name.count('.') >= 2
+        app_entries.append((is_unfriendly, name.lower(), package, name, editable))
+
+    # STEP 5: Sort by friendly/unfriendly then alphabetically
+    app_entries.sort()
+
+    settings = []
+
+    # STEP 6: Output settings based on filtered and sorted entries
+    for _, _, package, name, editable in app_entries:
+        is_adb_only = _use_adb and package in adb_apps and package not in Apps
+
+        settings.append(
+            {
+                "id": f"{package}_enabled",
+                "label": {
+                    "en": name if not is_adb_only else f"{package}",
+                    "de": name if not is_adb_only else f"{package}",
+                    "fr": name if not is_adb_only else f"{package}",
+                },
+                "field": {"checkbox": {"value": False}},
+            }
+        )
+
+        if is_adb_only and editable:
             settings.append(
                 {
                     "id": f"{package}_name",
@@ -684,19 +714,6 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
                         "fr": f"Nom convivial pour {package}",
                     },
                     "field": {"text": {"value": name}},
-                }
-            )
-        else:
-            # Predefined apps: checkbox only
-            settings.append(
-                {
-                    "id": f"{package}_enabled",
-                    "label": {
-                        "en": name,
-                        "de": name,
-                        "fr": name,
-                    },
-                    "field": {"checkbox": {"value": False}},
                 }
             )
 
