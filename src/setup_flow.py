@@ -315,9 +315,7 @@ async def handle_configuration_mode(
             _setup_step = SetupSteps.RECONFIGURE
             _reconfigured_device = selected_device
             use_chromecast = selected_device.use_chromecast if selected_device.use_chromecast else False
-            use_external_metadata = (
-                selected_device.use_external_metadata if selected_device.use_external_metadata else False
-            )
+            use_external_metadata = selected_device.use_external_metadata if selected_device.use_external_metadata else False
             use_adb = selected_device.use_adb if selected_device.use_adb else False
 
             return RequestUserInput(
