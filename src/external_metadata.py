@@ -13,7 +13,9 @@ import os
 from io import BytesIO
 from pathlib import Path
 from typing import Dict
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
+from bs4 import BeautifulSoup
+import re
 
 import google_play_scraper
 import httpx
@@ -55,7 +57,6 @@ def _get_icon_path(icon_name: str) -> Path:
     if icon_name.startswith("config://"):
         return _get_config_root() / "icons" / sanitize(icon_name[9:])
     return _get_icon_dir() / sanitize(icon_name)
-
 
 # Cache Management
 def _load_cache() -> Dict[str, Dict[str, str]]:
@@ -217,3 +218,60 @@ async def get_app_metadata(package_id: str) -> Dict[str, str]:
 
     _LOG.debug("Falling back to default metadata for %s", package_id)
     return {"name": package_id, "icon": ""}
+
+
+async def youtube_search(query: str, limit: int = 1):
+    url = f"https://www.youtube.com/results?search_query={quote(query)}"
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    with httpx.Client(headers=headers, timeout=10) as client:
+        response = client.get(url)
+        html = response.text
+
+    # Extract the ytInitialData JSON
+    match = re.search(r"var ytInitialData = ({.*?});</script>", html)
+    if not match:
+        raise RuntimeError("Could not find ytInitialData in the page")
+
+    data = json.loads(match.group(1))
+
+    try:
+        items = (
+            data["contents"]["twoColumnSearchResultsRenderer"]
+            ["primaryContents"]["sectionListRenderer"]
+            ["contents"][0]["itemSectionRenderer"]["contents"]
+        )
+    except (KeyError, IndexError):
+        raise RuntimeError("Could not parse YouTube data structure")
+
+    results = []
+    for item in items:
+        if "videoRenderer" in item:
+            video = item["videoRenderer"]
+            video_id = video.get("videoId")
+            results.append({"artwork": f"https://img.youtube.com/vi/{video_id}/0.jpg"})
+
+            if len(results) >= limit:
+                break
+
+    return results
+
+async def get_best_artwork(title: str, artist: str = None, current_package: str = None) -> Dict[str, str] | bool:
+    _LOG.debug("Resolving best artwork for title='%s', artist='%s', current_package='%s'", title, artist, current_package)
+
+    if current_package in ["com.google.android.youtube.tv", "com.liskovsoft.videomanager", "com.teamsmart.videomanager.tv"]:
+
+        _LOG.debug("YouTube/SmartTube detected. Searching for artwork.")
+
+        youtube = await youtube_search(title)
+
+        if youtube:
+            _LOG.debug("Artwork result:\n%s", json.dumps(youtube, indent=2))
+            return youtube[0]
+        else:
+            _LOG.debug("No artwork found from YouTube search.")
+
+    _LOG.debug("No artwork source applicable. Returning False.")
+    return False

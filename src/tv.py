@@ -51,7 +51,7 @@ import apps
 import discover
 import inputs
 from config import AtvDevice, _get_config_root
-from external_metadata import encode_icon_to_data_uri, get_app_metadata
+from external_metadata import encode_icon_to_data_uri, get_app_metadata, get_best_artwork
 from profiles import KeyPress, Profile
 from util import filter_data_img_properties
 
@@ -938,7 +938,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         # Update position every 30 seconds
         if changed_duration or (
-            current_time != self._media_position and self._last_update_position_time + 30 < time.time()
+                current_time != self._media_position and self._last_update_position_time + 30 < time.time()
         ):
             self._media_position = current_time
             update[MediaAttr.MEDIA_POSITION] = self._media_position
@@ -946,8 +946,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self._last_update_position_time = time.time()
 
         if (
-            status.metadata_type
-            and GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO) != self._media_type
+                status.metadata_type
+                and GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO) != self._media_type
         ):
             self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO)
             update[MediaAttr.MEDIA_TYPE] = self._media_type
@@ -958,10 +958,19 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self._use_app_url = False
         else:
             self._media_image_url = None
-            if self._device_config.use_external_metadata:
-                self._use_app_url = True
-                if self._app_image_url:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._app_image_url)
+
+            if self._atv.current_app and (status.title and status.artist):
+                artwork = await get_best_artwork(status.title, status.artist, self._atv.current_app)
+                _LOG.debug("Artwork result:\n%s", json.dumps(artwork, indent=2))
+
+                if artwork:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(artwork["artwork"])
+                    self._use_app_url = False
+            else:
+                if self._device_config.use_external_metadata:
+                    self._use_app_url = True
+                    if self._app_image_url:
+                        update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._app_image_url)
 
         if update:
             if _LOG.isEnabledFor(logging.DEBUG):
