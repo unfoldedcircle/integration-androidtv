@@ -835,6 +835,17 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         :return: OK if scheduled to be sent, other error code in case of an error
 
         """  # noqa
+        if action == 'TEXT':
+            # Special handling for text input
+            if not isinstance(keycode, str):
+                _LOG.error("[%s] Cannot send command, invalid key_code: %s", self.log_id, keycode)
+                return ucapi.StatusCodes.BAD_REQUEST
+            if keycode in ('DEL', 'ENTER'):
+                self._atv.send_key_command(keycode, 'SHORT')
+            else:
+                self._atv.send_text(keycode)
+            return ucapi.StatusCodes.OK
+
         if action in (KeyPress.LONG, KeyPress.BEGIN):
             direction = "START_LONG"
         elif action == KeyPress.END:
@@ -856,6 +867,12 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
     async def _launch_app(self, app: str) -> ucapi.StatusCodes:
         """Launch an app on Android TV."""
         self._atv.send_launch_app_command(app)
+        return ucapi.StatusCodes.OK
+
+    @async_handle_atvlib_errors
+    async def _send_text(self, text: str) -> ucapi.StatusCodes:
+        """Launch an app on Android TV."""
+        self._atv.send_text(text)
         return ucapi.StatusCodes.OK
 
     async def _switch_input(self, source: str) -> ucapi.StatusCodes:
