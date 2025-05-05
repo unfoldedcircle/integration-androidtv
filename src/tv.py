@@ -959,7 +959,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         else:
             self._media_image_url = None
 
-            if self._atv.current_app and (status.title and status.artist):
+            if self._atv.current_app and (status.title and status.artist) and self._device_config.use_external_metadata:
                 artwork = await get_best_artwork(status.title, status.artist, self._atv.current_app)
                 _LOG.debug("Artwork result:\n%s", json.dumps(artwork, indent=2))
 
