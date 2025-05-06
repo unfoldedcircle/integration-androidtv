@@ -233,6 +233,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._use_app_url = not device_config.use_chromecast
         self._player_state = media_player.States.ON
         self._muted = False
+        self._is_chromecast_playing = False
+        self._chromecast_metadata_active = False
 
     def __del__(self):
         """Destructs instance, disconnect AndroidTVRemote."""
@@ -595,111 +597,50 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self.events.emit(Events.DISCONNECTED, self._identifier)
 
     # Callbacks
-    async def _apply_current_app_metadata(self, current_app: str) -> dict:
+
+    def _is_on_updated(self, is_on: bool) -> None:
+        if not self._loop or not self._loop.is_running():
+            _LOG.warning("[%s] No running event loop for power update", self.log_id)
+            return
+        asyncio.run_coroutine_threadsafe(self._update_media_status(), self._loop)
+
+    async def _handle_is_on_updated(self, is_on: bool):
         global HOMESCREEN_IMAGE
 
         update = {}
-        # one-time initialization
+
         if HOMESCREEN_IMAGE is None:
-            HOMESCREEN_IMAGE = ""
             HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://androidtv.png")
 
-        # Special handling for homescreen & Android TV system apps: show pre-defined icon
+        current_app = self._atv.current_app or ""
         homescreen_app = apps.is_homescreen_app(current_app)
-        if homescreen_app or apps.is_standby_app(current_app):
-            update[MediaAttr.SOURCE] = apps.IdMappings[current_app]
+
+        update[MediaAttr.STATE] = (
+            media_player.States.ON.value if is_on else media_player.States.OFF.value
+        )
+
+        if not is_on:
+            # Reset Chromecast state on device off
+            self._chromecast_metadata_active = False
+            self._media_title = ""
+            self._media_image_url = HOMESCREEN_IMAGE
             update[MediaAttr.MEDIA_TITLE] = ""
             update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
-            update[MediaAttr.STATE] = (
-                media_player.States.ON.value if homescreen_app else media_player.States.STANDBY.value
-            )
-            return update
-
-        # Track state of data sources
-        offline_name = None
-        offline_match = None
-        external_name = None
-        external_icon = None
-
-        # Try offline ID mapping first
-        if current_app in apps.IdMappings:
-            offline_name = apps.IdMappings[current_app]
-            self._media_app = offline_name
-
-        # Try fuzzy offline name matching if ID mapping failed
-        if not offline_name:
-            for query, name in apps.NameMatching.items():
-                if query in current_app:
-                    offline_match = name
-                    self._media_app = name
-                    break
-
-        # Try external metadata
-        metadata = (
-            await get_app_metadata(current_app) if current_app and self._device_config.use_external_metadata else None
-        )
-        if metadata:
-            if _LOG.isEnabledFor(logging.DEBUG):
-                _LOG.debug("App metadata: %s", filter_data_img_properties(metadata))
-            external_name = metadata.get("name")
-            external_icon = metadata.get("icon")
-            if external_name:
-                self._media_app = external_name
-            if external_icon:
-                self._app_image_url = external_icon
-
-        # Determine final name/title to use
-        name_to_use = offline_name or offline_match or external_name or current_app
-        # TODO why set name to both source & media title fields?
-        update[MediaAttr.SOURCE] = name_to_use
-        if not self._media_title and not self._media_image_url:
-            update[MediaAttr.MEDIA_TITLE] = name_to_use
-
-        # Determine which icon to use
-        icon_to_use = None
-        if self._device_config.use_external_metadata or self._use_app_url:
-            if external_icon:
-                icon_to_use = external_icon
-            else:
-                icon_to_use = ""
-        elif self._media_image_url:
-            icon_to_use = await encode_icon_to_data_uri(self._media_image_url)
-
-        update[MediaAttr.STATE] = media_player.States.PLAYING.value
-        # Skip applying app icon if media image from cast is present
-        if not self._media_image_url:
-            if not icon_to_use:
-                update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
-            else:
-                update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
-
-        return update
-
-    def _is_on_updated(self, is_on: bool) -> None:
-        """Notify that the Android TV power state is updated."""
-        asyncio.create_task(self._handle_is_on_updated(is_on))
-
-    async def _handle_is_on_updated(self, is_on: bool):
-        _LOG.info("[%s] is on: %s", self.log_id, is_on)
-        current_app = self._atv.current_app or ""
-        if is_on:
-            self._chromecast_connect()
-            update = await self._apply_current_app_metadata(current_app)
-            update[MediaAttr.STATE] = media_player.States.ON.value
         else:
-            update = await self._apply_current_app_metadata(current_app)
-            update[MediaAttr.STATE] = media_player.States.OFF.value
+            # Device turned on, set to homescreen/app metadata
+            app_name = apps.IdMappings.get(current_app)
+            self._media_app = app_name
+            update[MediaAttr.SOURCE] = app_name
+            update[MediaAttr.MEDIA_TITLE] = app_name if not homescreen_app else ""
+            update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
 
         self.events.emit(Events.UPDATE, self._identifier, update)
 
     def _current_app_updated(self, current_app: str) -> None:
-        """Notify that the current app on Android TV is updated."""
-        asyncio.create_task(self._handle_current_app_updated(current_app))
-
-    async def _handle_current_app_updated(self, current_app: str):
-        _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
-        update = await self._apply_current_app_metadata(current_app)
-        self.events.emit(Events.UPDATE, self._identifier, update)
+        if not self._loop or not self._loop.is_running():
+            _LOG.warning("[%s] No running event loop for app update", self.log_id)
+            return
+        asyncio.run_coroutine_threadsafe(self._update_media_status(), self._loop)
 
     def _volume_info_updated(self, volume_info: dict[str, str | bool]) -> None:
         """Notify that the Android TV volume information is updated."""
@@ -890,97 +831,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         _LOG.info("[%s] Received Chromecast connection status : %s", self.log_id, status)
 
     def new_media_status(self, status: MediaStatus) -> None:
-        """Receive new media status event from Google cast."""
         if not self._loop or not self._loop.is_running():
-            _LOG.warning("[%s] No running event loop for handling new media status", self.log_id)
+            _LOG.warning("[%s] No running event loop for Chromecast status", self.log_id)
             return
-
-        try:
-            asyncio.run_coroutine_threadsafe(self._handle_new_media_status(status), self._loop)
-        except Exception as e:
-            _LOG.error("[%s] Failed to schedule media status handler: %s", self.log_id, e)
-
-    async def _handle_new_media_status(self, status: MediaStatus):
-        update = {}
-
-        if (
-            status.player_state
-            and GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING) != self._player_state
-        ):
-            # PLAYING, PAUSED, IDLE
-            self._player_state = GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING)
-            self._last_update_position_time = 0
-            update[MediaAttr.STATE] = self._player_state
-
-        if status.album_name != self._media_album:
-            self._media_album = status.album_name or ""
-            update[MediaAttr.MEDIA_ALBUM] = self._media_album
-
-        if status.artist != self._media_artist:
-            self._media_artist = status.artist or ""
-            update[MediaAttr.MEDIA_ARTIST] = self._media_artist
-
-        if status.title != self._media_title:
-            current_title = self.media_title
-            self._media_title = status.title or ""
-            if current_title != self.media_title:
-                _LOG.debug("[%s] Chromecast Media info updated : %s", self.log_id, status)
-                update[MediaAttr.MEDIA_TITLE] = self.media_title
-
-        current_time = int(status.current_time) if status.current_time else 0
-        duration = int(status.duration) if status.duration else 0
-        changed_duration = False
-
-        if duration != self._media_duration:
-            self._media_duration = duration
-            update[MediaAttr.MEDIA_DURATION] = self._media_duration
-            changed_duration = True
-
-        # Update position every 30 seconds
-        if changed_duration or (
-                current_time != self._media_position and self._last_update_position_time + 30 < time.time()
-        ):
-            self._media_position = current_time
-            update[MediaAttr.MEDIA_POSITION] = self._media_position
-            update[MediaAttr.MEDIA_DURATION] = self._media_duration
-            self._last_update_position_time = time.time()
-
-        if (
-                status.metadata_type
-                and GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO) != self._media_type
-        ):
-            self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO)
-            update[MediaAttr.MEDIA_TYPE] = self._media_type
-
-        if status.images and len(status.images) > 0 and status.images[0].url != self._media_image_url:
-            self._media_image_url = status.images[0].url
-            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._media_image_url)
-            self._use_app_url = False
-        else:
-            self._media_image_url = None
-
-            if self._device_config.use_external_metadata:
-                if status.title and status.artist:
-                    # Use external metadata to get artwork
-                    _LOG.debug("[%s] Requesting artwork for %s by %s", self.log_id, status.title, status.artist)
-                    artwork_url = await get_best_artwork(status.title, status.artist, self._atv.current_app)
-                    _LOG.debug("Artwork result:\n%s", json.dumps(artwork_url, indent=2))
-
-                    if artwork_url:
-                        self._media_image_url = artwork_url
-                        update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(artwork_url)
-                        self._use_app_url = False
-
-                if self._app_image_url:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._app_image_url)
-
-        if update:
-            if _LOG.isEnabledFor(logging.DEBUG):
-                _LOG.debug(
-                    "[%s] Update remote with Chromecast info : %s", self.log_id, filter_data_img_properties(update)
-                )
-
-            self.events.emit(Events.UPDATE, self._identifier, update)
+        asyncio.run_coroutine_threadsafe(self._update_media_status(), self._loop)
 
     def load_media_failed(self, queue_item_id: int, error_code: int) -> None:
         """Receive new media failed event from Google cast."""
@@ -1064,3 +918,135 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         except PyChromecastError as ex:
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
         return ucapi.StatusCodes.BAD_REQUEST
+
+    async def _update_media_status(self):
+        global HOMESCREEN_IMAGE
+
+        update = {}
+
+        # Initialize homescreen icon once
+        if HOMESCREEN_IMAGE is None:
+            HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://androidtv.png")
+
+        current_app = self._atv.current_app or ""
+        is_on = self._atv.is_on
+        homescreen_app = apps.is_homescreen_app(current_app)
+        standby_app = apps.is_standby_app(current_app)
+
+        # Device is OFF
+        if not is_on:
+            self._chromecast_metadata_active = False
+            update.update({
+                MediaAttr.STATE: media_player.States.OFF.value,
+                MediaAttr.MEDIA_TITLE: "",
+                MediaAttr.MEDIA_IMAGE_URL: HOMESCREEN_IMAGE,
+            })
+            self.events.emit(Events.UPDATE, self._identifier, update)
+            return
+
+        # Device on homescreen or standby app
+        if homescreen_app or standby_app:
+            self._chromecast_metadata_active = False
+            update.update({
+                MediaAttr.STATE: media_player.States.ON.value if homescreen_app else media_player.States.STANDBY.value,
+                MediaAttr.SOURCE: "",
+                MediaAttr.MEDIA_TITLE: "",
+                MediaAttr.MEDIA_IMAGE_URL: HOMESCREEN_IMAGE,
+            })
+            self.events.emit(Events.UPDATE, self._identifier, update)
+            return
+
+        # Chromecast status (only if enabled)
+        chromecast_playing_states = (
+            MEDIA_PLAYER_STATE_PLAYING,
+            MEDIA_PLAYER_STATE_PAUSED,
+            MEDIA_PLAYER_STATE_BUFFERING,
+        )
+
+        chromecast_active = False
+        chromecast_status = None
+
+        if self._device_config.use_chromecast and self._chromecast:
+            chromecast_status = self._chromecast.media_controller.status
+            chromecast_active = (
+                    self._chromecast.socket_client.is_connected and
+                    chromecast_status and
+                    chromecast_status.player_state in chromecast_playing_states and
+                    (chromecast_status.title or chromecast_status.images)
+            )
+
+        self._chromecast_metadata_active = chromecast_active
+
+        # App metadata from offline mappings
+        offline_name = apps.IdMappings.get(current_app)
+        offline_match = next(
+            (name for query, name in apps.NameMatching.items() if query in current_app), None
+        )
+
+        external_name = None
+        external_icon = None
+
+        # External metadata (if enabled)
+        if self._device_config.use_external_metadata:
+            metadata = await get_app_metadata(current_app)
+            if metadata:
+                external_name = metadata.get("name")
+                external_icon = metadata.get("icon")
+                if _LOG.isEnabledFor(logging.DEBUG):
+                    _LOG.debug("External app metadata: %s", filter_data_img_properties(metadata))
+
+        app_name = external_name or offline_name or offline_match or current_app
+        self._media_app = app_name
+        self._app_image_url = external_icon or ""
+
+        update[MediaAttr.SOURCE] = app_name
+
+        # --- Chromecast Active State Handling ---
+        if chromecast_active:
+            # Media Title from Chromecast (fallback to app_name)
+            self._media_title = chromecast_status.title or app_name
+            update[MediaAttr.MEDIA_TITLE] = self._media_title
+
+            # Media Image from Chromecast
+            if chromecast_status.images and chromecast_status.images[0].url:
+                self._media_image_url = chromecast_status.images[0].url
+
+            # External Artwork fallback (if enabled)
+            elif self._device_config.use_external_metadata and chromecast_status.title:
+                self._media_image_url = await get_best_artwork(
+                    chromecast_status.title, chromecast_status.artist, current_app
+                ) or external_icon or HOMESCREEN_IMAGE
+            else:
+                self._media_image_url = external_icon or HOMESCREEN_IMAGE
+
+            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._media_image_url)
+
+            update[MediaAttr.STATE] = GOOGLE_CAST_MEDIA_STATES_MAP.get(
+                chromecast_status.player_state, media_player.States.PLAYING
+            )
+
+            update.update({
+                MediaAttr.MEDIA_ARTIST: chromecast_status.artist or "",
+                MediaAttr.MEDIA_ALBUM: chromecast_status.album_name or "",
+                MediaAttr.MEDIA_POSITION: int(chromecast_status.current_time or 0),
+                MediaAttr.MEDIA_DURATION: int(chromecast_status.duration or 0),
+                MediaAttr.SOURCE: app_name,
+            })
+
+        # --- Chromecast Inactive or Disabled: App-level metadata only ---
+        else:
+            self._media_title = app_name
+            self._media_image_url = self._app_image_url or HOMESCREEN_IMAGE
+
+            update.update({
+                MediaAttr.MEDIA_TITLE: app_name,
+                MediaAttr.MEDIA_IMAGE_URL: await encode_icon_to_data_uri(self._media_image_url),
+                MediaAttr.STATE: media_player.States.PLAYING.value,
+                MediaAttr.SOURCE: app_name,
+                MediaAttr.MEDIA_ARTIST: "",
+                MediaAttr.MEDIA_ALBUM: "",
+                MediaAttr.MEDIA_POSITION: 0,
+                MediaAttr.MEDIA_DURATION: 0,
+            })
+
+        self.events.emit(Events.UPDATE, self._identifier, update)

@@ -14,7 +14,6 @@ from io import BytesIO
 from pathlib import Path
 from typing import Dict
 from urllib.parse import urlparse, quote
-from bs4 import BeautifulSoup
 import re
 
 import google_play_scraper
@@ -218,7 +217,7 @@ async def get_app_metadata(package_id: str) -> Dict[str, str]:
         return {"name": metadata["name"], "icon": icon_data_uri}
 
     _LOG.debug("Falling back to default metadata for %s", package_id)
-    return {"name": package_id, "icon": ""}
+    return {"name": "", "icon": ""}
 
 
 async def youtube_search(query: str, limit: int = 1):
