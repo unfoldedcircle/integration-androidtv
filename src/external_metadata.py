@@ -24,6 +24,7 @@ from PIL.Image import Resampling
 from pychromecast.controllers.media import MediaImage
 from sanitize_filename import sanitize
 from config import _get_config_root, _get_data_root
+from simplejustwatchapi import justwatch
 
 _LOG = logging.getLogger(__name__)
 
@@ -246,32 +247,64 @@ async def youtube_search(query: str, limit: int = 1):
     except (KeyError, IndexError):
         raise RuntimeError("Could not parse YouTube data structure")
 
-    results = []
     for item in items:
         if "videoRenderer" in item:
             video = item["videoRenderer"]
             video_id = video.get("videoId")
-            results.append({"artwork": f"https://img.youtube.com/vi/{video_id}/0.jpg"})
 
-            if len(results) >= limit:
-                break
+            return f"https://img.youtube.com/vi/{video_id}/0.jpg"
 
-    return results
+    return False
+
+async def search_poster_justwatch(query: str, country: str = "GB", limit: int = 1) -> list[dict]:
+    """Search for poster images using JustWatch API."""
+
+    response = justwatch.search(query, country, 'en', count=1, best_only=True)
+
+    if not response[0].poster:
+        return None
+    else:
+        poster_url = response[0].poster
+
+        if poster_url:
+            return poster_url
+
+    return False
 
 async def get_best_artwork(title: str, artist: str = None, current_package: str = None) -> Dict[str, str] | bool:
     _LOG.debug("Resolving best artwork for title='%s', artist='%s', current_package='%s'", title, artist, current_package)
 
+    search_query = f"{title} - {artist}" if artist else title
+
     if current_package in ["com.google.android.youtube.tv", "com.liskovsoft.videomanager", "com.teamsmart.videomanager.tv"]:
 
-        _LOG.debug("YouTube/SmartTube detected. Searching for artwork.")
+        _LOG.debug("YouTube detected. Searching for artwork.")
 
-        youtube = await youtube_search(title)
+        youtube = await youtube_search(search_query)
 
         if youtube:
             _LOG.debug("Artwork result:\n%s", json.dumps(youtube, indent=2))
-            return youtube[0]
+            return youtube
         else:
             _LOG.debug("No artwork found from YouTube search.")
 
+    else:
+
+        _LOG.debug("Non-YouTube package detected. Searching for artwork.")
+        justwatch = await search_poster_justwatch(search_query)
+
+        if justwatch:
+            _LOG.debug("Artwork result:\n%s", json.dumps(justwatch, indent=2))
+            return justwatch
+        else:
+            _LOG.debug("No artwork found from JustWatch search.")
+
     _LOG.debug("No artwork source applicable. Returning False.")
     return False
+
+
+# async def test():
+#     posters = await get_best_artwork("Episode 1", "Breaking Bad", "com.plexapp.android")
+#     print(posters)
+#
+# asyncio.run(test())

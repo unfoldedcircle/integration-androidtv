@@ -959,18 +959,20 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         else:
             self._media_image_url = None
 
-            if self._atv.current_app and (status.title and status.artist) and self._device_config.use_external_metadata:
-                artwork = await get_best_artwork(status.title, status.artist, self._atv.current_app)
-                _LOG.debug("Artwork result:\n%s", json.dumps(artwork, indent=2))
+            if self._device_config.use_external_metadata:
+                if status.title and status.artist:
+                    # Use external metadata to get artwork
+                    _LOG.debug("[%s] Requesting artwork for %s by %s", self.log_id, status.title, status.artist)
+                    artwork_url = await get_best_artwork(status.title, status.artist, self._atv.current_app)
+                    _LOG.debug("Artwork result:\n%s", json.dumps(artwork_url, indent=2))
 
-                if artwork:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(artwork["artwork"])
-                    self._use_app_url = False
-            else:
-                if self._device_config.use_external_metadata:
-                    self._use_app_url = True
-                    if self._app_image_url:
-                        update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._app_image_url)
+                    if artwork_url:
+                        self._media_image_url = artwork_url
+                        update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(artwork_url)
+                        self._use_app_url = False
+
+                if self._app_image_url:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._app_image_url)
 
         if update:
             if _LOG.isEnabledFor(logging.DEBUG):
