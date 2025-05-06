@@ -604,38 +604,6 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             return
         asyncio.run_coroutine_threadsafe(self._update_media_status(), self._loop)
 
-    async def _handle_is_on_updated(self, is_on: bool):
-        global HOMESCREEN_IMAGE
-
-        update = {}
-
-        if HOMESCREEN_IMAGE is None:
-            HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://androidtv.png")
-
-        current_app = self._atv.current_app or ""
-        homescreen_app = apps.is_homescreen_app(current_app)
-
-        update[MediaAttr.STATE] = (
-            media_player.States.ON.value if is_on else media_player.States.OFF.value
-        )
-
-        if not is_on:
-            # Reset Chromecast state on device off
-            self._chromecast_metadata_active = False
-            self._media_title = ""
-            self._media_image_url = HOMESCREEN_IMAGE
-            update[MediaAttr.MEDIA_TITLE] = ""
-            update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
-        else:
-            # Device turned on, set to homescreen/app metadata
-            app_name = apps.IdMappings.get(current_app)
-            self._media_app = app_name
-            update[MediaAttr.SOURCE] = app_name
-            update[MediaAttr.MEDIA_TITLE] = app_name if not homescreen_app else ""
-            update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
-
-        self.events.emit(Events.UPDATE, self._identifier, update)
-
     def _current_app_updated(self, current_app: str) -> None:
         if not self._loop or not self._loop.is_running():
             _LOG.warning("[%s] No running event loop for app update", self.log_id)
@@ -939,7 +907,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             update.update({
                 MediaAttr.STATE: media_player.States.OFF.value,
                 MediaAttr.MEDIA_TITLE: "",
-                MediaAttr.MEDIA_IMAGE_URL: HOMESCREEN_IMAGE,
+                MediaAttr.MEDIA_IMAGE_URL: "",
             })
             self.events.emit(Events.UPDATE, self._identifier, update)
             return
@@ -951,7 +919,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 MediaAttr.STATE: media_player.States.ON.value if homescreen_app else media_player.States.STANDBY.value,
                 MediaAttr.SOURCE: "",
                 MediaAttr.MEDIA_TITLE: "",
-                MediaAttr.MEDIA_IMAGE_URL: HOMESCREEN_IMAGE,
+                MediaAttr.MEDIA_IMAGE_URL: "",
             })
             self.events.emit(Events.UPDATE, self._identifier, update)
             return
