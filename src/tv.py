@@ -907,6 +907,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             update.update({
                 MediaAttr.STATE: media_player.States.OFF.value,
                 MediaAttr.MEDIA_TITLE: "",
+                MediaAttr.SOURCE: "",
                 MediaAttr.MEDIA_IMAGE_URL: "",
             })
             self.events.emit(Events.UPDATE, self._identifier, update)
@@ -974,7 +975,6 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             # Media Title from Chromecast (fallback to app_name)
             self._media_title = chromecast_status.title or app_name
             update[MediaAttr.MEDIA_TITLE] = self._media_title
-
             # Media Image from Chromecast
             if chromecast_status.images and chromecast_status.images[0].url:
                 self._media_image_url = chromecast_status.images[0].url
