@@ -973,14 +973,15 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         # --- Chromecast Active State Handling ---
         if chromecast_active:
             # Media Title from Chromecast (fallback to app_name)
-            self._media_title = chromecast_status.title or app_name
-            update[MediaAttr.MEDIA_TITLE] = self._media_title
+            self._media_title = chromecast_status.title if chromecast_status.title is not None else chromecast_status.artist or ""
+            update[MediaAttr.MEDIA_TITLE] = self._media_title or chromecast_status.artist
+
             # Media Image from Chromecast
             if chromecast_status.images and chromecast_status.images[0].url:
                 self._media_image_url = chromecast_status.images[0].url
 
             # External Artwork fallback (if enabled)
-            elif self._device_config.use_external_metadata and chromecast_status.title:
+            elif self._device_config.use_external_metadata and chromecast_status.player_state in ["PLAYING", "PAUSED", "BUFFERING"]:
                 self._media_image_url = await get_best_artwork(
                     chromecast_status.title, chromecast_status.artist, current_app
                 ) or external_icon or HOMESCREEN_IMAGE

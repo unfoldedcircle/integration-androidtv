@@ -253,7 +253,7 @@ async def youtube_search(query: str, limit: int = 1):
 
             return f"https://img.youtube.com/vi/{video_id}/0.jpg"
 
-    return False
+    return None
 
 async def search_poster_justwatch(query: str, country: str = "GB", limit: int = 1) -> list[dict]:
     """Search for poster images using JustWatch API."""
@@ -268,7 +268,7 @@ async def search_poster_justwatch(query: str, country: str = "GB", limit: int = 
         if poster_url:
             return poster_url
 
-    return False
+    return None
 
 async def get_best_artwork(title: str, artist: str = None, current_package: str = None) -> Dict[str, str] | bool:
     _LOG.debug("Resolving best artwork for title='%s', artist='%s', current_package='%s'", title, artist, current_package)
@@ -299,7 +299,7 @@ async def get_best_artwork(title: str, artist: str = None, current_package: str 
             _LOG.debug("No artwork found from JustWatch search.")
 
     _LOG.debug("No artwork source applicable. Returning False.")
-    return False
+    return None
 
 
 # async def test():
