@@ -333,9 +333,7 @@ async def handle_configuration_mode(
                             "en": "Volume step in percent",
                             "fr": "Pallier de volume en pourcent",
                         },
-                        "field": {
-                            "number": {"value": volume_step, "min": 1, "max": 50, "steps": 1, "decimals": 0}
-                        },
+                        "field": {"number": {"value": volume_step, "min": 1, "max": 50, "steps": 1, "decimals": 0}},
                     },
                 ],
             )
@@ -464,9 +462,7 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                     "en": "Volume step in percent",
                     "fr": "Pallier de volume en pourcent",
                 },
-                "field": {
-                    "number": {"value": 10, "min": 1, "max": 50, "steps": 1, "decimals": 0}
-                },
+                "field": {"number": {"value": 10, "min": 1, "max": 50, "steps": 1, "decimals": 0}},
             },
         ],
     )
@@ -508,7 +504,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
             id="",
             use_external_metadata=False,
             use_chromecast=False,
-            volume_step=_volume_step
+            volume_step=_volume_step,
         ),
     )
     _LOG.info("Chosen Android TV: %s. Start pairing process...", choice)
@@ -591,7 +587,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         use_chromecast=_use_chromecast,
         manufacturer=device_info.get("manufacturer", ""),
         model=device_info.get("model", ""),
-        volume_step=_volume_step
+        volume_step=_volume_step,
     )
 
     config.devices.add_or_update(device)  # triggers AndroidTv instance creation

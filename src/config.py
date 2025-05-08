@@ -239,7 +239,7 @@ class Devices:
                     item.get("auth_error", False),
                     item.get("use_external_metadata", False),
                     item.get("use_chromecast", False),
-                    item.get("volume_step", 10)
+                    item.get("volume_step", 10),
                 )
                 self._config.append(atv)
             return True
