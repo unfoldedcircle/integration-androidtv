@@ -347,6 +347,11 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         return self._atv.is_on
 
     @property
+    def device_config(self) -> AtvDevice:
+        """Return current device configuration."""
+        return self._device_config
+
+    @property
     def media_title(self) -> str | None:
         """Return media title."""
         if self._media_title and self._media_title != "":
