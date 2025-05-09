@@ -964,7 +964,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
-            self._chromecast.volume_up(delta=self._device_config.volume_step / 100)
+            self._chromecast.volume_up(delta=float(self._device_config.volume_step/100))
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
@@ -975,7 +975,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
-            self._chromecast.volume_down(delta=self._device_config.volume_step / 100)
+            self._chromecast.volume_down(delta=float(self._device_config.volume_step/100))
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)

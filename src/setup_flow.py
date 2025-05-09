@@ -486,7 +486,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     choice = msg.input_values["choice"]
     _use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
     _use_chromecast = msg.input_values.get("chromecast", "false") == "true"
-    _volume_step = msg.input_values.get("volume_step", 10)
+    _volume_step = float(msg.input_values.get("volume_step", 10))
     name = ""
 
     for discovered_tv in _discovered_android_tvs:
