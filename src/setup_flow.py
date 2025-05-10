@@ -618,14 +618,21 @@ async def _handle_device_reconfigure(
 
     use_chromecast = msg.input_values.get("chromecast", "false") == "true"
     use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
+    volume_step = float(msg.input_values.get("volume_step", 10))
 
     _LOG.debug("User has changed configuration")
     _reconfigured_device.use_chromecast = use_chromecast
     _reconfigured_device.use_external_metadata = use_external_metadata
+    _reconfigured_device.volume_step = volume_step
 
     config.devices.add_or_update(_reconfigured_device)  # triggers ATV instance update
     await asyncio.sleep(1)
-    _LOG.info("Setup successfully completed for %s", _reconfigured_device.name)
+    _LOG.info(
+        "Setup successfully completed for %s (chromecast %s, external metadata %s, volume step %s)",
+        _reconfigured_device.name,
+        _reconfigured_device.use_chromecast,
+        _reconfigured_device.volume_step,
+    )
 
     return SetupComplete()
 

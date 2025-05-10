@@ -969,6 +969,12 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
+            _LOG.debug(
+                "[%s] Volume up : current %s + step %s",
+                self.log_id,
+                self._chromecast.status.volume_level,
+                self._device_config.volume_step / 100,
+            )
             self._chromecast.volume_up(delta=float(self._device_config.volume_step / 100))
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
@@ -980,6 +986,12 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
+            _LOG.debug(
+                "[%s] Volume down : current %s - step %s",
+                self.log_id,
+                self._chromecast.status.volume_level,
+                self._device_config.volume_step / 100,
+            )
             self._chromecast.volume_down(delta=float(self._device_config.volume_step / 100))
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
@@ -992,6 +1004,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
             self._muted = not self._muted
+            _LOG.debug("[%s] Mute toggle : %s", self.log_id, self._muted)
             self._chromecast.set_volume_muted(self._muted)
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
@@ -1005,6 +1018,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if volume is None:
             return ucapi.StatusCodes.BAD_REQUEST
         try:
+            _LOG.debug("[%s] Set volume : %s", self.log_id, volume)
             self._chromecast.set_volume(float(volume) / 100)
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
