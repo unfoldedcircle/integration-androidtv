@@ -998,14 +998,14 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
         return ucapi.StatusCodes.BAD_REQUEST
 
-    async def volume_set(self, volume: float | None) -> ucapi.StatusCodes:
+    async def volume_set(self, volume: int | None) -> ucapi.StatusCodes:
         """Set volume."""
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         if volume is None:
             return ucapi.StatusCodes.BAD_REQUEST
         try:
-            await self._chromecast.set_volume(volume / 100)
+            self._chromecast.set_volume(float(volume) / 100)
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
