@@ -46,7 +46,10 @@
     "PRIMEVIDEO",
     "PLAYSTORE",
     "FACTORYTEST",
-    "DISNEY"
+    "DISNEY",
+    "KEY_VOLUME_UP",
+    "KEY_VOLUME_DOWN",
+    "KEY_VOLUME_MUTE"
   ],
   "command_map": {
     "CURSOR_ENTER_LONG": {
@@ -84,6 +87,15 @@
     "DISNEY": {
       "keycode": 142,
       "action": "SHORT"
+    },
+    "KEY_VOLUME_UP": {
+      "keycode": "VOLUME_UP"
+    },
+    "KEY_VOLUME_DOWN": {
+      "keycode": "VOLUME_DOWN"
+    },
+    "KEY_VOLUME_MUTE": {
+      "keycode": "VOLUME_MUTE"
     }
   }
 }
