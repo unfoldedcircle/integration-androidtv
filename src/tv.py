@@ -970,7 +970,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
             _LOG.debug(
-                "[%s] Volume up : current %s + step %s",
+                "[%s] Volume up : current %.2f + step %s",
                 self.log_id,
                 self._chromecast.status.volume_level,
                 self._device_config.volume_step / 100,
@@ -987,7 +987,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         try:
             _LOG.debug(
-                "[%s] Volume down : current %s - step %s",
+                "[%s] Volume down : current %.2f - step %s",
                 self.log_id,
                 self._chromecast.status.volume_level,
                 self._device_config.volume_step / 100,
@@ -1018,7 +1018,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if volume is None:
             return ucapi.StatusCodes.BAD_REQUEST
         try:
-            _LOG.debug("[%s] Set volume : %s", self.log_id, volume)
+            _LOG.debug("[%s] Set volume : %%.2f", self.log_id, float(volume) / 100)
             self._chromecast.set_volume(float(volume) / 100)
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:

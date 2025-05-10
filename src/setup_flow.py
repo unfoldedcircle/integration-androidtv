@@ -631,6 +631,7 @@ async def _handle_device_reconfigure(
         "Setup successfully completed for %s (chromecast %s, external metadata %s, volume step %s)",
         _reconfigured_device.name,
         _reconfigured_device.use_chromecast,
+        _reconfigured_device.use_external_metadata,
         _reconfigured_device.volume_step,
     )
 
