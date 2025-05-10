@@ -1018,7 +1018,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if volume is None:
             return ucapi.StatusCodes.BAD_REQUEST
         try:
-            _LOG.debug("[%s] Set volume : %%.2f", self.log_id, float(volume) / 100)
+            _LOG.debug("[%s] Set volume : %.2f", self.log_id, float(volume)/100)
             self._chromecast.set_volume(float(volume) / 100)
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
