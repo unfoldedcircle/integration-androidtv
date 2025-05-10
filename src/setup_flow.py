@@ -48,6 +48,7 @@ _pairing_android_tv: tv.AndroidTv | None = None
 _use_external_metadata: bool = False
 _reconfigured_device: AtvDevice | None = None
 _use_chromecast: bool = False
+_volume_step: float = 10
 
 # TODO #9 externalize language texts
 _user_input_discovery = RequestUserInput(
@@ -300,6 +301,7 @@ async def handle_configuration_mode(
             use_external_metadata = (
                 selected_device.use_external_metadata if selected_device.use_external_metadata else False
             )
+            volume_step = selected_device.volume_step if selected_device.volume_step else 10
 
             return RequestUserInput(
                 {
@@ -324,6 +326,14 @@ async def handle_configuration_mode(
                             "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes de Google Play",
                         },
                         "field": {"checkbox": {"value": use_external_metadata}},
+                    },
+                    {
+                        "id": "volume_step",
+                        "label": {
+                            "en": "Volume step in percent",
+                            "fr": "Pallier de volume en pourcent",
+                        },
+                        "field": {"number": {"value": volume_step, "min": 1, "max": 50, "steps": 1, "decimals": 0}},
                     },
                 ],
             )
@@ -446,6 +456,14 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                 },
                 "field": {"checkbox": {"value": False}},
             },
+            {
+                "id": "volume_step",
+                "label": {
+                    "en": "Volume step in percent",
+                    "fr": "Pallier de volume en pourcent",
+                },
+                "field": {"number": {"value": 10, "min": 1, "max": 50, "steps": 1, "decimals": 0}},
+            },
         ],
     )
 
@@ -463,10 +481,12 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     global _use_chromecast
     global _setup_step
     global _use_external_metadata
+    global _volume_step
 
     choice = msg.input_values["choice"]
     _use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
     _use_chromecast = msg.input_values.get("chromecast", "false") == "true"
+    _volume_step = float(msg.input_values.get("volume_step", 10))
     name = ""
 
     for discovered_tv in _discovered_android_tvs:
@@ -484,6 +504,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
             id="",
             use_external_metadata=False,
             use_chromecast=False,
+            volume_step=_volume_step,
         ),
     )
     _LOG.info("Chosen Android TV: %s. Start pairing process...", choice)
@@ -566,6 +587,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         use_chromecast=_use_chromecast,
         manufacturer=device_info.get("manufacturer", ""),
         model=device_info.get("model", ""),
+        volume_step=_volume_step,
     )
 
     config.devices.add_or_update(device)  # triggers AndroidTv instance creation
@@ -596,14 +618,22 @@ async def _handle_device_reconfigure(
 
     use_chromecast = msg.input_values.get("chromecast", "false") == "true"
     use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
+    volume_step = float(msg.input_values.get("volume_step", 10))
 
     _LOG.debug("User has changed configuration")
     _reconfigured_device.use_chromecast = use_chromecast
     _reconfigured_device.use_external_metadata = use_external_metadata
+    _reconfigured_device.volume_step = volume_step
 
     config.devices.add_or_update(_reconfigured_device)  # triggers ATV instance update
     await asyncio.sleep(1)
-    _LOG.info("Setup successfully completed for %s", _reconfigured_device.name)
+    _LOG.info(
+        "Setup successfully completed for %s (chromecast %s, external metadata %s, volume step %s)",
+        _reconfigured_device.name,
+        _reconfigured_device.use_chromecast,
+        _reconfigured_device.use_external_metadata,
+        _reconfigured_device.volume_step,
+    )
 
     return SetupComplete()
 

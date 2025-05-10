@@ -91,7 +91,10 @@
     "KEYCODE_F9",
     "KEYCODE_F10",
     "KEYCODE_F11",
-    "KEYCODE_F12"
+    "KEYCODE_F12",
+    "KEY_VOLUME_UP",
+    "KEY_VOLUME_DOWN",
+    "KEY_VOLUME_MUTE"
   ],
   "command_map": {
     "CURSOR_ENTER_LONG": {
@@ -105,6 +108,15 @@
     "MENU_LONG": {
       "keycode": "MENU",
       "action": "LONG"
+    },
+    "KEY_VOLUME_UP": {
+      "keycode": "VOLUME_UP"
+    },
+    "KEY_VOLUME_DOWN": {
+      "keycode": "VOLUME_DOWN"
+    },
+    "KEY_VOLUME_MUTE": {
+      "keycode": "VOLUME_MUTE"
     }
   }
 }

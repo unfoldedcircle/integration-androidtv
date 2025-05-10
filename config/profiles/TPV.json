@@ -42,7 +42,10 @@
     "HOME_LONG",
     "MENU_LONG",
     "ENTER",
-    "TELETEXT"
+    "TELETEXT",
+    "KEY_VOLUME_UP",
+    "KEY_VOLUME_DOWN",
+    "KEY_VOLUME_MUTE"
   ],
   "command_map": {
     "CURSOR_ENTER_LONG": {
@@ -64,6 +67,15 @@
     "TELETEXT": {
       "keycode": 233,
       "action": "SHORT"
+    },
+    "KEY_VOLUME_UP": {
+      "keycode": "VOLUME_UP"
+    },
+    "KEY_VOLUME_DOWN": {
+      "keycode": "VOLUME_DOWN"
+    },
+    "KEY_VOLUME_MUTE": {
+      "keycode": "VOLUME_MUTE"
     }
   }
 }
