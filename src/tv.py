@@ -347,6 +347,11 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         return self._atv.is_on
 
     @property
+    def device_config(self) -> AtvDevice:
+        """Return current device configuration."""
+        return self._device_config
+
+    @property
     def media_title(self) -> str | None:
         """Return media title."""
         if self._media_title and self._media_title != "":
@@ -961,46 +966,66 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     async def volume_up(self) -> ucapi.StatusCodes:
         """Change volume up."""
-        if self._chromecast is None:
-            return ucapi.StatusCodes.NOT_IMPLEMENTED
-        try:
-            self._chromecast.volume_up()
-            return ucapi.StatusCodes.OK
-        except PyChromecastError as ex:
-            _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
-        return ucapi.StatusCodes.BAD_REQUEST
+        if self.device_config.use_chromecast and self.device_config.use_chromecast_volume:
+            if self._chromecast is None:
+                return ucapi.StatusCodes.NOT_IMPLEMENTED
+            try:
+                _LOG.debug(
+                    "[%s] Volume up : current %.2f + step %s",
+                    self.log_id,
+                    self._chromecast.status.volume_level,
+                    self._device_config.volume_step / 100,
+                )
+                self._chromecast.volume_up(delta=float(self._device_config.volume_step / 100))
+                return ucapi.StatusCodes.OK
+            except PyChromecastError as ex:
+                _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
+            return ucapi.StatusCodes.BAD_REQUEST
+        return await self.send_media_player_command(media_player.Commands.VOLUME_UP)
 
     async def volume_down(self) -> ucapi.StatusCodes:
         """Change volume down."""
-        if self._chromecast is None:
-            return ucapi.StatusCodes.NOT_IMPLEMENTED
-        try:
-            self._chromecast.volume_down()
-            return ucapi.StatusCodes.OK
-        except PyChromecastError as ex:
-            _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
-        return ucapi.StatusCodes.BAD_REQUEST
+        if self.device_config.use_chromecast and self.device_config.use_chromecast_volume:
+            if self._chromecast is None:
+                return ucapi.StatusCodes.NOT_IMPLEMENTED
+            try:
+                _LOG.debug(
+                    "[%s] Volume down : current %.2f - step %s",
+                    self.log_id,
+                    self._chromecast.status.volume_level,
+                    self._device_config.volume_step / 100,
+                )
+                self._chromecast.volume_down(delta=float(self._device_config.volume_step / 100))
+                return ucapi.StatusCodes.OK
+            except PyChromecastError as ex:
+                _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
+            return ucapi.StatusCodes.BAD_REQUEST
+        return await self.send_media_player_command(media_player.Commands.VOLUME_DOWN)
 
     async def volume_mute_toggle(self) -> ucapi.StatusCodes:
         """Mute toggle."""
-        if self._chromecast is None:
-            return ucapi.StatusCodes.NOT_IMPLEMENTED
-        try:
-            self._muted = not self._muted
-            self._chromecast.set_volume_muted(self._muted)
-            return ucapi.StatusCodes.OK
-        except PyChromecastError as ex:
-            _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
-        return ucapi.StatusCodes.BAD_REQUEST
+        if self.device_config.use_chromecast and self.device_config.use_chromecast_volume:
+            if self._chromecast is None:
+                return ucapi.StatusCodes.NOT_IMPLEMENTED
+            try:
+                self._muted = not self._muted
+                _LOG.debug("[%s] Mute toggle : %s", self.log_id, self._muted)
+                self._chromecast.set_volume_muted(self._muted)
+                return ucapi.StatusCodes.OK
+            except PyChromecastError as ex:
+                _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
+            return ucapi.StatusCodes.BAD_REQUEST
+        return await self.send_media_player_command(media_player.Commands.MUTE_TOGGLE)
 
-    async def volume_set(self, volume: float | None) -> ucapi.StatusCodes:
+    async def volume_set(self, volume: int | None) -> ucapi.StatusCodes:
         """Set volume."""
         if self._chromecast is None:
             return ucapi.StatusCodes.NOT_IMPLEMENTED
         if volume is None:
             return ucapi.StatusCodes.BAD_REQUEST
         try:
-            await self._chromecast.set_volume(volume / 100)
+            _LOG.debug("[%s] Set volume : %.2f", self.log_id, float(volume) / 100)
+            self._chromecast.set_volume(float(volume) / 100)
             return ucapi.StatusCodes.OK
         except PyChromecastError as ex:
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
