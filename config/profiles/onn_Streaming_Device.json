@@ -25,9 +25,6 @@
     "search"
   ],
   "simple_commands": [
-    "KEY_VOLUME_UP",
-    "KEY_VOLUME_DOWN",
-    "KEY_VOLUME_MUTE"
   ],
   "command_map": {
     "context_menu": {
@@ -37,15 +34,6 @@
     "settings": {
       "keycode": "HOME",
       "action": "LONG"
-    },
-    "KEY_VOLUME_UP": {
-      "keycode": "VOLUME_UP"
-    },
-    "KEY_VOLUME_DOWN": {
-      "keycode": "VOLUME_DOWN"
-    },
-    "KEY_VOLUME_MUTE": {
-      "keycode": "VOLUME_MUTE"
     }
   }
 }

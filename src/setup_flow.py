@@ -48,6 +48,7 @@ _pairing_android_tv: tv.AndroidTv | None = None
 _use_external_metadata: bool = False
 _reconfigured_device: AtvDevice | None = None
 _use_chromecast: bool = False
+_use_chromecast_volume: bool = False
 _volume_step: float = 10
 
 # TODO #9 externalize language texts
@@ -298,6 +299,9 @@ async def handle_configuration_mode(
             _setup_step = SetupSteps.RECONFIGURE
             _reconfigured_device = selected_device
             use_chromecast = selected_device.use_chromecast if selected_device.use_chromecast else False
+            use_chromecast_volume = (
+                selected_device.use_chromecast_volume if selected_device.use_chromecast_volume else False
+            )
             use_external_metadata = (
                 selected_device.use_external_metadata if selected_device.use_external_metadata else False
             )
@@ -319,6 +323,14 @@ async def handle_configuration_mode(
                         "field": {"checkbox": {"value": use_chromecast}},
                     },
                     {
+                        "id": "chromecast_volume",
+                        "label": {
+                            "en": "Set volume through Chromecast",
+                            "fr": "Régler le volume par Chromecast",
+                        },
+                        "field": {"checkbox": {"value": use_chromecast_volume}},
+                    },
+                    {
                         "id": "external_metadata",
                         "label": {
                             "en": "Preview feature: Enable external Google Play metadata",
@@ -330,8 +342,8 @@ async def handle_configuration_mode(
                     {
                         "id": "volume_step",
                         "label": {
-                            "en": "Volume step in percent",
-                            "fr": "Pallier de volume en pourcent",
+                            "en": "Volume step in percent (Chromecast only)",
+                            "fr": "Pallier de volume en pourcentage (Chromecast uniquement)",
                         },
                         "field": {"number": {"value": volume_step, "min": 1, "max": 50, "steps": 1, "decimals": 0}},
                     },
@@ -448,6 +460,14 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                 "field": {"checkbox": {"value": False}},
             },
             {
+                "id": "chromecast_volume",
+                "label": {
+                    "en": "Set volume through Chromecast",
+                    "fr": "Régler le volume par Chromecast",
+                },
+                "field": {"checkbox": {"value": False}},
+            },
+            {
                 "id": "external_metadata",
                 "label": {
                     "en": "Preview feature: Enable external Google Play metadata",
@@ -459,8 +479,8 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
             {
                 "id": "volume_step",
                 "label": {
-                    "en": "Volume step in percent",
-                    "fr": "Pallier de volume en pourcent",
+                    "en": "Volume step in percent (Chromecast only)",
+                    "fr": "Pallier de volume en pourcent (Chromecast uniquement)",
                 },
                 "field": {"number": {"value": 10, "min": 1, "max": 50, "steps": 1, "decimals": 0}},
             },
@@ -479,6 +499,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     """
     global _pairing_android_tv
     global _use_chromecast
+    global _use_chromecast_volume
     global _setup_step
     global _use_external_metadata
     global _volume_step
@@ -486,6 +507,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     choice = msg.input_values["choice"]
     _use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
     _use_chromecast = msg.input_values.get("chromecast", "false") == "true"
+    _use_chromecast_volume = msg.input_values.get("chromecast_volume", "false") == "true"
     _volume_step = float(msg.input_values.get("volume_step", 10))
     name = ""
 
@@ -504,6 +526,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
             id="",
             use_external_metadata=False,
             use_chromecast=False,
+            use_chromecast_volume=_use_chromecast_volume,
             volume_step=_volume_step,
         ),
     )
@@ -585,6 +608,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         address=_pairing_android_tv.address,
         use_external_metadata=_use_external_metadata,
         use_chromecast=_use_chromecast,
+        use_chromecast_volume=_use_chromecast_volume,
         manufacturer=device_info.get("manufacturer", ""),
         model=device_info.get("model", ""),
         volume_step=_volume_step,
@@ -617,11 +641,13 @@ async def _handle_device_reconfigure(
         return SetupError()
 
     use_chromecast = msg.input_values.get("chromecast", "false") == "true"
+    use_chromecast_volume = msg.input_values.get("chromecast_volume", "false") == "true"
     use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
     volume_step = float(msg.input_values.get("volume_step", 10))
 
     _LOG.debug("User has changed configuration")
     _reconfigured_device.use_chromecast = use_chromecast
+    _reconfigured_device.use_chromecast_volume = use_chromecast_volume
     _reconfigured_device.use_external_metadata = use_external_metadata
     _reconfigured_device.volume_step = volume_step
 
