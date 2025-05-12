@@ -981,8 +981,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             except PyChromecastError as ex:
                 _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
             return ucapi.StatusCodes.BAD_REQUEST
-        else:
-            return await self.send_media_player_command(media_player.Commands.VOLUME_UP)
+        return await self.send_media_player_command(media_player.Commands.VOLUME_UP)
 
     async def volume_down(self) -> ucapi.StatusCodes:
         """Change volume down."""
@@ -1001,8 +1000,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             except PyChromecastError as ex:
                 _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
             return ucapi.StatusCodes.BAD_REQUEST
-        else:
-            return await self.send_media_player_command(media_player.Commands.VOLUME_DOWN)
+        return await self.send_media_player_command(media_player.Commands.VOLUME_DOWN)
 
     async def volume_mute_toggle(self) -> ucapi.StatusCodes:
         """Mute toggle."""
@@ -1017,8 +1015,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             except PyChromecastError as ex:
                 _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
             return ucapi.StatusCodes.BAD_REQUEST
-        else:
-            return await self.send_media_player_command(media_player.Commands.MUTE_TOGGLE)
+        return await self.send_media_player_command(media_player.Commands.MUTE_TOGGLE)
 
     async def volume_set(self, volume: int | None) -> ucapi.StatusCodes:
         """Set volume."""
