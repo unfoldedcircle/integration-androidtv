@@ -49,7 +49,7 @@ _use_external_metadata: bool = False
 _reconfigured_device: AtvDevice | None = None
 _use_chromecast: bool = False
 _use_chromecast_volume: bool = False
-_volume_step: float = 10
+_volume_step: int = 10
 
 # TODO #9 externalize language texts
 _user_input_discovery = RequestUserInput(
@@ -313,40 +313,10 @@ async def handle_configuration_mode(
                     "fr": "Configurez votre Android TV",
                 },
                 [
-                    {
-                        "id": "chromecast",
-                        "label": {
-                            "en": "Preview feature: Enable Chromecast features",
-                            "de": "Vorschaufunktion: Aktiviere Chromecast-Features",
-                            "fr": "Fonctionnalité en aperçu: Activer les fonctionnalités de Chromecast",
-                        },
-                        "field": {"checkbox": {"value": use_chromecast}},
-                    },
-                    {
-                        "id": "chromecast_volume",
-                        "label": {
-                            "en": "Set volume through Chromecast",
-                            "fr": "Régler le volume par Chromecast",
-                        },
-                        "field": {"checkbox": {"value": use_chromecast_volume}},
-                    },
-                    {
-                        "id": "external_metadata",
-                        "label": {
-                            "en": "Preview feature: Enable external Google Play metadata",
-                            "de": "Vorschaufunktion: Aktiviere externe Google Play Metadaten",
-                            "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes de Google Play",
-                        },
-                        "field": {"checkbox": {"value": use_external_metadata}},
-                    },
-                    {
-                        "id": "volume_step",
-                        "label": {
-                            "en": "Volume step in percent (Chromecast only)",
-                            "fr": "Pallier de volume en pourcentage (Chromecast uniquement)",
-                        },
-                        "field": {"number": {"value": volume_step, "min": 1, "max": 50, "steps": 1, "decimals": 0}},
-                    },
+                    __cfg_use_chromecast(use_chromecast),
+                    __cfg_chromecast_volume(use_chromecast_volume),
+                    __cfg_volume_step(volume_step),
+                    __cfg_external_metadata(use_external_metadata),
                 ],
             )
         case "reset":
@@ -450,40 +420,10 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                     "fr": "Choisir votre Android TV",
                 },
             },
-            {
-                "id": "chromecast",
-                "label": {
-                    "en": "Preview feature: Enable Chromecast features",
-                    "de": "Vorschaufunktion: Aktiviere Chromecast-Features",
-                    "fr": "Fonctionnalité en aperçu: Activer les fonctionnalités de Chromecast",
-                },
-                "field": {"checkbox": {"value": False}},
-            },
-            {
-                "id": "chromecast_volume",
-                "label": {
-                    "en": "Set volume through Chromecast",
-                    "fr": "Régler le volume par Chromecast",
-                },
-                "field": {"checkbox": {"value": False}},
-            },
-            {
-                "id": "external_metadata",
-                "label": {
-                    "en": "Preview feature: Enable external Google Play metadata",
-                    "de": "Vorschaufunktion: Aktiviere externe Google Play Metadaten",
-                    "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes de Google Play",
-                },
-                "field": {"checkbox": {"value": False}},
-            },
-            {
-                "id": "volume_step",
-                "label": {
-                    "en": "Volume step in percent (Chromecast only)",
-                    "fr": "Pallier de volume en pourcent (Chromecast uniquement)",
-                },
-                "field": {"number": {"value": 10, "min": 1, "max": 50, "steps": 1, "decimals": 0}},
-            },
+            __cfg_use_chromecast(False),
+            __cfg_chromecast_volume(False),
+            __cfg_volume_step(10),
+            __cfg_external_metadata(False),
         ],
     )
 
@@ -508,7 +448,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     _use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
     _use_chromecast = msg.input_values.get("chromecast", "false") == "true"
     _use_chromecast_volume = msg.input_values.get("chromecast_volume", "false") == "true"
-    _volume_step = float(msg.input_values.get("volume_step", 10))
+    _volume_step = int(msg.input_values.get("volume_step", 10))
     name = ""
 
     for discovered_tv in _discovered_android_tvs:
@@ -643,7 +583,7 @@ async def _handle_device_reconfigure(
     use_chromecast = msg.input_values.get("chromecast", "false") == "true"
     use_chromecast_volume = msg.input_values.get("chromecast_volume", "false") == "true"
     use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
-    volume_step = float(msg.input_values.get("volume_step", 10))
+    volume_step = int(msg.input_values.get("volume_step", 10))
 
     _LOG.debug("User has changed configuration")
     _reconfigured_device.use_chromecast = use_chromecast
@@ -674,3 +614,51 @@ def _setup_error_from_device_state(state: tv.DeviceState) -> SetupError:
             error_type = IntegrationSetupError.CONNECTION_REFUSED
 
     return SetupError(error_type=error_type)
+
+
+def __cfg_use_chromecast(enabled: bool):
+    return {
+        "id": "chromecast",
+        "label": {
+            "en": "Preview feature: Enable Chromecast features",
+            "de": "Vorschaufunktion: Aktiviere Chromecast-Features",
+            "fr": "Fonctionnalité en aperçu: Activer les fonctionnalités de Chromecast",
+        },
+        "field": {"checkbox": {"value": enabled}},
+    }
+
+
+def __cfg_chromecast_volume(enabled: bool):
+    return {
+        "id": "chromecast_volume",
+        "label": {
+            "en": "Preview feature: Set volume through Chromecast",
+            "de": "Vorschaufunktion: Lautstärkeregelung mittels Chromecast",
+            "fr": "Fonctionnalité en aperçu: Régler le volume par Chromecast",
+        },
+        "field": {"checkbox": {"value": enabled}},
+    }
+
+
+def __cfg_volume_step(value: int):
+    return {
+        "id": "volume_step",
+        "label": {
+            "en": "Volume step in percent (Chromecast only)",
+            "de": "Lautstärkeregelung in Prozent (nur Chromecast)",
+            "fr": "Pallier de volume en pourcentage (Chromecast uniquement)",
+        },
+        "field": {"number": {"value": value, "min": 1, "max": 50, "steps": 1, "decimals": 0}},
+    }
+
+
+def __cfg_external_metadata(enabled: bool):
+    return {
+        "id": "external_metadata",
+        "label": {
+            "en": "Preview feature: Enable external Google Play metadata",
+            "de": "Vorschaufunktion: Aktiviere externe Google Play Metadaten",
+            "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes de Google Play",
+        },
+        "field": {"checkbox": {"value": enabled}},
+    }
