@@ -8,13 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+---
+
+## v0.7.3 - 2025-05-13
 ### Added
 - Configurable volume step when using Google Cast volume control. Contributed by @albaintor, thanks! ([#72](https://github.com/unfoldedcircle/integration-androidtv/pull/71))
-
 ### Fixed
-- Normal volume control with Android TV keycodes ([#72](https://github.com/unfoldedcircle/integration-androidtv/issues/72)).
-
----
+- Normal volume control with Android TV keycodes (regression in v0.7.0) ([#72](https://github.com/unfoldedcircle/integration-androidtv/issues/72)).
+### Changed
+- Pre-select configure action in setup-flow if a device exists ([#73](https://github.com/unfoldedcircle/integration-androidtv/pull/73)).
 
 ## v0.7.2 - 2025-04-27
 ### Changed
