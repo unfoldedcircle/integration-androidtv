@@ -40,7 +40,7 @@ class AtvDevice:
     """Enable Chromecast features."""
     use_chromecast_volume: bool = False
     """Enable volume driven by Chromecast protocol."""
-    volume_step: float = 10
+    volume_step: int = 10
     """Volume step (1 to 100)."""
 
 
