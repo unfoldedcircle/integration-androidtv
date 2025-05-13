@@ -313,6 +313,7 @@ async def handle_configuration_mode(
             return RequestUserInput(
                 {
                     "en": "Configure your Android TV",
+                    "de": "Konfiguriere deinen Android TV",
                     "fr": "Configurez votre Android TV",
                 },
                 [
