@@ -168,6 +168,7 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
 
         # TODO #9 externalize language texts
         # build user actions, based on available devices
+        selected_action_index = 0
         dropdown_actions = [
             {
                 "id": "add",
@@ -181,6 +182,8 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
 
         # add remove & reset actions if there's at least one configured device
         if dropdown_devices:
+            # pre-select configure action if at least one device exists
+            selected_action_index = 1
             dropdown_actions.append(
                 {
                     "id": "configure",
@@ -237,7 +240,7 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
                 {
                     "field": {
                         "dropdown": {
-                            "value": dropdown_actions[0]["id"],
+                            "value": dropdown_actions[selected_action_index]["id"],
                             "items": dropdown_actions,
                         }
                     },
