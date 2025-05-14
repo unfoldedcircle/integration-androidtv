@@ -409,7 +409,7 @@ async def main():
     logging.getLogger("setup_flow").setLevel(level)
     logging.getLogger("androidtvremote2").setLevel(level)
     logging.getLogger("external_metadata").setLevel(level)
-    # logging.getLogger("pychromecast").setLevel(level)
+    logging.getLogger("pychromecast").setLevel(level)
 
     profile_path = os.path.join(api.config_dir_path, "profiles")
     device_profile.load(profile_path)

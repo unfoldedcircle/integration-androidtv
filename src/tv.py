@@ -235,6 +235,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._muted = False
         self._is_chromecast_playing = False
         self._chromecast_metadata_active = False
+        self._emit_lock = asyncio.Lock()
 
     def __del__(self):
         """Destructs instance, disconnect AndroidTVRemote."""
@@ -910,7 +911,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 MediaAttr.SOURCE: "",
                 MediaAttr.MEDIA_IMAGE_URL: "",
             })
-            self.events.emit(Events.UPDATE, self._identifier, update)
+            async with self._emit_lock:
+                self.events.emit(Events.UPDATE, self._identifier, update)
             return
 
         # Device on homescreen or standby app
@@ -922,7 +924,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 MediaAttr.MEDIA_TITLE: "",
                 MediaAttr.MEDIA_IMAGE_URL: "",
             })
-            self.events.emit(Events.UPDATE, self._identifier, update)
+            async with self._emit_lock:
+                self.events.emit(Events.UPDATE, self._identifier, update)
             return
 
         # Chromecast status (only if enabled)
@@ -960,13 +963,13 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             metadata = await get_app_metadata(current_app)
             if metadata:
                 external_name = metadata.get("name")
-                external_icon = metadata.get("icon")
+                external_icon = metadata.get("icon") or HOMESCREEN_IMAGE
                 if _LOG.isEnabledFor(logging.DEBUG):
                     _LOG.debug("External app metadata: %s", filter_data_img_properties(metadata))
 
-        app_name = external_name or offline_name or offline_match or current_app
+        app_name = offline_name or offline_match or external_name or current_app
         self._media_app = app_name
-        self._app_image_url = external_icon or ""
+        self._app_image_url = external_icon if isinstance(external_icon, str) and external_icon.strip() else HOMESCREEN_IMAGE
 
         update[MediaAttr.SOURCE] = app_name
 
@@ -986,9 +989,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     chromecast_status.title, chromecast_status.artist, current_app
                 ) or external_icon or HOMESCREEN_IMAGE
             else:
-                self._media_image_url = external_icon or HOMESCREEN_IMAGE
+                self._media_image_url = external_icon
 
-            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._media_image_url)
+            # update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._media_image_url)
 
             update[MediaAttr.STATE] = GOOGLE_CAST_MEDIA_STATES_MAP.get(
                 chromecast_status.player_state, media_player.States.PLAYING
@@ -1000,7 +1003,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 MediaAttr.MEDIA_POSITION: int(chromecast_status.current_time or 0),
                 MediaAttr.MEDIA_DURATION: int(chromecast_status.duration or 0),
                 MediaAttr.SOURCE: app_name,
+                MediaAttr.MEDIA_IMAGE_URL: await encode_icon_to_data_uri(self._media_image_url),
             })
+
 
         # --- Chromecast Inactive or Disabled: App-level metadata only ---
         else:
@@ -1018,4 +1023,5 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 MediaAttr.MEDIA_DURATION: 0,
             })
 
-        self.events.emit(Events.UPDATE, self._identifier, update)
+        async with self._emit_lock:
+            self.events.emit(Events.UPDATE, self._identifier, update)
