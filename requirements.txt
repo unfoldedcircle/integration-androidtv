@@ -8,3 +8,4 @@ pychromecast~=14.0.7
 httpx~=0.28.1
 sanitize-filename~=1.2.0
 adb-shell==0.4.4
+simple-justwatch-python-api>=0.16

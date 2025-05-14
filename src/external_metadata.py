@@ -13,7 +13,8 @@ import os
 from io import BytesIO
 from pathlib import Path
 from typing import Dict
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
+import re
 
 import google_play_scraper
 import httpx
@@ -22,6 +23,7 @@ from PIL.Image import Resampling
 from pychromecast.controllers.media import MediaImage
 from sanitize_filename import sanitize
 from config import _get_config_root, _get_data_root
+from simplejustwatchapi import justwatch
 
 _LOG = logging.getLogger(__name__)
 
@@ -55,7 +57,6 @@ def _get_icon_path(icon_name: str) -> Path:
     if icon_name.startswith("config://"):
         return _get_config_root() / "icons" / sanitize(icon_name[9:])
     return _get_icon_dir() / sanitize(icon_name)
-
 
 # Cache Management
 def _load_cache() -> Dict[str, Dict[str, str]]:
@@ -216,4 +217,93 @@ async def get_app_metadata(package_id: str) -> Dict[str, str]:
         return {"name": metadata["name"], "icon": icon_data_uri}
 
     _LOG.debug("Falling back to default metadata for %s", package_id)
-    return {"name": package_id, "icon": ""}
+    return {"name": "", "icon": ""}
+
+
+async def youtube_search(query: str, limit: int = 1):
+    url = f"https://www.youtube.com/results?search_query={quote(query)}"
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    with httpx.Client(headers=headers, timeout=10) as client:
+        response = client.get(url)
+        html = response.text
+
+    # Extract the ytInitialData JSON
+    match = re.search(r"var ytInitialData = ({.*?});</script>", html)
+    if not match:
+        raise RuntimeError("Could not find ytInitialData in the page")
+
+    data = json.loads(match.group(1))
+
+    try:
+        items = (
+            data["contents"]["twoColumnSearchResultsRenderer"]
+            ["primaryContents"]["sectionListRenderer"]
+            ["contents"][0]["itemSectionRenderer"]["contents"]
+        )
+    except (KeyError, IndexError):
+        raise RuntimeError("Could not parse YouTube data structure")
+
+    for item in items:
+        if "videoRenderer" in item:
+            video = item["videoRenderer"]
+            video_id = video.get("videoId")
+
+            return f"https://img.youtube.com/vi/{video_id}/0.jpg"
+
+    return None
+
+async def search_poster_justwatch(query: str, country: str = "GB", limit: int = 1) -> list[dict]:
+    """Search for poster images using JustWatch API."""
+
+    response = justwatch.search(query, country, 'en', count=1, best_only=True)
+
+    if not response[0].poster:
+        return None
+    else:
+        poster_url = response[0].poster
+
+        if poster_url:
+            return poster_url
+
+    return None
+
+async def get_best_artwork(title: str, artist: str = None, current_package: str = None) -> Dict[str, str] | bool:
+    _LOG.debug("Resolving best artwork for title='%s', artist='%s', current_package='%s'", title, artist, current_package)
+
+    search_query = f"{title} - {artist}" if artist else title
+
+    if current_package in ["com.google.android.youtube.tv", "com.liskovsoft.videomanager", "com.teamsmart.videomanager.tv"]:
+
+        _LOG.debug("YouTube detected. Searching for artwork.")
+
+        youtube = await youtube_search(search_query)
+
+        if youtube:
+            _LOG.debug("Artwork result:\n%s", json.dumps(youtube, indent=2))
+            return youtube
+        else:
+            _LOG.debug("No artwork found from YouTube search.")
+
+    else:
+
+        _LOG.debug("Non-YouTube package detected. Searching for artwork.")
+        justwatch = await search_poster_justwatch(search_query)
+
+        if justwatch:
+            _LOG.debug("Artwork result:\n%s", json.dumps(justwatch, indent=2))
+            return justwatch
+        else:
+            _LOG.debug("No artwork found from JustWatch search.")
+
+    _LOG.debug("No artwork source applicable. Returning False.")
+    return None
+
+
+# async def test():
+#     posters = await get_best_artwork("Episode 1", "Breaking Bad", "com.plexapp.android")
+#     print(posters)
+#
+# asyncio.run(test())
