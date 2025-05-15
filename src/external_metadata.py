@@ -108,6 +108,60 @@ async def _download_and_resize_icon(url: str, package_id: str) -> str | None:
         return None
 
 
+# async def encode_icon_to_data_uri(icon_name: str) -> str:
+#     """
+#     Encode an image from a local file path or remote URL.
+#
+#     Returns a base64-encoded PNG data URI.
+#     """
+#     if isinstance(icon_name, MediaImage):
+#         icon_name = icon_name.url
+#
+#     if isinstance(icon_name, str) and icon_name.startswith("data:image"):
+#         _LOG.debug("Icon is already a data URI")
+#         return icon_name
+#
+#     _LOG.debug("Encoding icon to data URI: %s", icon_name)
+#     try:
+#         if _is_url(icon_name):
+#             async with httpx.AsyncClient() as client:
+#                 response = await client.get(icon_name, timeout=10)
+#                 response.raise_for_status()
+#                 img_bytes = BytesIO(response.content)
+#
+#             def encode_image() -> str:
+#                 img = Image.open(img_bytes)
+#                 img = img.convert("RGBA")
+#                 buffer = BytesIO()
+#                 img.save(buffer, format="PNG")
+#                 encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+#                 return f"data:image/png;base64,{encoded}"
+#
+#             return await asyncio.to_thread(encode_image)
+#
+#         def load_and_encode() -> str:
+#             icon_path = _get_icon_path(icon_name)
+#             if not icon_path.exists():
+#                 raise FileNotFoundError(f"Icon not found: {icon_name}")
+#             with open(icon_path, "rb") as f:
+#                 img = Image.open(f)
+#                 img.load()
+#                 img = img.convert("RGBA")
+#                 buffer = BytesIO()
+#                 img.save(buffer, format="PNG")
+#                 encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+#                 return f"data:image/png;base64,{encoded}"
+#
+#         return await asyncio.to_thread(load_and_encode)
+#
+#     except Exception as e:
+#         _LOG.warning("Failed to encode icon to base64 for %s: %s", icon_name, e)
+#         return ""
+
+
+_ENCODED_ICON_CACHE: dict[str, str] = {}
+_MISSING_ICON_CACHE: set[str] = set()
+
 async def encode_icon_to_data_uri(icon_name: str) -> str:
     """
     Encode an image from a local file path or remote URL.
@@ -121,7 +175,15 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
         _LOG.debug("Icon is already a data URI")
         return icon_name
 
+    if icon_name in _ENCODED_ICON_CACHE:
+        return _ENCODED_ICON_CACHE[icon_name]
+
+    if icon_name in _MISSING_ICON_CACHE:
+        _LOG.debug("Skipping encoding; previously failed: %s", icon_name)
+        return ""
+
     _LOG.debug("Encoding icon to data URI: %s", icon_name)
+
     try:
         if _is_url(icon_name):
             async with httpx.AsyncClient() as client:
@@ -137,12 +199,18 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
                 encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
                 return f"data:image/png;base64,{encoded}"
 
-            return await asyncio.to_thread(encode_image)
+            encoded = await asyncio.to_thread(encode_image)
+            _ENCODED_ICON_CACHE[icon_name] = encoded
+            return encoded
+
+        # Local file path
+        icon_path = _get_icon_path(icon_name)
+        if not icon_path.exists():
+            _LOG.warning("Icon not found on disk: %s", icon_path)
+            _MISSING_ICON_CACHE.add(icon_name)
+            return ""
 
         def load_and_encode() -> str:
-            icon_path = _get_icon_path(icon_name)
-            if not icon_path.exists():
-                raise FileNotFoundError(f"Icon not found: {icon_name}")
             with open(icon_path, "rb") as f:
                 img = Image.open(f)
                 img.load()
@@ -152,10 +220,13 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
                 encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
                 return f"data:image/png;base64,{encoded}"
 
-        return await asyncio.to_thread(load_and_encode)
+        encoded = await asyncio.to_thread(load_and_encode)
+        _ENCODED_ICON_CACHE[icon_name] = encoded
+        return encoded
 
     except Exception as e:
         _LOG.warning("Failed to encode icon to base64 for %s: %s", icon_name, e)
+        _MISSING_ICON_CACHE.add(icon_name)
         return ""
 
 
