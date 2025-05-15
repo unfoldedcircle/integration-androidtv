@@ -446,37 +446,11 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                     "fr": "Choisir votre Android TV",
                 },
             },
-            {
-                "id": "chromecast",
-                "label": {
-                    "en": "Preview feature: Enable Chromecast features",
-                    "de": "Vorschaufunktion: Aktiviere Chromecast-Features",
-                    "fr": "Fonctionnalité en aperçu: Activer les fonctionnalités de Chromecast",
-                },
-                "field": {"checkbox": {"value": False}},
-            },
-            {
-                "id": "external_metadata",
-                "label": {
-                    "en": "Preview feature: Enable external metadata",
-                    "de": "Vorschaufunktion: Aktiviere externe Metadaten",
-                    "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes",
-                },
-                "field": {"checkbox": {"value": False}},
-            },
-            {
-                "id": "adb",
-                "label": {
-                    "en": "Preview feature: Enable ADB connection (for app list)",
-                    "de": "Vorschaufunktion: Aktiviere ADB Verbindung (für App-Browsing)",
-                    "fr": "Fonctionnalité en aperçu: Activer la connexion ADB (pour la navigation dans les applications)",
-                },
-                "field": {"checkbox": {"value": False}},
-            },
             __cfg_use_chromecast(False),
             __cfg_chromecast_volume(False),
             __cfg_volume_step(10),
             __cfg_external_metadata(False),
+            __cfg_adb(False),
         ],
     )
 
