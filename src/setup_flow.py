@@ -54,6 +54,8 @@ _use_chromecast: bool = False
 _use_adb: bool = False
 _adb_device_id: str = ""
 _device_info: dict[str, str] = {}
+_use_chromecast_volume: bool = False
+_volume_step: int = 10
 
 # TODO #9 externalize language texts
 _user_input_discovery = RequestUserInput(
@@ -174,6 +176,7 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
 
         # TODO #9 externalize language texts
         # build user actions, based on available devices
+        selected_action_index = 0
         dropdown_actions = [
             {
                 "id": "add",
@@ -187,6 +190,8 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
 
         # add remove & reset actions if there's at least one configured device
         if dropdown_devices:
+            # pre-select configure action if at least one device exists
+            selected_action_index = 1
             dropdown_actions.append(
                 {
                     "id": "configure",
@@ -243,7 +248,7 @@ async def handle_driver_setup(msg: DriverSetupRequest) -> RequestUserInput | Set
                 {
                     "field": {
                         "dropdown": {
-                            "value": dropdown_actions[0]["id"],
+                            "value": dropdown_actions[selected_action_index]["id"],
                             "items": dropdown_actions,
                         }
                     },
@@ -315,12 +320,19 @@ async def handle_configuration_mode(
             _setup_step = SetupSteps.RECONFIGURE
             _reconfigured_device = selected_device
             use_chromecast = selected_device.use_chromecast if selected_device.use_chromecast else False
-            use_external_metadata = selected_device.use_external_metadata if selected_device.use_external_metadata else False
             use_adb = selected_device.use_adb if selected_device.use_adb else False
+            use_chromecast_volume = (
+                selected_device.use_chromecast_volume if selected_device.use_chromecast_volume else False
+            )
+            use_external_metadata = (
+                selected_device.use_external_metadata if selected_device.use_external_metadata else False
+            )
+            volume_step = selected_device.volume_step if selected_device.volume_step else 10
 
             return RequestUserInput(
                 {
                     "en": "Configure your Android TV",
+                    "de": "Konfiguriere deinen Android TV",
                     "fr": "Configurez votre Android TV",
                 },
                 [
@@ -351,6 +363,10 @@ async def handle_configuration_mode(
                         },
                         "field": {"checkbox": {"value": use_adb}},
                     },
+                    __cfg_use_chromecast(use_chromecast),
+                    __cfg_chromecast_volume(use_chromecast_volume),
+                    __cfg_volume_step(volume_step),
+                    __cfg_external_metadata(use_external_metadata),
                 ],
             )
         case "reset":
@@ -481,6 +497,10 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                 },
                 "field": {"checkbox": {"value": False}},
             },
+            __cfg_use_chromecast(False),
+            __cfg_chromecast_volume(False),
+            __cfg_volume_step(10),
+            __cfg_external_metadata(False),
         ],
     )
 
@@ -496,13 +516,17 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     """
     global _pairing_android_tv
     global _use_chromecast
+    global _use_chromecast_volume
     global _setup_step
     global _use_external_metadata
     global _use_adb
+    global _volume_step
 
     choice = msg.input_values["choice"]
     _use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
     _use_chromecast = msg.input_values.get("chromecast", "false") == "true"
+    _use_chromecast_volume = msg.input_values.get("chromecast_volume", "false") == "true"
+    _volume_step = int(msg.input_values.get("volume_step", 10))
     _use_adb = msg.input_values.get("adb", "false") == "true"
     name = ""
 
@@ -522,6 +546,8 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
             use_external_metadata=False,
             use_chromecast=False,
             use_adb=False,
+            use_chromecast_volume=_use_chromecast_volume,
+            volume_step=_volume_step,
         ),
     )
     _LOG.info("Chosen Android TV: %s. Start pairing process...", choice)
@@ -771,6 +797,10 @@ async def handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupEr
         model=_device_info.get("model", ""),
         use_external_metadata=_use_external_metadata,
         use_chromecast=_use_chromecast,
+        use_chromecast_volume=_use_chromecast_volume,
+        manufacturer=device_info.get("manufacturer", ""),
+        model=device_info.get("model", ""),
+        volume_step=_volume_step,
         use_adb=_use_adb,
     )
     _LOG.debug("Created AtvDevice: %s", device)
@@ -806,17 +836,27 @@ async def _handle_device_reconfigure(
         return SetupError()
 
     use_chromecast = msg.input_values.get("chromecast", "false") == "true"
+    use_chromecast_volume = msg.input_values.get("chromecast_volume", "false") == "true"
     use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
+    volume_step = int(msg.input_values.get("volume_step", 10))
     use_adb = msg.input_values.get("adb", "false") == "true"
 
     _LOG.debug("User has changed configuration")
     _reconfigured_device.use_chromecast = use_chromecast
+    _reconfigured_device.use_chromecast_volume = use_chromecast_volume
     _reconfigured_device.use_external_metadata = use_external_metadata
     _reconfigured_device.use_adb = use_adb
+    _reconfigured_device.volume_step = volume_step
 
     config.devices.add_or_update(_reconfigured_device)  # triggers ATV instance update
     await asyncio.sleep(1)
-    _LOG.info("Setup successfully completed for %s", _reconfigured_device.name)
+    _LOG.info(
+        "Setup successfully completed for %s (chromecast %s, external metadata %s, volume step %s)",
+        _reconfigured_device.name,
+        _reconfigured_device.use_chromecast,
+        _reconfigured_device.use_external_metadata,
+        _reconfigured_device.volume_step,
+    )
 
     return SetupComplete()
 
@@ -831,3 +871,51 @@ def _setup_error_from_device_state(state: tv.DeviceState) -> SetupError:
             error_type = IntegrationSetupError.CONNECTION_REFUSED
 
     return SetupError(error_type=error_type)
+
+
+def __cfg_use_chromecast(enabled: bool):
+    return {
+        "id": "chromecast",
+        "label": {
+            "en": "Preview feature: Enable Chromecast features",
+            "de": "Vorschaufunktion: Aktiviere Chromecast-Features",
+            "fr": "Fonctionnalité en aperçu: Activer les fonctionnalités de Chromecast",
+        },
+        "field": {"checkbox": {"value": enabled}},
+    }
+
+
+def __cfg_chromecast_volume(enabled: bool):
+    return {
+        "id": "chromecast_volume",
+        "label": {
+            "en": "Preview feature: Set volume through Chromecast",
+            "de": "Vorschaufunktion: Lautstärkeregelung mittels Chromecast",
+            "fr": "Fonctionnalité en aperçu: Régler le volume par Chromecast",
+        },
+        "field": {"checkbox": {"value": enabled}},
+    }
+
+
+def __cfg_volume_step(value: int):
+    return {
+        "id": "volume_step",
+        "label": {
+            "en": "Volume step in percent (Chromecast only)",
+            "de": "Lautstärkeregelung in Prozent (nur Chromecast)",
+            "fr": "Pallier de volume en pourcentage (Chromecast uniquement)",
+        },
+        "field": {"number": {"value": value, "min": 1, "max": 50, "steps": 1, "decimals": 0}},
+    }
+
+
+def __cfg_external_metadata(enabled: bool):
+    return {
+        "id": "external_metadata",
+        "label": {
+            "en": "Preview feature: Enable external Google Play metadata",
+            "de": "Vorschaufunktion: Aktiviere externe Google Play Metadaten",
+            "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes de Google Play",
+        },
+        "field": {"checkbox": {"value": enabled}},
+    }
