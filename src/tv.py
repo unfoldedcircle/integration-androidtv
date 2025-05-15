@@ -983,10 +983,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             if metadata:
                 external_name = metadata.get("name")
                 external_icon = metadata.get("icon")
-                if _LOG.isEnabledFor(logging.DEBUG):
-                    _LOG.debug("External app metadata: %s", filter_data_img_properties(metadata))
+                _LOG.debug("External app metadata: %s", filter_data_img_properties(metadata))
 
-        app_name = external_name or offline_name or offline_match or current_app
+        app_name = (external_name or offline_name or offline_match or current_app)
         self._media_app = app_name
         self._app_image_url = external_icon or ""
 
