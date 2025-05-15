@@ -320,7 +320,9 @@ async def handle_configuration_mode(
             _setup_step = SetupSteps.RECONFIGURE
             _reconfigured_device = selected_device
             use_chromecast = selected_device.use_chromecast if selected_device.use_chromecast else False
-            use_adb = selected_device.use_adb if selected_device.use_adb else False
+            use_adb = (
+                selected_device.use_adb if selected_device.use_adb else False
+            )
             use_chromecast_volume = (
                 selected_device.use_chromecast_volume if selected_device.use_chromecast_volume else False
             )
@@ -336,37 +338,11 @@ async def handle_configuration_mode(
                     "fr": "Configurez votre Android TV",
                 },
                 [
-                    {
-                        "id": "chromecast",
-                        "label": {
-                            "en": "Preview feature: Enable Chromecast features",
-                            "de": "Vorschaufunktion: Aktiviere Chromecast-Features",
-                            "fr": "Fonctionnalité en aperçu: Activer les fonctionnalités de Chromecast",
-                        },
-                        "field": {"checkbox": {"value": use_chromecast}},
-                    },
-                    {
-                        "id": "external_metadata",
-                        "label": {
-                            "en": "Preview feature: Enable external Google Play metadata",
-                            "de": "Vorschaufunktion: Aktiviere externe Google Play Metadaten",
-                            "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes de Google Play",
-                        },
-                        "field": {"checkbox": {"value": use_external_metadata}},
-                    },
-                    {
-                        "id": "adb",
-                        "label": {
-                            "en": "Preview feature: Enable ADB connection (for app list)",
-                            "de": "Vorschaufunktion: Aktiviere ADB Verbindung (für App-Browsing)",
-                            "fr": "Fonctionnalité en aperçu: Activer la connexion ADB (pour la navigation dans les applications)",
-                        },
-                        "field": {"checkbox": {"value": use_adb}},
-                    },
                     __cfg_use_chromecast(use_chromecast),
                     __cfg_chromecast_volume(use_chromecast_volume),
                     __cfg_volume_step(volume_step),
                     __cfg_external_metadata(use_external_metadata),
+                    __cfg_adb(use_adb),
                 ],
             )
         case "reset":
@@ -482,9 +458,9 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
             {
                 "id": "external_metadata",
                 "label": {
-                    "en": "Preview feature: Enable external Google Play metadata",
-                    "de": "Vorschaufunktion: Aktiviere externe Google Play Metadaten",
-                    "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes de Google Play",
+                    "en": "Preview feature: Enable external metadata",
+                    "de": "Vorschaufunktion: Aktiviere externe Metadaten",
+                    "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes",
                 },
                 "field": {"checkbox": {"value": False}},
             },
@@ -580,14 +556,167 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     return _setup_error_from_device_state(_pairing_android_tv.state)
 
 
+# async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | SetupComplete | SetupError:
+#     """
+#     Process user data pairing pin response in a setup process.
+#
+#     :param msg: response data from the requested user data
+#     :return: the setup action on how to continue.
+#     """
+#     global _pairing_android_tv
+#     global _setup_step
+#
+#     _LOG.debug("Entered handle_user_data_pin with msg: %s", msg)
+#
+#     if _pairing_android_tv is None:
+#         _LOG.error("Can't handle pairing pin: no device instance! Aborting setup")
+#         return SetupError()
+#
+#     _LOG.info("[%s] User has entered the PIN", _pairing_android_tv.log_id)
+#
+#     res = await _pairing_android_tv.finish_pairing(msg.input_values["pin"])
+#     _LOG.debug("[%s] finish_pairing result: %s", _pairing_android_tv.log_id, res)
+#
+#     _pairing_android_tv.disconnect()
+#     _LOG.debug("[%s] Disconnected after pairing attempt", _pairing_android_tv.log_id)
+#
+#     if res != ucapi.StatusCodes.OK:
+#         _LOG.warning("[%s] Pairing failed", _pairing_android_tv.log_id)
+#         return SetupError()
+#
+#     _LOG.info("[%s] Pairing done, retrieving device information", _pairing_android_tv.log_id)
+#     timeout = int(tv.CONNECTION_TIMEOUT)
+#     res = ucapi.StatusCodes.SERVER_ERROR
+#     _device_info = None
+#
+#     if await _pairing_android_tv.init(timeout):
+#         _LOG.debug("[%s] Initialization successful", _pairing_android_tv.log_id)
+#         if await _pairing_android_tv.connect(timeout):
+#             _LOG.debug("[%s] Connection successful", _pairing_android_tv.log_id)
+#             _device_info = _pairing_android_tv.device_info or {}
+#             _LOG.debug("[%s] Retrieved device info: %s", _pairing_android_tv.log_id, _device_info)
+#
+#             if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier, True):
+#                 res = ucapi.StatusCodes.OK
+#                 _LOG.debug("[%s] Default certificates assigned successfully", _pairing_android_tv.log_id)
+#
+#     _pairing_android_tv.disconnect()
+#     _LOG.debug("[%s] Disconnected after retrieving device information", _pairing_android_tv.log_id)
+#
+#     if res != ucapi.StatusCodes.OK:
+#         state = _pairing_android_tv.state
+#         _LOG.info("[%s] Setup failed: %s (state=%s)", _pairing_android_tv.log_id, res, state)
+#         _pairing_android_tv = None
+#         return _setup_error_from_device_state(state)
+#
+#     adb_apps = {}
+#     if _use_adb:
+#         _LOG.debug("ADB is enabled, proceeding with ADB setup")
+#
+#         if not msg.input_values.get("adb", False):
+#             _LOG.error("ADB setup failed: 'adb' not found in input values")
+#             return SetupError()
+#
+#         from adb_tv import adb_connect, get_installed_apps, is_authorised
+#
+#         device_id = _pairing_android_tv.identifier
+#         ip_address = _pairing_android_tv.address
+#         _LOG.debug("Attempting ADB setup for device_id: %s, ip_address: %s", device_id, ip_address)
+#
+#         adb_device = await adb_connect(device_id, ip_address)
+#         if not adb_device or not await is_authorised(adb_device):
+#             return SetupError(error_type=IntegrationSetupError.AUTHORIZATION_ERROR)
+#
+#         _LOG.debug("ADB authorisation confirmed")
+#         adb_apps = await get_installed_apps(adb_device)
+#         _LOG.debug("Retrieved ADB apps: %s", adb_apps)
+#         await adb_device.close()
+#
+#     from apps import Apps, IdMappings
+#     from external_metadata import get_app_metadata
+#
+#     offline_friendly_names = set(IdMappings.values())
+#     offline_package_ids = set(Apps.keys())
+#
+#     if _use_adb:
+#         filtered_adb_apps = {}
+#         for package, details in adb_apps.items():
+#             if package in Apps or package in IdMappings:
+#                 continue
+#             friendly = details.get("name", "")
+#             if friendly and friendly in offline_friendly_names:
+#                 continue
+#             filtered_adb_apps[package] = details
+#
+#         merged_apps = {**filtered_adb_apps, **Apps}
+#     else:
+#         merged_apps = Apps
+#
+#     _LOG.debug("Merged apps (offline preferred): %s", merged_apps)
+#
+#     app_entries = []
+#
+#     for package, details in merged_apps.items():
+#         mapped_name = IdMappings.get(package)
+#         name = mapped_name or details.get("name", package)
+#         editable = False
+#
+#         if _use_external_metadata and not mapped_name:
+#             try:
+#                 metadata = await get_app_metadata(package)
+#                 if metadata.get("name"):
+#                     name = metadata["name"]
+#                     editable = True
+#             except Exception as e:
+#                 _LOG.warning("Metadata lookup failed for %s: %s", package, e)
+#
+#         is_unfriendly = name.startswith("com.") or name.count('.') >= 2
+#         app_entries.append((is_unfriendly, name.lower(), package, name, editable))
+#
+#     app_entries.sort()
+#
+#     settings = []
+#
+#     for _, _, package, name, editable in app_entries:
+#         is_adb_only = _use_adb and package in adb_apps and package not in Apps
+#
+#         settings.append({
+#             "id": f"{package}_enabled",
+#             "label": {
+#                 "en": name if not is_adb_only else f"{package}",
+#                 "de": name if not is_adb_only else f"{package}",
+#                 "fr": name if not is_adb_only else f"{package}",
+#             },
+#             "field": {"checkbox": {"value": False}},
+#         })
+#
+#         if is_adb_only and editable:
+#             settings.append({
+#                 "id": f"{package}_name",
+#                 "label": {
+#                     "en": f"Friendly name for {package}",
+#                     "de": f"Anzeigename für {package}",
+#                     "fr": f"Nom convivial pour {package}",
+#                 },
+#                 "field": {"text": {"value": name}},
+#             })
+#
+#     _setup_step = SetupSteps.APP_SELECTION
+#     return RequestUserInput(
+#         title={
+#             "en": "Select visible apps",
+#             "de": "Wähle sichtbare Apps",
+#             "fr": "Sélectionnez les applications visibles",
+#         },
+#         settings=settings,
+#     )
+
 async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | SetupComplete | SetupError:
     """
     Process user data pairing pin response in a setup process.
 
-    Driver setup callback to provide requested user data during the setup process.
-
     :param msg: response data from the requested user data
-    :return: the setup action on how to continue: SetupComplete if a valid Android TV device was chosen.
+    :return: the setup action on how to continue.
     """
     global _pairing_android_tv
     global _setup_step
@@ -606,14 +735,14 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
     _pairing_android_tv.disconnect()
     _LOG.debug("[%s] Disconnected after pairing attempt", _pairing_android_tv.log_id)
 
-    if res == ucapi.StatusCodes.OK:
-        _LOG.info("[%s] Pairing done, retrieving device information", _pairing_android_tv.log_id)
-        res = ucapi.StatusCodes.SERVER_ERROR
-        timeout = int(tv.CONNECTION_TIMEOUT)
-        _LOG.debug("[%s] Attempting to initialize and connect with timeout: %d", _pairing_android_tv.log_id, timeout)
+    if res != ucapi.StatusCodes.OK:
+        _LOG.warning("[%s] Pairing failed", _pairing_android_tv.log_id)
+        return SetupError()
 
-    _device_info = None
+    _LOG.info("[%s] Pairing done, retrieving device information", _pairing_android_tv.log_id)
     timeout = int(tv.CONNECTION_TIMEOUT)
+    res = ucapi.StatusCodes.SERVER_ERROR
+    _device_info = None
 
     if await _pairing_android_tv.init(timeout):
         _LOG.debug("[%s] Initialization successful", _pairing_android_tv.log_id)
@@ -635,11 +764,12 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         _pairing_android_tv = None
         return _setup_error_from_device_state(state)
 
+    adb_apps = {}
     if _use_adb:
         _LOG.debug("ADB is enabled, proceeding with ADB setup")
 
         if not msg.input_values.get("adb", False):
-            _LOG.error("ADB setup failed: 'use_adb' not found in input values")
+            _LOG.error("ADB setup failed: 'adb' not found in input values")
             return SetupError()
 
         from adb_tv import adb_connect, get_installed_apps, is_authorised
@@ -649,53 +779,41 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         _LOG.debug("Attempting ADB setup for device_id: %s, ip_address: %s", device_id, ip_address)
 
         adb_device = await adb_connect(device_id, ip_address)
-        if not adb_device:
-            return SetupError(error_type=IntegrationSetupError.AUTHORIZATION_ERROR)
-
-        if not await is_authorised(adb_device):
+        if not adb_device or not await is_authorised(adb_device):
             return SetupError(error_type=IntegrationSetupError.AUTHORIZATION_ERROR)
 
         _LOG.debug("ADB authorisation confirmed")
-
-    from apps import Apps, IdMappings
-    from external_metadata import get_app_metadata
-
-    # STEP 1: Resolve canonical friendly names used in offline mappings
-    offline_friendly_names = set(IdMappings.values())
-    offline_package_ids = set(Apps.keys())
-
-    if _use_adb:
         adb_apps = await get_installed_apps(adb_device)
         _LOG.debug("Retrieved ADB apps: %s", adb_apps)
         await adb_device.close()
 
-        # STEP 2: Remove ADB entries that duplicate an offline friendly name
+    from apps import Apps, IdMappings
+    from external_metadata import get_app_metadata
+
+    offline_friendly_names = set(IdMappings.values())
+    offline_package_ids = set(Apps.keys())
+
+    if _use_adb:
         filtered_adb_apps = {}
         for package, details in adb_apps.items():
-            if package in Apps:
-                continue  # Already covered offline (exact match)
-            if package in IdMappings:
-                continue  # Already has a mapped friendly name offline
+            if package in Apps or package in IdMappings:
+                continue
             friendly = details.get("name", "")
-            if friendly and friendly in IdMappings.values():
-                continue  # Another offline app already uses this friendly name
+            if friendly and friendly in offline_friendly_names:
+                continue
             filtered_adb_apps[package] = details
 
-
-        # STEP 3: Merge with Apps, giving priority to offline Apps
         merged_apps = {**filtered_adb_apps, **Apps}
     else:
         merged_apps = Apps
 
     _LOG.debug("Merged apps (offline preferred): %s", merged_apps)
 
-    # STEP 4: Build app list for rendering
     app_entries = []
 
     for package, details in merged_apps.items():
         mapped_name = IdMappings.get(package)
-        static_name = details.get("name", package)
-        name = mapped_name or static_name
+        name = mapped_name or details.get("name", package)
         editable = False
 
         if _use_external_metadata and not mapped_name:
@@ -703,46 +821,40 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
                 metadata = await get_app_metadata(package)
                 if metadata.get("name"):
                     name = metadata["name"]
-                    editable = True  # Only editable if name came from metadata
+                    editable = True
             except Exception as e:
                 _LOG.warning("Metadata lookup failed for %s: %s", package, e)
 
         is_unfriendly = name.startswith("com.") or name.count('.') >= 2
         app_entries.append((is_unfriendly, name.lower(), package, name, editable))
 
-    # STEP 5: Sort by friendly/unfriendly then alphabetically
     app_entries.sort()
 
     settings = []
 
-    # STEP 6: Output settings based on filtered and sorted entries
     for _, _, package, name, editable in app_entries:
         is_adb_only = _use_adb and package in adb_apps and package not in Apps
 
-        settings.append(
-            {
-                "id": f"{package}_enabled",
-                "label": {
-                    "en": name if not is_adb_only else f"{package}",
-                    "de": name if not is_adb_only else f"{package}",
-                    "fr": name if not is_adb_only else f"{package}",
-                },
-                "field": {"checkbox": {"value": False}},
-            }
-        )
+        settings.append({
+            "id": f"{package}_enabled",
+            "label": {
+                "en": name if not is_adb_only else f"{package}",
+                "de": name if not is_adb_only else f"{package}",
+                "fr": name if not is_adb_only else f"{package}",
+            },
+            "field": {"checkbox": {"value": False}},
+        })
 
-        if is_adb_only and editable:
-            settings.append(
-                {
-                    "id": f"{package}_name",
-                    "label": {
-                        "en": f"Friendly name for {package}",
-                        "de": f"Anzeigename für {package}",
-                        "fr": f"Nom convivial pour {package}",
-                    },
-                    "field": {"text": {"value": name}},
-                }
-            )
+        if is_adb_only or editable:
+            settings.append({
+                "id": f"{package}_name",
+                "label": {
+                    "en": f"Friendly name for {package}",
+                    "de": f"Anzeigename für {package}",
+                    "fr": f"Nom convivial pour {package}",
+                },
+                "field": {"text": {"value": name}},
+            })
 
     _setup_step = SetupSteps.APP_SELECTION
     return RequestUserInput(
@@ -798,8 +910,6 @@ async def handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupEr
         use_external_metadata=_use_external_metadata,
         use_chromecast=_use_chromecast,
         use_chromecast_volume=_use_chromecast_volume,
-        manufacturer=device_info.get("manufacturer", ""),
-        model=device_info.get("model", ""),
         volume_step=_volume_step,
         use_adb=_use_adb,
     )
@@ -913,9 +1023,20 @@ def __cfg_external_metadata(enabled: bool):
     return {
         "id": "external_metadata",
         "label": {
-            "en": "Preview feature: Enable external Google Play metadata",
-            "de": "Vorschaufunktion: Aktiviere externe Google Play Metadaten",
-            "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes de Google Play",
+            "en": "Preview feature: Enable external metadata",
+            "de": "Vorschaufunktion: Aktiviere externe Metadaten",
+            "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes",
+        },
+        "field": {"checkbox": {"value": enabled}},
+    }
+
+def __cfg_adb(enabled: bool):
+    return {
+        "id": "adb",
+        "label": {
+            "en": "Preview feature: Enable ADB connection (for app list)",
+            "de": "Vorschaufunktion: Aktiviere ADB Verbindung (für App-Browsing)",
+            "fr": "Fonctionnalité en aperçu: Activer la connexion ADB (pour la navigation dans les applications)",
         },
         "field": {"checkbox": {"value": enabled}},
     }
