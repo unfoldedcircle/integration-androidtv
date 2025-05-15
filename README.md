@@ -8,8 +8,8 @@ Button control and ON/OFF states are supported. With the optional Google Cast su
 retrieved from supported apps.  
 The application source list is limited to a predefined list, as retrieving the installed apps is not possible.
 
-This integration is included in the Remote Two and Remote 3 firmware, and no external service must be run to connect with
-Android TV devices. It can be run as an external integration for development
+This integration is included in the Remote Two and Remote 3 firmware, and no external service must be run to connect
+with Android TV devices. It can be run as an external integration for development.
 
 - [Requirements and setting](docs/settings.md).
 - Multiple Android TV devices are supported with version 0.5.0 and newer.
@@ -21,6 +21,7 @@ Android TV devices. It can be run as an external integration for development
 Preview features:
 - Optional external metadata lookup using the Google Play Store for friendly application name and icon.
 - Google Cast support to retrieve media-playing information.
+- Google Cast volume control with configurable volume step.
 
 The preview features are not enabled by default. They can be enabled in the device configuration of the setup flow.
 

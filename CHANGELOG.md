@@ -10,6 +10,10 @@ _Changes in the next release_
 
 ---
 
+## v0.7.4 - 2025-05-15
+### Fixed
+- Sporadic media image URL replacement with an invalid URL ([#75](https://github.com/unfoldedcircle/integration-androidtv/pull/75)).
+
 ## v0.7.3 - 2025-05-13
 ### Added
 - Configurable volume step when using Google Cast volume control. Contributed by @albaintor, thanks! ([#72](https://github.com/unfoldedcircle/integration-androidtv/pull/71))
