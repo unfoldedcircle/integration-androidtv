@@ -9,12 +9,11 @@ import asyncio
 import base64
 import json
 import logging
-import os
+import re
 from io import BytesIO
 from pathlib import Path
 from typing import Dict
-from urllib.parse import urlparse, quote
-import re
+from urllib.parse import quote, urlparse
 
 import google_play_scraper
 import httpx
@@ -22,8 +21,9 @@ from PIL import Image
 from PIL.Image import Resampling
 from pychromecast.controllers.media import MediaImage
 from sanitize_filename import sanitize
-from config import _get_config_root, _get_data_root
 from simplejustwatchapi import justwatch
+
+from config import _get_config_root, _get_data_root
 
 _LOG = logging.getLogger(__name__)
 
@@ -57,6 +57,7 @@ def _get_icon_path(icon_name: str) -> Path:
     if icon_name.startswith("config://"):
         return _get_config_root() / "icons" / sanitize(icon_name[9:])
     return _get_icon_dir() / sanitize(icon_name)
+
 
 # Cache Management
 def _load_cache() -> Dict[str, Dict[str, str]]:
@@ -161,6 +162,7 @@ async def _download_and_resize_icon(url: str, package_id: str) -> str | None:
 
 _ENCODED_ICON_CACHE: dict[str, str] = {}
 _MISSING_ICON_CACHE: set[str] = set()
+
 
 async def encode_icon_to_data_uri(icon_name: str) -> str:
     """
@@ -291,11 +293,10 @@ async def get_app_metadata(package_id: str) -> Dict[str, str]:
     return {"name": "", "icon": ""}
 
 
-async def youtube_search(query: str, limit: int = 1):
+async def youtube_search(query: str):
+    """Search for poster images using YouTube."""
     url = f"https://www.youtube.com/results?search_query={quote(query)}"
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
+    headers = {"User-Agent": "Mozilla/5.0"}
 
     with httpx.Client(headers=headers, timeout=10) as client:
         response = client.get(url)
@@ -309,11 +310,9 @@ async def youtube_search(query: str, limit: int = 1):
     data = json.loads(match.group(1))
 
     try:
-        items = (
-            data["contents"]["twoColumnSearchResultsRenderer"]
-            ["primaryContents"]["sectionListRenderer"]
-            ["contents"][0]["itemSectionRenderer"]["contents"]
-        )
+        items = data["contents"]["twoColumnSearchResultsRenderer"]["primaryContents"]["sectionListRenderer"][
+            "contents"
+        ][0]["itemSectionRenderer"]["contents"]
     except (KeyError, IndexError):
         raise RuntimeError("Could not parse YouTube data structure")
 
@@ -326,27 +325,35 @@ async def youtube_search(query: str, limit: int = 1):
 
     return None
 
-async def search_poster_justwatch(query: str, country: str = "GB", limit: int = 1) -> list[dict]:
-    """Search for poster images using JustWatch API."""
 
-    response = justwatch.search(query, country, 'en', count=1, best_only=True)
+async def search_poster_justwatch(query: str, country: str = "GB") -> str | None:
+    """Search for poster images using JustWatch API."""
+    response = justwatch.search(query, country, "en", count=1, best_only=True)
 
     if not response[0].poster:
         return None
-    else:
-        poster_url = response[0].poster
 
-        if poster_url:
-            return poster_url
+    poster_url = response[0].poster
+
+    if poster_url:
+        return poster_url
 
     return None
 
-async def get_best_artwork(title: str, artist: str = None, current_package: str = None) -> Dict[str, str] | bool:
-    _LOG.debug("Resolving best artwork for title='%s', artist='%s', current_package='%s'", title, artist, current_package)
+
+async def get_best_artwork(title: str, artist: str = None, current_package: str = None) -> str | None:
+    """Get artwork for a TV show or movie based on current app and title/artist."""
+    _LOG.debug(
+        "Resolving best artwork for title='%s', artist='%s', current_package='%s'", title, artist, current_package
+    )
 
     search_query = f"{title} - {artist}" if artist else title
 
-    if current_package in ["com.google.android.youtube.tv", "com.liskovsoft.videomanager", "com.teamsmart.videomanager.tv"]:
+    if current_package in [
+        "com.google.android.youtube.tv",
+        "com.liskovsoft.videomanager",
+        "com.teamsmart.videomanager.tv",
+    ]:
 
         _LOG.debug("YouTube detected. Searching for artwork.")
 
@@ -355,19 +362,17 @@ async def get_best_artwork(title: str, artist: str = None, current_package: str 
         if youtube:
             _LOG.debug("Artwork result:\n%s", json.dumps(youtube, indent=2))
             return youtube
-        else:
-            _LOG.debug("No artwork found from YouTube search.")
+        _LOG.debug("No artwork found from YouTube search.")
 
     else:
 
         _LOG.debug("Non-YouTube package detected. Searching for artwork.")
-        justwatch = await search_poster_justwatch(search_query)
+        justwatch_poster = await search_poster_justwatch(search_query)
 
-        if justwatch:
+        if justwatch_poster:
             _LOG.debug("Artwork result:\n%s", json.dumps(justwatch, indent=2))
-            return justwatch
-        else:
-            _LOG.debug("No artwork found from JustWatch search.")
+            return justwatch_poster
+        _LOG.debug("No artwork found from JustWatch search.")
 
     _LOG.debug("No artwork source applicable. Returning False.")
     return None

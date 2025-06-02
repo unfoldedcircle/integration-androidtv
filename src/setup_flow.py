@@ -6,6 +6,7 @@ Setup flow for Android TV Remote integration.
 """
 
 import asyncio
+import json
 import logging
 import os
 from enum import IntEnum
@@ -27,7 +28,10 @@ from ucapi import (
 import config
 import discover
 import tv
+from adb_tv import adb_connect, get_installed_apps, is_authorised
+from apps import Apps, IdMappings
 from config import AtvDevice, _get_config_root
+from external_metadata import get_app_metadata
 
 _LOG = logging.getLogger(__name__)
 
@@ -320,9 +324,7 @@ async def handle_configuration_mode(
             _setup_step = SetupSteps.RECONFIGURE
             _reconfigured_device = selected_device
             use_chromecast = selected_device.use_chromecast if selected_device.use_chromecast else False
-            use_adb = (
-                selected_device.use_adb if selected_device.use_adb else False
-            )
+            use_adb = selected_device.use_adb if selected_device.use_adb else False
             use_chromecast_volume = (
                 selected_device.use_chromecast_volume if selected_device.use_chromecast_volume else False
             )
@@ -529,6 +531,7 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
 
     return _setup_error_from_device_state(_pairing_android_tv.state)
 
+
 async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | SetupComplete | SetupError:
     """
     Process user data pairing pin response in a setup process.
@@ -590,8 +593,6 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
             _LOG.error("ADB setup failed: 'adb' not found in input values")
             return SetupError()
 
-        from adb_tv import adb_connect, get_installed_apps, is_authorised
-
         device_id = _pairing_android_tv.identifier
         ip_address = _pairing_android_tv.address
         _LOG.debug("Attempting ADB setup for device_id: %s, ip_address: %s", device_id, ip_address)
@@ -605,11 +606,8 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
         _LOG.debug("Retrieved ADB apps: %s", adb_apps)
         await adb_device.close()
 
-    from apps import Apps, IdMappings
-    from external_metadata import get_app_metadata
-
     offline_friendly_names = set(IdMappings.values())
-    offline_package_ids = set(Apps.keys())
+    # offline_package_ids = set(Apps.keys())
 
     if _use_adb:
         filtered_adb_apps = {}
@@ -643,7 +641,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
             except Exception as e:
                 _LOG.warning("Metadata lookup failed for %s: %s", package, e)
 
-        is_unfriendly = name.startswith("com.") or name.count('.') >= 2
+        is_unfriendly = name.startswith("com.") or name.count(".") >= 2
         app_entries.append((is_unfriendly, name.lower(), package, name, editable))
 
     app_entries.sort()
@@ -653,26 +651,30 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
     for _, _, package, name, editable in app_entries:
         is_adb_only = _use_adb and package in adb_apps and package not in Apps
 
-        settings.append({
-            "id": f"{package}_enabled",
-            "label": {
-                "en": name if not is_adb_only else f"{package}",
-                "de": name if not is_adb_only else f"{package}",
-                "fr": name if not is_adb_only else f"{package}",
-            },
-            "field": {"checkbox": {"value": False}},
-        })
+        settings.append(
+            {
+                "id": f"{package}_enabled",
+                "label": {
+                    "en": name if not is_adb_only else f"{package}",
+                    "de": name if not is_adb_only else f"{package}",
+                    "fr": name if not is_adb_only else f"{package}",
+                },
+                "field": {"checkbox": {"value": False}},
+            }
+        )
 
         if is_adb_only or editable:
-            settings.append({
-                "id": f"{package}_name",
-                "label": {
-                    "en": f"Friendly name for {package}",
-                    "de": f"Anzeigename für {package}",
-                    "fr": f"Nom convivial pour {package}",
-                },
-                "field": {"text": {"value": name}},
-            })
+            settings.append(
+                {
+                    "id": f"{package}_name",
+                    "label": {
+                        "en": f"Friendly name for {package}",
+                        "de": f"Anzeigename für {package}",
+                        "fr": f"Nom convivial pour {package}",
+                    },
+                    "field": {"text": {"value": name}},
+                }
+            )
 
     _setup_step = SetupSteps.APP_SELECTION
     return RequestUserInput(
@@ -687,14 +689,6 @@ async def handle_user_data_pin(msg: UserDataResponse) -> RequestUserInput | Setu
 
 async def handle_app_selection(msg: UserDataResponse) -> SetupComplete | SetupError:
     global _pairing_android_tv
-    global _use_chromecast
-    global _use_external_metadata
-    global _use_adb
-    global _device_info
-
-    import json
-
-    from apps import Apps  # offline apps
 
     selected_apps = {}
 
@@ -847,6 +841,7 @@ def __cfg_external_metadata(enabled: bool):
         },
         "field": {"checkbox": {"value": enabled}},
     }
+
 
 def __cfg_adb(enabled: bool):
     return {

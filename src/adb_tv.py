@@ -1,10 +1,10 @@
 """
 This module provides utilities for interacting with Android TVs via ADB (Android Debug Bridge).
+
 It includes functions for managing ADB keys, connecting to devices, retrieving installed apps,
 and verifying device authorization.
 """
 
-import asyncio
 import os
 from pathlib import Path
 from typing import Dict, Optional
@@ -47,9 +47,9 @@ def load_or_generate_adb_keys(device_id: str) -> PythonRSASigner:
     if not priv_path.exists() or not pub_path.exists():
         keygen(str(priv_path))
 
-    with open(priv_path) as f:
+    with open(priv_path, encoding="utf-8") as f:
         priv = f.read()
-    with open(pub_path) as f:
+    with open(pub_path, encoding="utf-8") as f:
         pub = f.read()
     return PythonRSASigner(pub, priv)
 

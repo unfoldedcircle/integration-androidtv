@@ -51,7 +51,11 @@ import apps
 import discover
 import inputs
 from config import AtvDevice, _get_config_root
-from external_metadata import encode_icon_to_data_uri, get_app_metadata, get_best_artwork
+from external_metadata import (
+    encode_icon_to_data_uri,
+    get_app_metadata,
+    get_best_artwork,
+)
 from profiles import KeyPress, Profile
 from util import filter_data_img_properties
 
@@ -603,13 +607,13 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     # Callbacks
 
-    def _is_on_updated(self, is_on: bool) -> None:
+    def _is_on_updated(self, _is_on: bool) -> None:
         if not self._loop or not self._loop.is_running():
             _LOG.warning("[%s] No running event loop for power update", self.log_id)
             return
         asyncio.run_coroutine_threadsafe(self._update_media_status(), self._loop)
 
-    def _current_app_updated(self, current_app: str) -> None:
+    def _current_app_updated(self, _current_app: str) -> None:
         if not self._loop or not self._loop.is_running():
             _LOG.warning("[%s] No running event loop for app update", self.log_id)
             return
@@ -644,7 +648,6 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 _LOG.warning("Failed to read apps list from %s: %s", apps_file, e)
         else:
             _LOG.info("No saved app list found for %s, falling back to default", self._identifier)
-            import apps  # fall back to static apps
 
             source_list.extend(apps.Apps.keys())
 
@@ -701,6 +704,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     async def select_source(self, source: str) -> ucapi.StatusCodes:
         """
+        Launch an app on the Android TV or select in input source on a TV running Android TV.
+
         Select a given source, either a user-defined app (from JSON),
         an input source (KeyCode), or directly by app-link / id.
 
@@ -749,13 +754,13 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         :return: OK if scheduled to be sent, other error code in case of an error
 
         """  # noqa
-        if action == 'TEXT':
+        if action == "TEXT":
             # Special handling for text input
             if not isinstance(keycode, str):
                 _LOG.error("[%s] Cannot send command, invalid key_code: %s", self.log_id, keycode)
                 return ucapi.StatusCodes.BAD_REQUEST
-            if keycode in ('DEL', 'ENTER'):
-                self._atv.send_key_command(keycode, 'SHORT')
+            if keycode in ("DEL", "ENTER"):
+                self._atv.send_key_command(keycode, "SHORT")
             else:
                 self._atv.send_text(keycode)
             return ucapi.StatusCodes.OK
@@ -804,6 +809,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         _LOG.info("[%s] Received Chromecast connection status : %s", self.log_id, status)
 
     def new_media_status(self, status: MediaStatus) -> None:
+        """Receive new media status event from Google cast."""
         if not self._loop or not self._loop.is_running():
             _LOG.warning("[%s] No running event loop for Chromecast status", self.log_id)
             return
@@ -926,24 +932,30 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         # Device is OFF
         if not is_on:
             self._chromecast_metadata_active = False
-            update.update({
-                MediaAttr.STATE: media_player.States.OFF.value,
-                MediaAttr.MEDIA_TITLE: "",
-                MediaAttr.SOURCE: "",
-                MediaAttr.MEDIA_IMAGE_URL: "",
-            })
+            update.update(
+                {
+                    MediaAttr.STATE: media_player.States.OFF.value,
+                    MediaAttr.MEDIA_TITLE: "",
+                    MediaAttr.SOURCE: "",
+                    MediaAttr.MEDIA_IMAGE_URL: "",
+                }
+            )
             self.events.emit(Events.UPDATE, self._identifier, update)
             return
 
         # Device on homescreen or standby app
         if homescreen_app or standby_app:
             self._chromecast_metadata_active = False
-            update.update({
-                MediaAttr.STATE: media_player.States.ON.value if homescreen_app else media_player.States.STANDBY.value,
-                MediaAttr.SOURCE: "",
-                MediaAttr.MEDIA_TITLE: "",
-                MediaAttr.MEDIA_IMAGE_URL: "",
-            })
+            update.update(
+                {
+                    MediaAttr.STATE: (
+                        media_player.States.ON.value if homescreen_app else media_player.States.STANDBY.value
+                    ),
+                    MediaAttr.SOURCE: "",
+                    MediaAttr.MEDIA_TITLE: "",
+                    MediaAttr.MEDIA_IMAGE_URL: "",
+                }
+            )
             self.events.emit(Events.UPDATE, self._identifier, update)
             return
 
@@ -960,19 +972,17 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._device_config.use_chromecast and self._chromecast:
             chromecast_status = self._chromecast.media_controller.status
             chromecast_active = (
-                    self._chromecast.socket_client.is_connected and
-                    chromecast_status and
-                    chromecast_status.player_state in chromecast_playing_states and
-                    (chromecast_status.title or chromecast_status.images)
+                self._chromecast.socket_client.is_connected
+                and chromecast_status
+                and chromecast_status.player_state in chromecast_playing_states
+                and (chromecast_status.title or chromecast_status.images)
             )
 
         self._chromecast_metadata_active = chromecast_active
 
         # App metadata from offline mappings
         offline_name = apps.IdMappings.get(current_app)
-        offline_match = next(
-            (name for query, name in apps.NameMatching.items() if query in current_app), None
-        )
+        offline_match = next((name for query, name in apps.NameMatching.items() if query in current_app), None)
 
         external_name = None
         external_icon = None
@@ -985,7 +995,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 external_icon = metadata.get("icon")
                 _LOG.debug("External app metadata: %s", filter_data_img_properties(metadata))
 
-        app_name = (external_name or offline_name or offline_match or current_app)
+        app_name = external_name or offline_name or offline_match or current_app
         self._media_app = app_name
         self._app_image_url = external_icon or ""
 
@@ -994,7 +1004,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         # --- Chromecast Active State Handling ---
         if chromecast_active:
             # Media Title from Chromecast (fallback to app_name)
-            self._media_title = chromecast_status.title if chromecast_status.title is not None else chromecast_status.artist or ""
+            self._media_title = (
+                chromecast_status.title if chromecast_status.title is not None else chromecast_status.artist or ""
+            )
             update[MediaAttr.MEDIA_TITLE] = self._media_title or chromecast_status.artist
 
             # Media Image from Chromecast
@@ -1002,10 +1014,16 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 self._media_image_url = chromecast_status.images[0].url
 
             # External Artwork fallback (if enabled)
-            elif self._device_config.use_external_metadata and chromecast_status.player_state in ["PLAYING", "PAUSED", "BUFFERING"]:
-                self._media_image_url = await get_best_artwork(
-                    chromecast_status.title, chromecast_status.artist, current_app
-                ) or external_icon or HOMESCREEN_IMAGE
+            elif self._device_config.use_external_metadata and chromecast_status.player_state in [
+                "PLAYING",
+                "PAUSED",
+                "BUFFERING",
+            ]:
+                self._media_image_url = (
+                    await get_best_artwork(chromecast_status.title, chromecast_status.artist, current_app)
+                    or external_icon
+                    or HOMESCREEN_IMAGE
+                )
             else:
                 self._media_image_url = external_icon or HOMESCREEN_IMAGE
 
@@ -1015,28 +1033,32 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 chromecast_status.player_state, media_player.States.PLAYING
             )
 
-            update.update({
-                MediaAttr.MEDIA_ARTIST: chromecast_status.artist or "",
-                MediaAttr.MEDIA_ALBUM: chromecast_status.album_name or "",
-                MediaAttr.MEDIA_POSITION: int(chromecast_status.current_time or 0),
-                MediaAttr.MEDIA_DURATION: int(chromecast_status.duration or 0),
-                MediaAttr.SOURCE: app_name,
-            })
+            update.update(
+                {
+                    MediaAttr.MEDIA_ARTIST: chromecast_status.artist or "",
+                    MediaAttr.MEDIA_ALBUM: chromecast_status.album_name or "",
+                    MediaAttr.MEDIA_POSITION: int(chromecast_status.current_time or 0),
+                    MediaAttr.MEDIA_DURATION: int(chromecast_status.duration or 0),
+                    MediaAttr.SOURCE: app_name,
+                }
+            )
 
         # --- Chromecast Inactive or Disabled: App-level metadata only ---
         else:
             self._media_title = app_name
             self._media_image_url = self._app_image_url or HOMESCREEN_IMAGE
 
-            update.update({
-                MediaAttr.MEDIA_TITLE: app_name,
-                MediaAttr.MEDIA_IMAGE_URL: await encode_icon_to_data_uri(self._media_image_url),
-                MediaAttr.STATE: media_player.States.PLAYING.value,
-                MediaAttr.SOURCE: app_name,
-                MediaAttr.MEDIA_ARTIST: "",
-                MediaAttr.MEDIA_ALBUM: "",
-                MediaAttr.MEDIA_POSITION: 0,
-                MediaAttr.MEDIA_DURATION: 0,
-            })
+            update.update(
+                {
+                    MediaAttr.MEDIA_TITLE: app_name,
+                    MediaAttr.MEDIA_IMAGE_URL: await encode_icon_to_data_uri(self._media_image_url),
+                    MediaAttr.STATE: media_player.States.PLAYING.value,
+                    MediaAttr.SOURCE: app_name,
+                    MediaAttr.MEDIA_ARTIST: "",
+                    MediaAttr.MEDIA_ALBUM: "",
+                    MediaAttr.MEDIA_POSITION: 0,
+                    MediaAttr.MEDIA_DURATION: 0,
+                }
+            )
 
         self.events.emit(Events.UPDATE, self._identifier, update)
