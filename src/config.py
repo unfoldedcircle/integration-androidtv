@@ -11,11 +11,25 @@ import json
 import logging
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterator
 
 _LOG = logging.getLogger(__name__)
 
 _CFG_FILENAME = "config.json"
+
+
+# Paths
+def _get_config_root() -> Path:
+    config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
+    config_home.mkdir(parents=True, exist_ok=True)
+    return config_home
+
+
+def _get_data_root() -> Path:
+    data_home = Path(os.environ.get("UC_DATA_HOME", "./data"))
+    data_home.mkdir(parents=True, exist_ok=True)
+    return data_home
 
 
 @dataclass
@@ -38,6 +52,8 @@ class AtvDevice:
     """Enable External Metadata."""
     use_chromecast: bool = False
     """Enable Chromecast features."""
+    use_adb: bool = False
+    """Enable ADB features."""
     use_chromecast_volume: bool = False
     """Enable volume driven by Chromecast protocol."""
     volume_step: int = 10
@@ -137,6 +153,7 @@ class Devices:
                 item.auth_error = atv.auth_error
                 item.use_external_metadata = atv.use_external_metadata
                 item.use_chromecast = atv.use_chromecast
+                item.use_adb = atv.use_adb
                 item.use_chromecast_volume = atv.use_chromecast_volume
                 item.volume_step = atv.volume_step if atv.volume_step else 10
                 return self.store()
@@ -144,19 +161,19 @@ class Devices:
 
     def default_certfile(self) -> str:
         """Return the default certificate file for initializing a device."""
-        return os.path.join(self._data_path, "androidtv_remote_cert.pem")
+        return os.path.join(self._data_path + "/certs", "androidtv_remote_cert.pem")
 
     def default_keyfile(self) -> str:
         """Return the default key file for initializing a device."""
-        return os.path.join(self._data_path, "androidtv_remote_key.pem")
+        return os.path.join(self._data_path + "/certs", "androidtv_remote_key.pem")
 
     def certfile(self, atv_id: str) -> str:
         """Return the certificate file of the device."""
-        return os.path.join(self._data_path, f"androidtv_{atv_id}_remote_cert.pem")
+        return os.path.join(self._data_path + "/certs", f"androidtv_{atv_id}_remote_cert.pem")
 
     def keyfile(self, atv_id: str) -> str:
         """Return the key file of the device."""
-        return os.path.join(self._data_path, f"androidtv_{atv_id}_remote_key.pem")
+        return os.path.join(self._data_path + "/certs", f"androidtv_{atv_id}_remote_key.pem")
 
     def remove(self, atv_id: str) -> bool:
         """Remove the given device configuration."""
@@ -242,6 +259,7 @@ class Devices:
                     item.get("auth_error", False),
                     item.get("use_external_metadata", False),
                     item.get("use_chromecast", False),
+                    item.get("use_adb", False),
                     item.get("use_chromecast_volume", False),
                     item.get("volume_step", 10),
                 )
