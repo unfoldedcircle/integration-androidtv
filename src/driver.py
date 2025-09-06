@@ -67,7 +67,7 @@ async def on_standby():
 
 
 async def connect_device(device: tv.AndroidTv):
-    """Connect device and send state"""
+    """Connect device and send state."""
     try:
         _LOG.debug("Connecting device %s...", device.device_config.id)
         await device.connect()
@@ -209,7 +209,6 @@ async def handle_connected(identifier: str):
 
 async def handle_disconnected(identifier: str):
     """Handle Android TV disconnection."""
-
     for entity_id in _entities_from_device_id(identifier):
         configured_entity = api.configured_entities.get(entity_id)
         if configured_entity is None:
