@@ -32,6 +32,7 @@ REMOTE_STATE_MAPPING = {
     MediaStates.UNKNOWN: RemoteStates.UNKNOWN,
 }
 
+
 class AndroidTVRemote(Remote):
     """Representation of a AndroidTV Remote entity."""
 
