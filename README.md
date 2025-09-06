@@ -13,8 +13,8 @@ with Android TV devices. It can be run as an external integration for developmen
 
 - [Requirements and setting](docs/settings.md).
 - Multiple Android TV devices are supported with version 0.5.0 and newer.
-- A [media player entity](https://github.com/unfoldedcircle/core-api/blob/main/doc/entities/entity_media_player.md)
-  is exposed per Android TV device to the Remote.
+- A [media player entity](https://github.com/unfoldedcircle/core-api/blob/main/doc/entities/entity_media_player.md) and a [remote entity](https://github.com/unfoldedcircle/core-api/blob/main/doc/entities/entity_remote.md)
+  are exposed per Android TV device to the Remote.
 - Device profiles allow device-specific support and custom key bindings, for example, double-click or long-press actions.  
   See [command mappings](docs/command_mapping.md) for more information.
 
@@ -24,6 +24,78 @@ Preview features:
 - Google Cast volume control with configurable volume step.
 
 The preview features are not enabled by default. They can be enabled in the device configuration of the setup flow.
+
+## Configuration
+
+After running the setup flow and configuring your device, 2 new entities will be available :
+- Media Player entity : should cover most needs with predefined commands
+- Remote entity : should be used to run custom commands or command sequences
+
+The available commands depend on the device capabilities :
+
+| Command           | Description         |
+|-------------------|---------------------|
+| on                | Turn on             |
+| off               | Turn off            |
+| toggle            | Power toggle        |
+| play_pause        | Play/pause          |
+| stop              | Stop                |
+| previous          | Previous chapter    |
+| next              | Next chapter        |
+| fast_forward      | Fast forward        |
+| rewind            | Rewind              |
+| volume_up         | Volume up           |
+| volume_down       | Volume down         |
+| mute_toggle       | Mute toggle         |
+| mute              | Mute                |
+| unmute            | Unmute              |
+| repeat            | Repeat              |
+| shuffle           | Shuffle             |
+| channel_up        | Channel up          |
+| channel_down      | Channel down        |
+| cursor_up         | Cursor up           |
+| cursor_down       | Cursor down         |
+| cursor_left       | Cursor left         |
+| cursor_right      | Cursor right        |
+| cursor_enter      | Cursor enter        |
+| digit_0           | 0                   |
+| digit_1           | 1                   |
+| digit_2           | 2                   |
+| digit_3           | 3                   |
+| digit_4           | 4                   |
+| digit_5           | 5                   |
+| digit_6           | 6                   |
+| digit_7           | 7                   |
+| digit_8           | 8                   |
+| digit_9           | 9                   |
+| function_red      | Red                 |
+| function_green    | Green               |
+| function_yellow   | Yellow              |
+| function_blue     | Blue                |
+| home              | Home                |
+| menu              | Menu                |
+| context_menu      | Context menu        |
+| guide             | Guide               |
+| info              | Info                |
+| back              | Back                |
+| record            | Record              |
+| my_recordings     | My recordings       |
+| live              | Live                |
+| audio_track       | Next audio track    |
+| subtitle          | Next subtitle track |
+| settings          | Settings            |
+
+In addition of these specific commands depending on the device capabilities :
+
+**Default devices :**
+`CURSOR_ENTER_LONG, HOME_LONG, MENU_LONG, KEYCODE_STAR, KEYCODE_POUND, KEYCODE_A to KEYCODE_Z, KEYCODE_COMMA, KEYCODE_PERIOD, KEYCODE_SPACE, KEYCODE_DEL, KEYCODE_MINUS, KEYCODE_EQUALS, KEYCODE_LEFT_BRACKET, KEYCODE_RIGHT_BRACKET, KEYCODE_BACKSLASH, KEYCODE_SEMICOLON, KEYCODE_APOSTROPHE, KEYCODE_SLASH, KEYCODE_AT, KEYCODE_PLUS, KEYCODE_PAGE_UP, KEYCODE_PAGE_DOWN, KEYCODE_F1 to KEYCODE_F12`
+
+**Dune HD :** `YOUTUBE, NETFLIX, PRIMEVIDEO, FACTORYTEST, DISNEY`
+
+**Shield TV :** `SCREENSAVER`
+
+**onn. Streaming Device 4K pro:** `TELETEXT`
+
 
 ## Standalone Usage
 ### Setup

@@ -104,7 +104,7 @@ class AndroidTVRemote(Remote):
                 res = await self._device.turn_off()
             else:
                 res = await self._device.turn_on()
-        elif command in self.options[Options.SIMPLE_COMMANDS]:
+        elif command in self.options.get(Options.SIMPLE_COMMANDS, {}):
             res = await self._device.send_media_player_command(command)
         elif cmd_id == Commands.SEND_CMD:
             res = await self._device.send_media_player_command(command)
