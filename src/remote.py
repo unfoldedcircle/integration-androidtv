@@ -16,6 +16,7 @@ from ucapi.remote import States as RemoteStates
 
 import tv
 from config import AtvDevice, create_entity_id
+from const import REMOTE_BUTTONS_MAPPING, REMOTE_UI_PAGES
 from profiles import Profile
 
 _LOG = logging.getLogger(__name__)
@@ -30,7 +31,6 @@ REMOTE_STATE_MAPPING = {
     MediaStates.UNAVAILABLE: RemoteStates.UNAVAILABLE,
     MediaStates.UNKNOWN: RemoteStates.UNKNOWN,
 }
-
 
 class AndroidTVRemote(Remote):
     """Representation of a AndroidTV Remote entity."""
@@ -55,8 +55,8 @@ class AndroidTVRemote(Remote):
             features,
             attributes,
             simple_commands=profile.simple_commands if profile.simple_commands else [],
-            button_mapping=[],  # TODO
-            ui_pages=[],  # TODO
+            button_mapping=REMOTE_BUTTONS_MAPPING,
+            ui_pages=REMOTE_UI_PAGES,
         )
 
     def get_int_param(self, param: str, params: dict[str, Any], default: int):
