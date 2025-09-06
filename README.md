@@ -85,9 +85,9 @@ The available commands depend on the device capabilities :
 | subtitle          | Next subtitle track |
 | settings          | Settings            |
 
-In addition of these specific commands depending on the device capabilities :
+In addition these specific commands are also available depending on the device capabilities :
 
-**Default devices :**
+**Any device :**
 `CURSOR_ENTER_LONG, HOME_LONG, MENU_LONG, KEYCODE_STAR, KEYCODE_POUND, KEYCODE_A to KEYCODE_Z, KEYCODE_COMMA, KEYCODE_PERIOD, KEYCODE_SPACE, KEYCODE_DEL, KEYCODE_MINUS, KEYCODE_EQUALS, KEYCODE_LEFT_BRACKET, KEYCODE_RIGHT_BRACKET, KEYCODE_BACKSLASH, KEYCODE_SEMICOLON, KEYCODE_APOSTROPHE, KEYCODE_SLASH, KEYCODE_AT, KEYCODE_PLUS, KEYCODE_PAGE_UP, KEYCODE_PAGE_DOWN, KEYCODE_F1 to KEYCODE_F12`
 
 **Dune HD :** `YOUTUBE, NETFLIX, PRIMEVIDEO, FACTORYTEST, DISNEY`
