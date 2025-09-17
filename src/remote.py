@@ -35,6 +35,7 @@ REMOTE_STATE_MAPPING = {
 COMMAND_DURATION_MS = 250
 COMMAND_TIMEOUT = 5000
 
+
 def calculate_duration(cmd_id: str, params: dict[str, Any] | None = None) -> int:
     """Calculate and return the expected duration of command or command sequence."""
     delay = get_int_param("delay", params, 0)
@@ -42,7 +43,7 @@ def calculate_duration(cmd_id: str, params: dict[str, Any] | None = None) -> int
     commands_count = 1
     if cmd_id == Commands.SEND_CMD_SEQUENCE:
         commands_count = len(params.get("sequence", []))
-    return commands_count*(delay+COMMAND_DURATION_MS)*repeat
+    return commands_count * (delay + COMMAND_DURATION_MS) * repeat
 
 
 def get_int_param(param: str, params: dict[str, Any], default: int):
