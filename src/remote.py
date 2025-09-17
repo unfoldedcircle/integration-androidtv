@@ -32,6 +32,27 @@ REMOTE_STATE_MAPPING = {
     MediaStates.UNKNOWN: RemoteStates.UNKNOWN,
 }
 
+COMMAND_DURATION_MS = 250
+COMMAND_TIMEOUT = 5000
+
+def calculate_duration(cmd_id: str, params: dict[str, Any] | None = None) -> int:
+    """Calculate and return the expected duration of command or command sequence."""
+    delay = get_int_param("delay", params, 0)
+    repeat = get_int_param("repeat", params, 1)
+    commands_count = 1
+    if cmd_id == Commands.SEND_CMD_SEQUENCE:
+        commands_count = len(params.get("sequence", []))
+    return commands_count*(delay+COMMAND_DURATION_MS)*repeat
+
+
+def get_int_param(param: str, params: dict[str, Any], default: int):
+    """Get parameter in integer format."""
+    # TODO bug to be fixed on UC Core : some params are sent as (empty) strings by remote (hold == "")
+    value = params.get(param, default)
+    if isinstance(value, str) and len(value) > 0:
+        return int(float(value))
+    return default
+
 
 class AndroidTVRemote(Remote):
     """Representation of a AndroidTV Remote entity."""
@@ -59,14 +80,6 @@ class AndroidTVRemote(Remote):
             button_mapping=REMOTE_BUTTONS_MAPPING,
             ui_pages=REMOTE_UI_PAGES,
         )
-
-    def get_int_param(self, param: str, params: dict[str, Any], default: int):
-        """Get parameter in integer format."""
-        # TODO bug to be fixed on UC Core : some params are sent as (empty) strings by remote (hold == "")
-        value = params.get(param, default)
-        if isinstance(value, str) and len(value) > 0:
-            return int(float(value))
-        return default
 
     async def command(self, cmd_id: str, params: dict[str, Any] | None = None) -> StatusCodes:
         """
@@ -96,28 +109,38 @@ class AndroidTVRemote(Remote):
         elif command in self.options.get(Options.SIMPLE_COMMANDS, {}):
             res = await self._device.send_media_player_command(command)
         elif cmd_id in [Commands.SEND_CMD, Commands.SEND_CMD_SEQUENCE]:
-            _ = asyncio.get_event_loop().create_task(self.send_commands(cmd_id, params))
+            # If the expected duration exceeds the remote timeout, execute it in async mode
+            if calculate_duration(cmd_id, params) > COMMAND_TIMEOUT:
+                _ = asyncio.get_event_loop().create_task(self.send_commands(cmd_id, params))
+            else:
+                res = self.send_commands(cmd_id, params)
         else:
             return StatusCodes.NOT_IMPLEMENTED
         return res
 
-    async def send_commands(self, cmd_id: str, params: dict[str, Any] | None = None):
+    async def send_commands(self, cmd_id: str, params: dict[str, Any] | None = None) -> StatusCodes:
         """Handle custom command or commands sequence."""
         # hold = self.get_int_param("hold", params, 0)
-        delay = self.get_int_param("delay", params, 0)
-        repeat = self.get_int_param("repeat", params, 1)
+        delay = get_int_param("delay", params, 0)
+        repeat = get_int_param("repeat", params, 1)
         command = params.get("command", "")
+        res = StatusCodes.OK
         for _i in range(0, repeat):
             if cmd_id == Commands.SEND_CMD:
-                await self._device.send_media_player_command(command)
+                result = await self._device.send_media_player_command(command)
+                if result != StatusCodes.OK:
+                    res = result
                 if delay > 0:
                     await asyncio.sleep(delay)
             else:
                 commands = params.get("sequence", [])
                 for command in commands:
-                    await self._device.send_media_player_command(command)
+                    result = await self._device.send_media_player_command(command)
+                    if result != StatusCodes.OK:
+                        res = result
                     if delay > 0:
                         await asyncio.sleep(delay)
+        return res
 
     def filter_changed_attributes(self, update: dict[str, Any]) -> dict[str, Any]:
         """
