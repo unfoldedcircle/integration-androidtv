@@ -4,7 +4,12 @@
 def is_homescreen_app(app_id: str) -> bool:
     """Check if the app is a homescreen app."""
     # make sure each app_id is defined in IdMappings below!
-    return app_id in ["com.android.systemui", "com.google.android.tvlauncher", "com.google.android.apps.tv.launcherx"]
+    return app_id in [
+        "com.android.systemui",
+        "com.google.android.tvlauncher",
+        "com.google.android.apps.tv.launcherx",
+        "com.spocky.projengmenu",  # Projectivity Launcher
+    ]
 
 
 def is_standby_app(app_id: str) -> bool:
