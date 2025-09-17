@@ -18,6 +18,9 @@ env:
   # Python version to use in the builder image. See https://hub.docker.com/r/unfoldedcircle/r2-pyinstaller for possible versions.
   PYTHON_VER: 3.11.13-0.4.0
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-24.04
