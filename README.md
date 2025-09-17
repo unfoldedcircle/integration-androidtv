@@ -9,7 +9,12 @@ retrieved from supported apps.
 The application source list is limited to a predefined list, as retrieving the installed apps is not possible.
 
 This integration is included in the Remote Two and Remote 3 firmware, and no external service must be run to connect
-with Android TV devices. It can be run as an external integration for development.
+with Android TV devices.
+
+‼️ Do not install this integration as a custom integration on the Remote, or it can interfere with the included version.  
+Included integrations cannot be updated manually. The integration can be run as an external integration for testing and 
+development.
+
 
 - [Requirements and setting](docs/settings.md).
 - Multiple Android TV devices are supported with version 0.5.0 and newer.
