@@ -94,7 +94,7 @@ In addition these specific commands are also available depending on the device c
 
 **Shield TV :** `SCREENSAVER`
 
-**onn. Streaming Device 4K pro:** `TELETEXT`
+**Philips Android TV:** `TELETEXT`
 
 
 ## Standalone Usage

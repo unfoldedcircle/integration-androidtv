@@ -80,7 +80,11 @@ async def connect_device(device: tv.AndroidTv):
                 continue
             # Return all attributes according to entity type
             if isinstance(entity, media_player.AndroidTVMediaPlayer):
-                _LOG.debug("Sending attributes %s : %s", entity_id, device.attributes)
+                if _LOG.level <= logging.DEBUG:
+                    attributes = {
+                        k: v for k, v in device.attributes.items() if k != MediaAttr.MEDIA_IMAGE_URL or len(v) < 64
+                    }
+                    _LOG.debug("Sending attributes %s : %s", entity_id, attributes)
                 api.configured_entities.update_attributes(entity_id, device.attributes)
             if isinstance(entity, remote.AndroidTVRemote):
                 api.configured_entities.update_attributes(

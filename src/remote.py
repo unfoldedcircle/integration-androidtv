@@ -79,48 +79,45 @@ class AndroidTVRemote(Remote):
         :return: status code of the command request
         """
         _LOG.info("[%s] Got command request: %s %s", self.id, cmd_id, params)
-
         if self._device is None:
             _LOG.warning("[%s] No AndroidTV instance for this remote entity", self.id)
             return StatusCodes.NOT_FOUND
-
-        repeat = self.get_int_param("repeat", params, 1)
-        res = StatusCodes.OK
-        for _i in range(0, repeat):
-            res = await self.handle_command(cmd_id, params)
-        return res
-
-    async def handle_command(self, cmd_id: str, params: dict[str, Any] | None = None) -> StatusCodes:
-        """Handle command."""
-        # hold = self.get_int_param("hold", params, 0)
-        delay = self.get_int_param("delay", params, 0)
         command = params.get("command", "")
-
-        if command == Commands.ON:
+        res = StatusCodes.OK
+        if cmd_id == Commands.ON:
             res = await self._device.turn_on()
-        elif command == Commands.OFF:
+        elif cmd_id == Commands.OFF:
             res = await self._device.turn_off()
-        elif command == Commands.TOGGLE:
+        elif cmd_id == Commands.TOGGLE:
             if self._device.is_on:
                 res = await self._device.turn_off()
             else:
                 res = await self._device.turn_on()
         elif command in self.options.get(Options.SIMPLE_COMMANDS, {}):
             res = await self._device.send_media_player_command(command)
-        elif cmd_id == Commands.SEND_CMD:
-            res = await self._device.send_media_player_command(command)
-        elif cmd_id == Commands.SEND_CMD_SEQUENCE:
-            commands = params.get("sequence", [])  # .split(",")
-            res = StatusCodes.OK
-            for command in commands:
-                res = await self.handle_command(Commands.SEND_CMD, {"command": command, "params": params})
-                if delay > 0:
-                    await asyncio.sleep(delay)
+        elif cmd_id in [Commands.SEND_CMD, Commands.SEND_CMD_SEQUENCE]:
+            _ = asyncio.get_event_loop().create_task(self.send_commands(cmd_id, params))
         else:
             return StatusCodes.NOT_IMPLEMENTED
-        if delay > 0 and cmd_id != Commands.SEND_CMD_SEQUENCE:
-            await asyncio.sleep(delay)
         return res
+
+    async def send_commands(self, cmd_id: str, params: dict[str, Any] | None = None):
+        """Handle custom command or commands sequence."""
+        # hold = self.get_int_param("hold", params, 0)
+        delay = self.get_int_param("delay", params, 0)
+        repeat = self.get_int_param("repeat", params, 1)
+        command = params.get("command", "")
+        for _i in range(0, repeat):
+            if cmd_id == Commands.SEND_CMD:
+                await self._device.send_media_player_command(command)
+                if delay > 0:
+                    await asyncio.sleep(delay)
+            else:
+                commands = params.get("sequence", [])
+                for command in commands:
+                    await self._device.send_media_player_command(command)
+                    if delay > 0:
+                        await asyncio.sleep(delay)
 
     def filter_changed_attributes(self, update: dict[str, Any]) -> dict[str, Any]:
         """

@@ -20,16 +20,16 @@ _LOG = logging.getLogger(__name__)
 _CFG_FILENAME = "config.json"
 
 
-def create_entity_id(avr_id: str, entity_type: EntityTypes) -> str:
+def create_entity_id(device_id: str, entity_type: EntityTypes) -> str:
     """Create a unique entity identifier for the given receiver and entity type."""
-    return f"{entity_type.value}.{avr_id}"
+    return f"{entity_type.value}.{device_id}"
 
 
 def device_from_entity_id(entity_id: str) -> str | None:
     """
-    Return the avr_id prefix of an entity_id.
+    Return the device id prefix of an entity_id.
 
-    The prefix is the part before the first dot in the name and refers to the AVR device identifier.
+    The prefix is the part before the first dot in the name and refers to the device identifier.
 
     :param entity_id: the entity identifier
     :return: the device prefix, or None if entity_id doesn't contain a dot
