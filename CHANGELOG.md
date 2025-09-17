@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+### Changed
+- Update the embedded Python runtime to 3.11.13.
+- Enabled GitHub dependabot.
+
+### Fixed
+- qemu installation instructions.
+
 ---
 
 ## v0.7.4 - 2025-05-15
