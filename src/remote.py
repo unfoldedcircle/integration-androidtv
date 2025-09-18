@@ -86,7 +86,6 @@ class AndroidTVRemote(Remote):
         if self._device is None:
             _LOG.warning("[%s] No AndroidTV instance for this remote entity", self.id)
             return StatusCodes.NOT_FOUND
-        command = params.get("command", "")
         res = StatusCodes.OK
         if cmd_id == Commands.ON:
             res = await self._device.turn_on()
@@ -98,7 +97,7 @@ class AndroidTVRemote(Remote):
             else:
                 res = await self._device.turn_on()
         elif cmd_id in [Commands.SEND_CMD, Commands.SEND_CMD_SEQUENCE]:
-            # If the expected duration exceeds the remote timeout, keep it running and return
+            # If the duration exceeds the remote timeout, keep it running and return immediately
             try:
                 async with asyncio.timeout(COMMAND_TIMEOUT):
                     res = await shield(self.send_commands(cmd_id, params))
