@@ -36,7 +36,6 @@ REMOTE_STATE_MAPPING = {
 COMMAND_TIMEOUT = 4500
 
 
-
 def get_int_param(param: str, params: dict[str, Any], default: int):
     """Get parameter in integer format."""
     # TODO bug to be fixed on UC Core : some params are sent as (empty) strings by remote (hold == "")
