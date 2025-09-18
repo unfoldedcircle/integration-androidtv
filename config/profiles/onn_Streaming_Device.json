@@ -30,10 +30,6 @@
     "context_menu": {
       "keycode": "DPAD_CENTER",
       "action": "LONG"
-    },
-    "settings": {
-      "keycode": "HOME",
-      "action": "LONG"
     }
   }
 }
