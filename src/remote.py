@@ -12,7 +12,7 @@ from typing import Any
 
 from ucapi import EntityTypes, Remote, StatusCodes
 from ucapi.media_player import States as MediaStates
-from ucapi.remote import Attributes, Commands, Features, Options
+from ucapi.remote import Attributes, Commands, Features
 from ucapi.remote import States as RemoteStates
 
 import tv
