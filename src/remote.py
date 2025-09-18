@@ -7,6 +7,7 @@ Media-player entity functions.
 
 import asyncio
 import logging
+from asyncio import shield
 from typing import Any
 
 from ucapi import EntityTypes, Remote, StatusCodes
@@ -32,18 +33,8 @@ REMOTE_STATE_MAPPING = {
     MediaStates.UNKNOWN: RemoteStates.UNKNOWN,
 }
 
-COMMAND_DURATION_MS = 250
-COMMAND_TIMEOUT = 5000
+COMMAND_TIMEOUT = 4500
 
-
-def calculate_duration(cmd_id: str, params: dict[str, Any] | None = None) -> int:
-    """Calculate and return the expected duration of command or command sequence."""
-    delay = get_int_param("delay", params, 0)
-    repeat = get_int_param("repeat", params, 1)
-    commands_count = 1
-    if cmd_id == Commands.SEND_CMD_SEQUENCE:
-        commands_count = len(params.get("sequence", []))
-    return commands_count * (delay + COMMAND_DURATION_MS) * repeat
 
 
 def get_int_param(param: str, params: dict[str, Any], default: int):
@@ -110,11 +101,12 @@ class AndroidTVRemote(Remote):
         elif command in self.options.get(Options.SIMPLE_COMMANDS, {}):
             res = await self._device.send_media_player_command(command)
         elif cmd_id in [Commands.SEND_CMD, Commands.SEND_CMD_SEQUENCE]:
-            # If the expected duration exceeds the remote timeout, execute it in async mode
-            if calculate_duration(cmd_id, params) > COMMAND_TIMEOUT:
-                _ = asyncio.get_event_loop().create_task(self.send_commands(cmd_id, params))
-            else:
-                res = self.send_commands(cmd_id, params)
+            # If the expected duration exceeds the remote timeout, keep it running and return
+            try:
+                async with asyncio.timeout(COMMAND_TIMEOUT):
+                    res = await shield(self.send_commands(cmd_id, params))
+            except asyncio.TimeoutError:
+                _LOG.info("[%s] Command request timeout, keep running: %s %s", self.id, cmd_id, params)
         else:
             return StatusCodes.NOT_IMPLEMENTED
         return res
