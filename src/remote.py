@@ -97,8 +97,6 @@ class AndroidTVRemote(Remote):
                 res = await self._device.turn_off()
             else:
                 res = await self._device.turn_on()
-        elif command in self.options.get(Options.SIMPLE_COMMANDS, {}):
-            res = await self._device.send_media_player_command(command)
         elif cmd_id in [Commands.SEND_CMD, Commands.SEND_CMD_SEQUENCE]:
             # If the expected duration exceeds the remote timeout, keep it running and return
             try:
