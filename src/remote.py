@@ -33,7 +33,7 @@ REMOTE_STATE_MAPPING = {
     MediaStates.UNKNOWN: RemoteStates.UNKNOWN,
 }
 
-COMMAND_TIMEOUT = 4500
+COMMAND_TIMEOUT = 4.5
 
 
 def get_int_param(param: str, params: dict[str, Any], default: int):
