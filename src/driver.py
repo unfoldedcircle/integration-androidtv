@@ -454,6 +454,8 @@ async def main():
     logging.getLogger("discover").setLevel(level)
     logging.getLogger("profiles").setLevel(level)
     logging.getLogger("setup_flow").setLevel(level)
+    logging.getLogger("media_player").setLevel(level)
+    logging.getLogger("remote").setLevel(level)
     logging.getLogger("androidtvremote2").setLevel(level)
     logging.getLogger("external_metadata").setLevel(level)
     # logging.getLogger("pychromecast").setLevel(level)

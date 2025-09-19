@@ -41,8 +41,8 @@ def get_int_param(param: str, params: dict[str, Any], default: int):
     # TODO bug to be fixed on UC Core : some params are sent as (empty) strings by remote (hold == "")
     value = params.get(param, default)
     if isinstance(value, str) and len(value) > 0:
-        return int(float(value))
-    return default
+        return int(value)
+    return value
 
 
 class AndroidTVRemote(Remote):
@@ -120,7 +120,7 @@ class AndroidTVRemote(Remote):
                 if result != StatusCodes.OK:
                     res = result
                 if delay > 0:
-                    await asyncio.sleep(delay)
+                    await asyncio.sleep(delay/1000)
             else:
                 commands = params.get("sequence", [])
                 for command in commands:
@@ -128,7 +128,7 @@ class AndroidTVRemote(Remote):
                     if result != StatusCodes.OK:
                         res = result
                     if delay > 0:
-                        await asyncio.sleep(delay)
+                        await asyncio.sleep(delay/1000)
         return res
 
     def filter_changed_attributes(self, update: dict[str, Any]) -> dict[str, Any]:
