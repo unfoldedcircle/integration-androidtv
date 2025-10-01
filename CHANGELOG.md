@@ -10,6 +10,16 @@ _Changes in the next release_
 
 ---
 
+## v0.7.5 - 2025-09-18
+### Added
+- Identify Projectivity launcher as a home screen app ([#89](https://github.com/unfoldedcircle/integration-androidtv/pull/89)).
+### Changed
+- onn. Streaming Device 4K pro: using the default settings key instead of a long home press to access the settings menu ([#88](https://github.com/unfoldedcircle/integration-androidtv/pull/88)).
+- Update the embedded Python runtime to 3.11.13 ([#97](https://github.com/unfoldedcircle/integration-androidtv/pull/97)).
+- Enabled GitHub dependabot.
+### Fixed
+- qemu installation instructions.
+
 ## v0.7.4 - 2025-05-15
 ### Fixed
 - Sporadic media image URL replacement with an invalid URL ([#75](https://github.com/unfoldedcircle/integration-androidtv/pull/75)).

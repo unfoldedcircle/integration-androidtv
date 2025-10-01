@@ -9,7 +9,12 @@ retrieved from supported apps.
 The application source list is limited to a predefined list, as retrieving the installed apps is not possible.
 
 This integration is included in the Remote Two and Remote 3 firmware, and no external service must be run to connect
-with Android TV devices. It can be run as an external integration for development.
+with Android TV devices.
+
+‼️ Do not install this integration as a custom integration on the Remote, or it can interfere with the included version.  
+Included integrations cannot be updated manually. The integration can be run as an external integration for testing and 
+development.
+
 
 - [Requirements and setting](docs/settings.md).
 - Multiple Android TV devices are supported with version 0.5.0 and newer.
@@ -147,7 +152,7 @@ The `--onefile` option to create a one-file bundled executable should be avoided
 
 On x86-64 Linux we need Qemu to emulate the aarch64 target platform:
 ```bash
-sudo apt install qemu binfmt-support qemu-user-static
+sudo apt install qemu-system-arm binfmt-support qemu-user-static
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 ```
 
@@ -157,7 +162,7 @@ docker run --rm --name builder \
     --platform=aarch64 \
     --user=$(id -u):$(id -g) \
     -v "$PWD":/workspace \
-    docker.io/unfoldedcircle/r2-pyinstaller:3.11.12  \
+    docker.io/unfoldedcircle/r2-pyinstaller:3.11.13  \
     bash -c \
       "python -m pip install -r requirements.txt && \
       pyinstaller --clean --onedir --name intg-androidtv src/driver.py"
@@ -170,7 +175,7 @@ On an aarch64 host platform, the build image can be run directly (and much faste
 docker run --rm --name builder \
     --user=$(id -u):$(id -g) \
     -v "$PWD":/workspace \
-    docker.io/unfoldedcircle/r2-pyinstaller:3.11.12  \
+    docker.io/unfoldedcircle/r2-pyinstaller:3.11.13  \
     bash -c \
       "python -m pip install -r requirements.txt && \
       pyinstaller --clean --onedir --name intg-androidtv src/driver.py"
