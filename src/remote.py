@@ -120,7 +120,7 @@ class AndroidTVRemote(Remote):
                 if result != StatusCodes.OK:
                     res = result
                 if delay > 0:
-                    await asyncio.sleep(delay/1000)
+                    await asyncio.sleep(delay / 1000)
             else:
                 commands = params.get("sequence", [])
                 for command in commands:
@@ -128,7 +128,7 @@ class AndroidTVRemote(Remote):
                     if result != StatusCodes.OK:
                         res = result
                     if delay > 0:
-                        await asyncio.sleep(delay/1000)
+                        await asyncio.sleep(delay / 1000)
         return res
 
     def filter_changed_attributes(self, update: dict[str, Any]) -> dict[str, Any]:
