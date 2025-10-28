@@ -4,6 +4,6 @@ pyee~=13.0.0
 google_play_scraper==1.2.7
 pillow>=11.2.1
 requests>=2.32
-pychromecast~=14.0.7
+pychromecast~=14.0.9
 httpx~=0.28.1
 sanitize-filename~=1.2.0
