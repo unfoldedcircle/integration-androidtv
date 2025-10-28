@@ -12,7 +12,7 @@ import logging
 import os
 import socket
 import time
-from asyncio import AbstractEventLoop, timeout, Lock
+from asyncio import AbstractEventLoop, Lock, timeout
 from enum import IntEnum
 from functools import wraps
 from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
