@@ -9,11 +9,11 @@ import asyncio
 import base64
 import json
 import logging
-import os
+import re
 from io import BytesIO
 from pathlib import Path
 from typing import Dict
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import google_play_scraper
 import httpx
@@ -21,6 +21,9 @@ from PIL import Image
 from PIL.Image import Resampling
 from pychromecast.controllers.media import MediaImage
 from sanitize_filename import sanitize
+from simplejustwatchapi import justwatch
+
+from config import _get_config_root, _get_data_root
 
 _LOG = logging.getLogger(__name__)
 
@@ -30,27 +33,14 @@ ICON_SIZE = (240, 240)
 
 
 # Paths
-def _get_config_root() -> Path:
-    config_home = Path(os.environ.get("UC_CONFIG_HOME", "./config"))
-    config_home.mkdir(parents=True, exist_ok=True)
-    return config_home
-
-
-def _get_cache_root() -> Path:
-    data_home = Path(os.environ.get("UC_DATA_HOME", "./data"))
-    cache_root = data_home / CACHE_ROOT
-    cache_root.mkdir(parents=True, exist_ok=True)
-    return cache_root
-
-
 def _get_metadata_dir() -> Path:
-    metadata_dir = _get_cache_root()
+    metadata_dir = _get_data_root() / CACHE_ROOT
     metadata_dir.mkdir(parents=True, exist_ok=True)
     return metadata_dir
 
 
 def _get_icon_dir() -> Path:
-    icon_dir = _get_cache_root() / ICON_SUBDIR
+    icon_dir = _get_data_root() / CACHE_ROOT / ICON_SUBDIR
     icon_dir.mkdir(parents=True, exist_ok=True)
     return icon_dir
 
@@ -119,6 +109,61 @@ async def _download_and_resize_icon(url: str, package_id: str) -> str | None:
         return None
 
 
+# async def encode_icon_to_data_uri(icon_name: str) -> str:
+#     """
+#     Encode an image from a local file path or remote URL.
+#
+#     Returns a base64-encoded PNG data URI.
+#     """
+#     if isinstance(icon_name, MediaImage):
+#         icon_name = icon_name.url
+#
+#     if isinstance(icon_name, str) and icon_name.startswith("data:image"):
+#         _LOG.debug("Icon is already a data URI")
+#         return icon_name
+#
+#     _LOG.debug("Encoding icon to data URI: %s", icon_name)
+#     try:
+#         if _is_url(icon_name):
+#             async with httpx.AsyncClient() as client:
+#                 response = await client.get(icon_name, timeout=10)
+#                 response.raise_for_status()
+#                 img_bytes = BytesIO(response.content)
+#
+#             def encode_image() -> str:
+#                 img = Image.open(img_bytes)
+#                 img = img.convert("RGBA")
+#                 buffer = BytesIO()
+#                 img.save(buffer, format="PNG")
+#                 encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+#                 return f"data:image/png;base64,{encoded}"
+#
+#             return await asyncio.to_thread(encode_image)
+#
+#         def load_and_encode() -> str:
+#             icon_path = _get_icon_path(icon_name)
+#             if not icon_path.exists():
+#                 raise FileNotFoundError(f"Icon not found: {icon_name}")
+#             with open(icon_path, "rb") as f:
+#                 img = Image.open(f)
+#                 img.load()
+#                 img = img.convert("RGBA")
+#                 buffer = BytesIO()
+#                 img.save(buffer, format="PNG")
+#                 encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+#                 return f"data:image/png;base64,{encoded}"
+#
+#         return await asyncio.to_thread(load_and_encode)
+#
+#     except Exception as e:
+#         _LOG.warning("Failed to encode icon to base64 for %s: %s", icon_name, e)
+#         return ""
+
+
+_ENCODED_ICON_CACHE: dict[str, str] = {}
+_MISSING_ICON_CACHE: set[str] = set()
+
+
 async def encode_icon_to_data_uri(icon_name: str) -> str:
     """
     Encode an image from a local file path or remote URL.
@@ -132,7 +177,15 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
         _LOG.debug("Icon is already a data URI")
         return icon_name
 
+    if icon_name in _ENCODED_ICON_CACHE:
+        return _ENCODED_ICON_CACHE[icon_name]
+
+    if icon_name in _MISSING_ICON_CACHE:
+        _LOG.debug("Skipping encoding; previously failed: %s", icon_name)
+        return ""
+
     _LOG.debug("Encoding icon to data URI: %s", icon_name)
+
     try:
         if _is_url(icon_name):
             async with httpx.AsyncClient() as client:
@@ -148,12 +201,18 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
                 encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
                 return f"data:image/png;base64,{encoded}"
 
-            return await asyncio.to_thread(encode_image)
+            encoded = await asyncio.to_thread(encode_image)
+            _ENCODED_ICON_CACHE[icon_name] = encoded
+            return encoded
+
+        # Local file path
+        icon_path = _get_icon_path(icon_name)
+        if not icon_path.exists():
+            _LOG.warning("Icon not found on disk: %s", icon_path)
+            _MISSING_ICON_CACHE.add(icon_name)
+            return ""
 
         def load_and_encode() -> str:
-            icon_path = _get_icon_path(icon_name)
-            if not icon_path.exists():
-                raise FileNotFoundError(f"Icon not found: {icon_name}")
             with open(icon_path, "rb") as f:
                 img = Image.open(f)
                 img.load()
@@ -163,10 +222,13 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
                 encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
                 return f"data:image/png;base64,{encoded}"
 
-        return await asyncio.to_thread(load_and_encode)
+        encoded = await asyncio.to_thread(load_and_encode)
+        _ENCODED_ICON_CACHE[icon_name] = encoded
+        return encoded
 
     except Exception as e:
         _LOG.warning("Failed to encode icon to base64 for %s: %s", icon_name, e)
+        _MISSING_ICON_CACHE.add(icon_name)
         return ""
 
 
@@ -228,4 +290,96 @@ async def get_app_metadata(package_id: str) -> Dict[str, str]:
         return {"name": metadata["name"], "icon": icon_data_uri}
 
     _LOG.debug("Falling back to default metadata for %s", package_id)
-    return {"name": package_id, "icon": ""}
+    return {"name": "", "icon": ""}
+
+
+async def youtube_search(query: str):
+    """Search for poster images using YouTube."""
+    url = f"https://www.youtube.com/results?search_query={quote(query)}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    with httpx.Client(headers=headers, timeout=10) as client:
+        response = client.get(url)
+        html = response.text
+
+    # Extract the ytInitialData JSON
+    match = re.search(r"var ytInitialData = ({.*?});</script>", html)
+    if not match:
+        raise RuntimeError("Could not find ytInitialData in the page")
+
+    data = json.loads(match.group(1))
+
+    try:
+        items = data["contents"]["twoColumnSearchResultsRenderer"]["primaryContents"]["sectionListRenderer"][
+            "contents"
+        ][0]["itemSectionRenderer"]["contents"]
+    except (KeyError, IndexError):
+        raise RuntimeError("Could not parse YouTube data structure")
+
+    for item in items:
+        if "videoRenderer" in item:
+            video = item["videoRenderer"]
+            video_id = video.get("videoId")
+
+            return f"https://img.youtube.com/vi/{video_id}/0.jpg"
+
+    return None
+
+
+async def search_poster_justwatch(query: str, country: str = "GB") -> str | None:
+    """Search for poster images using JustWatch API."""
+    response = justwatch.search(query, country, "en", count=1, best_only=True)
+
+    if not response[0].poster:
+        return None
+
+    poster_url = response[0].poster
+
+    if poster_url:
+        return poster_url
+
+    return None
+
+
+async def get_best_artwork(title: str, artist: str = None, current_package: str = None) -> str | None:
+    """Get artwork for a TV show or movie based on current app and title/artist."""
+    _LOG.debug(
+        "Resolving best artwork for title='%s', artist='%s', current_package='%s'", title, artist, current_package
+    )
+
+    search_query = f"{title} - {artist}" if artist else title
+
+    if current_package in [
+        "com.google.android.youtube.tv",
+        "com.liskovsoft.videomanager",
+        "com.teamsmart.videomanager.tv",
+    ]:
+
+        _LOG.debug("YouTube detected. Searching for artwork.")
+
+        youtube = await youtube_search(search_query)
+
+        if youtube:
+            _LOG.debug("Artwork result:\n%s", json.dumps(youtube, indent=2))
+            return youtube
+        _LOG.debug("No artwork found from YouTube search.")
+
+    else:
+
+        _LOG.debug("Non-YouTube package detected. Searching for artwork.")
+        justwatch_poster = await search_poster_justwatch(search_query)
+
+        if justwatch_poster:
+            _LOG.debug("Artwork result:\n%s", json.dumps(justwatch, indent=2))
+            return justwatch_poster
+        _LOG.debug("No artwork found from JustWatch search.")
+
+    _LOG.debug("No artwork source applicable. Returning False.")
+    return None
+
+
+# async def test():
+#     posters = await get_best_artwork("Episode 1", "Breaking Bad", "com.plexapp.android")
+#     print(posters)
+#
+# asyncio.run(test())

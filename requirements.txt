@@ -7,3 +7,6 @@ requests>=2.32
 pychromecast~=14.0.9
 httpx~=0.28.1
 sanitize-filename~=1.2.0
+async_timeout~=5.0.1
+adb_shell==0.4.4
+simple-justwatch-python-api>=0.16
