@@ -12,7 +12,7 @@ import logging
 import os
 import socket
 import time
-from asyncio import AbstractEventLoop, timeout
+from asyncio import AbstractEventLoop, Lock, timeout
 from enum import IntEnum
 from functools import wraps
 from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
@@ -232,6 +232,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._use_app_url = not device_config.use_chromecast
         self._player_state = media_player.States.ON
         self._muted = False
+        self._connect_lock = Lock()
 
     def __del__(self):
         """Destructs instance, disconnect AndroidTVRemote."""
@@ -422,14 +423,17 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         :return: True if connected or connecting, False if timeout or authentication error occurred.
         """
         # if we are already connecting, simply ignore further connect calls
-        if self._state == DeviceState.CONNECTING:
+        if self._connect_lock.locked():
             _LOG.debug("[%s] Connection task already running", self.log_id)
             return True
+
+        await self._connect_lock.acquire()
 
         if isinstance(self._atv.is_on, bool) and self._atv.is_on:
             _LOG.debug("[%s] Android TV is already connected", self.log_id)
             # just to make sure the state is up-to-date
             self.events.emit(Events.CONNECTED, self._identifier)
+            self._connect_lock.release()
             return True
 
         self._state = DeviceState.CONNECTING
@@ -485,6 +489,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 )
                 break
 
+        self._connect_lock.release()
         if not success:
             if self._state == DeviceState.CONNECTING:
                 self._state = DeviceState.ERROR
