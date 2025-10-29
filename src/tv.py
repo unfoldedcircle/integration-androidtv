@@ -667,7 +667,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             else:
                 icon_to_use = ""
         elif self._media_image_url:
-            icon_to_use = await encode_icon_to_data_uri(self._media_image_url)
+            # TODO what's the intended logic?
+            # `icon_to_use` is never used because of the inverse `if not self._media_image_url:` check below!
+            icon_to_use = self._media_image_url
 
         update[MediaAttr.STATE] = media_player.States.PLAYING.value
         # Skip applying app icon if media image from cast is present
@@ -911,7 +913,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         if status.images and len(status.images) > 0 and status.images[0].url != self._media_image_url:
             self._media_image_url = status.images[0].url
-            update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._media_image_url)
+            update[MediaAttr.MEDIA_IMAGE_URL] = self._media_image_url
             self._use_app_url = False
         else:
             self._media_image_url = None
