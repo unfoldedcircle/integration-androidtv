@@ -361,6 +361,38 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             return apps.IdMappings[self._media_app]
         return self._media_app
 
+    @property
+    def volume_level(self) -> float | None:
+        """Returns the volume level if supported and enabled."""
+        if not self.device_config.use_chromecast_volume:
+            return None
+        if self._chromecast:
+            return self._chromecast.status.volume_level
+        return 0
+
+    @property
+    def player_state(self) -> media_player.States:
+        """Return the media player state."""
+        return self._player_state
+
+    @property
+    def attributes(self) -> dict[str, any]:
+        """Return the device attributes."""
+        attributes = {
+            MediaAttr.STATE: self._player_state,
+            MediaAttr.MUTED: self._muted,
+            MediaAttr.MEDIA_TYPE: self._media_type,
+            MediaAttr.MEDIA_IMAGE_URL: self._media_image_url if self._media_image_url else "",
+            MediaAttr.MEDIA_TITLE: self.media_title if self.media_title else "",
+            MediaAttr.MEDIA_ALBUM: self._media_album if self._media_album else "",
+            MediaAttr.MEDIA_ARTIST: self._media_artist if self._media_artist else "",
+            MediaAttr.MEDIA_POSITION: self._media_position,
+            MediaAttr.MEDIA_DURATION: self._media_duration,
+        }
+        if self.device_config.use_chromecast_volume:
+            attributes[MediaAttr.VOLUME] = self.volume_level
+        return attributes
+
     def _backoff(self) -> float:
         delay = self._reconnect_delay * BACKOFF_FACTOR
         if delay >= BACKOFF_MAX:

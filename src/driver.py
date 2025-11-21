@@ -14,10 +14,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 import ucapi
-from ucapi import MediaPlayer, media_player
 from ucapi.media_player import Attributes as MediaAttr
 
 import config
+import media_player
+import remote
 import setup_flow
 import tv
 from profiles import DeviceProfile, Profile
@@ -65,6 +66,34 @@ async def on_standby():
         configured.disconnect()
 
 
+async def connect_device(device: tv.AndroidTv):
+    """Connect device and send state."""
+    try:
+        _LOG.debug("Connecting device %s...", device.device_config.id)
+        await device.connect()
+        _LOG.debug("Device %s connected, sending attributes for subscribed entities", device.device_config.id)
+        state = device.state
+        for entity in api.configured_entities.get_all():
+            entity_id = entity.get("entity_id", "")
+            device_id = config.device_from_entity_id(entity_id)
+            if device_id != device.device_config.id:
+                continue
+            # Return all attributes according to entity type
+            if isinstance(entity, media_player.AndroidTVMediaPlayer):
+                if _LOG.level <= logging.DEBUG:
+                    attributes = {
+                        k: v for k, v in device.attributes.items() if k != MediaAttr.MEDIA_IMAGE_URL or len(v) < 64
+                    }
+                    _LOG.debug("Sending attributes %s : %s", entity_id, attributes)
+                api.configured_entities.update_attributes(entity_id, device.attributes)
+            if isinstance(entity, remote.AndroidTVRemote):
+                api.configured_entities.update_attributes(
+                    entity_id, {ucapi.remote.Attributes.STATE: remote.REMOTE_STATE_MAPPING.get(state)}
+                )
+    except RuntimeError as ex:
+        _LOG.error("Error while reconnecting to Kodi %s", ex)
+
+
 @api.listens_to(ucapi.Events.EXIT_STANDBY)
 async def on_exit_standby():
     """
@@ -87,19 +116,24 @@ async def on_subscribe_entities(entity_ids) -> None:
     """
     _LOG.debug("Subscribe entities event: %s", entity_ids)
     for entity_id in entity_ids:
-        # Simple mapping at the moment: one entity per device (with the same id)
-        atv_id = entity_id
-        if atv_id in _configured_android_tvs:
-            atv = _configured_android_tvs[atv_id]
+        entity = api.configured_entities.get(entity_id)
+        device_id = config.device_from_entity_id(entity_id)
+        if device_id in _configured_android_tvs:
+            atv = _configured_android_tvs[device_id]
             if atv.is_on is None:
-                state = media_player.States.UNAVAILABLE
+                state = ucapi.media_player.States.UNAVAILABLE
             else:
-                state = media_player.States.ON if atv.is_on else media_player.States.OFF
-            api.configured_entities.update_attributes(entity_id, {media_player.Attributes.STATE: state})
+                state = ucapi.media_player.States.ON if atv.is_on else ucapi.media_player.States.OFF
+            if isinstance(entity, media_player.AndroidTVMediaPlayer):
+                api.configured_entities.update_attributes(entity_id, {ucapi.media_player.Attributes.STATE: state})
+            if isinstance(entity, remote.AndroidTVRemote):
+                api.configured_entities.update_attributes(
+                    entity_id, {ucapi.remote.Attributes.STATE: remote.REMOTE_STATE_MAPPING.get(state)}
+                )
             _LOOP.create_task(atv.connect())
             continue
 
-        device = config.devices.get(atv_id)
+        device = config.devices.get(device_id)
         if device:
             _add_configured_android_tv(device)
         else:
@@ -110,87 +144,92 @@ async def on_subscribe_entities(entity_ids) -> None:
 async def on_unsubscribe_entities(entity_ids) -> None:
     """On unsubscribe, we disconnect the devices and remove listeners for events."""
     _LOG.debug("Unsubscribe entities event: %s", entity_ids)
-    # Simple mapping at the moment: one entity per device (with the same id)
+    devices_to_remove = set()
     for entity_id in entity_ids:
-        _configured_android_tvs[entity_id].disconnect()
-        _configured_android_tvs[entity_id].events.remove_all_listeners()
+        device_id = config.device_from_entity_id(entity_id)
+        if device_id is None:
+            continue
+        devices_to_remove.add(device_id)
 
+    # Keep devices that are used by other configured entities not in this list
+    for entity in api.configured_entities.get_all():
+        entity_id = entity.get("entity_id", "")
+        if entity_id in entity_ids:
+            continue
+        device_id = config.device_from_entity_id(entity_id)
+        if device_id is None:
+            continue
+        if device_id in devices_to_remove:
+            devices_to_remove.remove(device_id)
 
-# pylint: disable=too-many-return-statements
-async def media_player_cmd_handler(
-    entity: MediaPlayer, cmd_id: str, params: dict[str, Any] | None
-) -> ucapi.StatusCodes:
-    """
-    Media-player entity command handler.
-
-    Called by the integration-API if a command is sent to a configured media-player entity.
-
-    :param entity: media-player entity
-    :param cmd_id: command
-    :param params: optional command parameters
-    :return:
-    """
-    # Simple mapping at the moment: one entity per device (with the same id)
-    atv_id = entity.id
-
-    if atv_id not in _configured_android_tvs:
-        _LOG.warning(
-            "Cannot execute command %s %s: no Android TV device found for entity %s",
-            cmd_id,
-            params if params else "",
-            entity.id,
-        )
-        return ucapi.StatusCodes.NOT_FOUND
-
-    android_tv = _configured_android_tvs[atv_id]
-
-    _LOG.info("[%s] command: %s %s", android_tv.log_id, cmd_id, params if params else "")
-
-    if cmd_id == media_player.Commands.ON:
-        return await android_tv.turn_on()
-    if cmd_id == media_player.Commands.OFF:
-        return await android_tv.turn_off()
-    if cmd_id == media_player.Commands.SELECT_SOURCE:
-        if params is None or "source" not in params:
-            return ucapi.StatusCodes.BAD_REQUEST
-        return await android_tv.select_source(params["source"])
-    if cmd_id == media_player.Commands.VOLUME_UP:
-        return await android_tv.volume_up()
-    if cmd_id == media_player.Commands.VOLUME_DOWN:
-        return await android_tv.volume_down()
-    if cmd_id == media_player.Commands.MUTE_TOGGLE:
-        return await android_tv.volume_mute_toggle()
-    if cmd_id == media_player.Commands.VOLUME:
-        return await android_tv.volume_set(params.get("volume"))
-    if cmd_id == media_player.Commands.SEEK:
-        return await android_tv.media_seek(params.get("media_position", 0))
-
-    return await android_tv.send_media_player_command(cmd_id)
+    for device_id in devices_to_remove:
+        if device_id in _configured_android_tvs:
+            _configured_android_tvs[device_id].disconnect()
+            _configured_android_tvs[device_id].events.remove_all_listeners()
 
 
 async def handle_connected(identifier: str):
     """Handle Android TV connection."""
     device = config.devices.get(identifier)
+    if identifier not in _configured_android_tvs:
+        _LOG.warning("Device %s is not configured", identifier)
+        return
+
     _LOG.debug("[%s] device connected", device.name if device else identifier)
 
-    if device and device.auth_error:
-        device.auth_error = False
-        config.devices.update(device)
+    for entity_id in _entities_from_device_id(identifier):
+        configured_entity = api.configured_entities.get(entity_id)
+        if configured_entity is None:
+            continue
 
-    # TODO is this the correct state?
-    api.configured_entities.update_attributes(identifier, {media_player.Attributes.STATE: media_player.States.STANDBY})
-    await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
+        if configured_entity.entity_type == ucapi.EntityTypes.MEDIA_PLAYER:
+            if (
+                configured_entity.attributes[ucapi.media_player.Attributes.STATE]
+                == ucapi.media_player.States.UNAVAILABLE
+            ):
+                # TODO why STANDBY?
+                api.configured_entities.update_attributes(
+                    entity_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.STANDBY}
+                )
+            else:
+                api.configured_entities.update_attributes(
+                    entity_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.ON}
+                )
+        elif configured_entity.entity_type == ucapi.EntityTypes.REMOTE:
+            if configured_entity.attributes[ucapi.remote.Attributes.STATE] == ucapi.remote.States.UNAVAILABLE:
+                api.configured_entities.update_attributes(
+                    entity_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.OFF}
+                )
+
+        if device and device.auth_error:
+            device.auth_error = False
+            config.devices.update(device)
+
+        # TODO is this the correct state?
+        api.configured_entities.update_attributes(identifier, {MediaAttr.STATE: ucapi.media_player.States.STANDBY})
+
+        await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
 
 
 async def handle_disconnected(identifier: str):
     """Handle Android TV disconnection."""
+    for entity_id in _entities_from_device_id(identifier):
+        configured_entity = api.configured_entities.get(entity_id)
+        if configured_entity is None:
+            continue
+
+        if configured_entity.entity_type == ucapi.EntityTypes.MEDIA_PLAYER:
+            api.configured_entities.update_attributes(
+                entity_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.UNAVAILABLE}
+            )
+        elif configured_entity.entity_type == ucapi.EntityTypes.REMOTE:
+            api.configured_entities.update_attributes(
+                entity_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.UNAVAILABLE}
+            )
+
     if _LOG.isEnabledFor(logging.DEBUG):
         device = config.devices.get(identifier)
         _LOG.debug("[%s] device disconnected", device.name if device else identifier)
-
-    api.configured_entities.update_attributes(
-        identifier, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
-    )
 
 
 async def handle_authentication_error(identifier: str):
@@ -200,9 +239,19 @@ async def handle_authentication_error(identifier: str):
         device.auth_error = True
         config.devices.update(device)
 
-    api.configured_entities.update_attributes(
-        identifier, {media_player.Attributes.STATE: media_player.States.UNAVAILABLE}
-    )
+    for entity_id in _entities_from_device_id(identifier):
+        configured_entity = api.configured_entities.get(entity_id)
+        if configured_entity is None:
+            continue
+
+        if configured_entity.entity_type == ucapi.EntityTypes.MEDIA_PLAYER:
+            api.configured_entities.update_attributes(
+                entity_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.UNAVAILABLE}
+            )
+        elif configured_entity.entity_type == ucapi.EntityTypes.REMOTE:
+            api.configured_entities.update_attributes(
+                entity_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.UNAVAILABLE}
+            )
 
 
 async def handle_android_tv_address_change(atv_id: str, address: str) -> None:
@@ -222,12 +271,8 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
     :param atv_id: AndroidTV identifier
     :param update: dictionary containing the updated properties
     """
-    attributes = {}
-    # Simple mapping at the moment: one entity per device (with the same id)
-    entity_id = atv_id
-
-    configured_entity = api.configured_entities.get(entity_id)
-    if configured_entity is None:
+    configured_entities = _entities_from_device_id(atv_id)
+    if len(configured_entities) == 0:
         _LOG.debug("[%s] ignoring non-configured device update: %s", atv_id, update)
         return
 
@@ -235,68 +280,93 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
         device = config.devices.get(atv_id)
         _LOG.debug("[%s] device update: %s", device.name if device else atv_id, filter_data_img_properties(update))
 
-    old_state = (
-        configured_entity.attributes[MediaAttr.STATE]
-        if MediaAttr.STATE in configured_entity.attributes
-        else media_player.States.UNKNOWN
-    )
+    for entity_id in configured_entities:
+        _LOG.info("Update device %s for configured entity %s", atv_id, entity_id)
+        configured_entity = api.configured_entities.get(entity_id)
+        if configured_entity is None:
+            continue
+        attributes = {}
+        if isinstance(configured_entity, media_player.AndroidTVMediaPlayer):
+            old_state = (
+                configured_entity.attributes[MediaAttr.STATE]
+                if MediaAttr.STATE in configured_entity.attributes
+                else ucapi.media_player.States.UNKNOWN
+            )
 
-    if MediaAttr.STATE in update and update[MediaAttr.STATE] != old_state:
-        attributes[MediaAttr.STATE] = update[MediaAttr.STATE]
+            if MediaAttr.STATE in update and update[MediaAttr.STATE] != old_state:
+                attributes[MediaAttr.STATE] = update[MediaAttr.STATE]
 
-    if MediaAttr.MEDIA_TITLE in update:
-        attributes[MediaAttr.MEDIA_TITLE] = update[MediaAttr.MEDIA_TITLE]
+            if MediaAttr.MEDIA_TITLE in update:
+                attributes[MediaAttr.MEDIA_TITLE] = update[MediaAttr.MEDIA_TITLE]
 
-    if MediaAttr.MEDIA_ALBUM in update:
-        attributes[MediaAttr.MEDIA_ALBUM] = update[MediaAttr.MEDIA_ALBUM]
+            if MediaAttr.MEDIA_ALBUM in update:
+                attributes[MediaAttr.MEDIA_ALBUM] = update[MediaAttr.MEDIA_ALBUM]
 
-    if MediaAttr.MEDIA_ARTIST in update:
-        attributes[MediaAttr.MEDIA_ARTIST] = update[MediaAttr.MEDIA_ARTIST]
+            if MediaAttr.MEDIA_ARTIST in update:
+                attributes[MediaAttr.MEDIA_ARTIST] = update[MediaAttr.MEDIA_ARTIST]
 
-    if MediaAttr.MEDIA_POSITION in update:
-        attributes[MediaAttr.MEDIA_POSITION] = update[MediaAttr.MEDIA_POSITION]
-        attributes["media_position_updated_at"] = datetime.now(tz=UTC).isoformat()
+            if MediaAttr.MEDIA_POSITION in update:
+                attributes[MediaAttr.MEDIA_POSITION] = update[MediaAttr.MEDIA_POSITION]
+                attributes["media_position_updated_at"] = datetime.now(tz=UTC).isoformat()
 
-    if MediaAttr.MEDIA_DURATION in update:
-        attributes[MediaAttr.MEDIA_DURATION] = update[MediaAttr.MEDIA_DURATION]
+            if MediaAttr.MEDIA_DURATION in update:
+                attributes[MediaAttr.MEDIA_DURATION] = update[MediaAttr.MEDIA_DURATION]
 
-    if MediaAttr.MEDIA_IMAGE_URL in update:
-        attributes[MediaAttr.MEDIA_IMAGE_URL] = update[MediaAttr.MEDIA_IMAGE_URL]
+            if MediaAttr.MEDIA_IMAGE_URL in update:
+                attributes[MediaAttr.MEDIA_IMAGE_URL] = update[MediaAttr.MEDIA_IMAGE_URL]
 
-    if MediaAttr.VOLUME in update:
-        attributes[MediaAttr.VOLUME] = update[MediaAttr.VOLUME]
+            if MediaAttr.VOLUME in update:
+                attributes[MediaAttr.VOLUME] = update[MediaAttr.VOLUME]
 
-    if MediaAttr.MUTED in update:
-        attributes[MediaAttr.MUTED] = update[MediaAttr.MUTED]
+            if MediaAttr.MUTED in update:
+                attributes[MediaAttr.MUTED] = update[MediaAttr.MUTED]
 
-    if MediaAttr.SOURCE_LIST in update:
-        attributes[MediaAttr.SOURCE_LIST] = update[MediaAttr.SOURCE_LIST]
+            if MediaAttr.SOURCE_LIST in update:
+                attributes[MediaAttr.SOURCE_LIST] = update[MediaAttr.SOURCE_LIST]
 
-    if MediaAttr.SOURCE in update:
-        attributes[MediaAttr.SOURCE] = update[MediaAttr.SOURCE]
+            if MediaAttr.SOURCE in update:
+                attributes[MediaAttr.SOURCE] = update[MediaAttr.SOURCE]
 
-    if attributes:
-        if MediaAttr.STATE not in attributes and old_state in (
-            media_player.States.UNAVAILABLE,
-            media_player.States.UNKNOWN,
-        ):
-            attributes[media_player.Attributes.STATE] = media_player.States.ON
+            if attributes:
+                if MediaAttr.STATE not in attributes and old_state in (
+                    ucapi.media_player.States.UNAVAILABLE,
+                    ucapi.media_player.States.UNKNOWN,
+                ):
+                    attributes[MediaAttr.STATE] = ucapi.media_player.States.ON
 
-        api.configured_entities.update_attributes(entity_id, attributes)
+                api.configured_entities.update_attributes(entity_id, attributes)
+            attributes = update
+        elif isinstance(configured_entity, remote.AndroidTVRemote):
+            attributes = configured_entity.filter_changed_attributes(update)
+
+        if attributes:
+            api.configured_entities.update_attributes(entity_id, attributes)
 
 
-def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -> None:
-    profile = device_profile.match(device.manufacturer, device.model, device.use_chromecast)
+def _entities_from_device_id(device_id: str) -> list[str]:
+    """
+    Return all associated entity identifiers of the given device.
+
+    :param device_id: the device identifier
+    :return: list of entity identifiers
+    """
+    # dead simple for now: one media_player entity per device!
+    # TODO #21 support multiple zones: one media-player per zone
+    return [f"media_player.{device_id}", f"remote.{device_id}"]
+
+
+def _add_configured_android_tv(device_config: config.AtvDevice, connect: bool = True) -> None:
+    profile = device_profile.match(device_config.manufacturer, device_config.model, device_config.use_chromecast)
 
     # the device should not yet be configured, but better be safe
-    if device.id in _configured_android_tvs:
-        android_tv = _configured_android_tvs[device.id]
+    if device_config.id in _configured_android_tvs:
+        android_tv = _configured_android_tvs[device_config.id]
         android_tv.disconnect()
     else:
         android_tv = tv.AndroidTv(
-            certfile=config.devices.certfile(device.id),
-            keyfile=config.devices.keyfile(device.id),
-            device_config=device,
+            certfile=config.devices.certfile(device_config.id),
+            keyfile=config.devices.keyfile(device_config.id),
+            device_config=device_config,
             profile=profile,
             loop=_LOOP,
         )
@@ -306,11 +376,11 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         android_tv.events.on(tv.Events.UPDATE, handle_android_tv_update)
         android_tv.events.on(tv.Events.IP_ADDRESS_CHANGED, handle_android_tv_address_change)
 
-        _configured_android_tvs[device.id] = android_tv
+        _configured_android_tvs[device_config.id] = android_tv
         _LOG.info(
             "[%s] Configured Android TV device %s with profile and features : %s %s %s",
-            device.name,
-            device.id,
+            device_config.name,
+            device_config.id,
             profile.manufacturer,
             profile.model,
             profile.features,
@@ -324,45 +394,23 @@ def _add_configured_android_tv(device: config.AtvDevice, connect: bool = True) -
         # start background task
         _LOOP.create_task(start_connection())
 
-    _register_available_entities(device, profile)
+    _register_available_entities(device_config, android_tv, profile)
 
 
-def _register_available_entities(device: config.AtvDevice, profile: Profile) -> None:
+def _register_available_entities(device_config: config.AtvDevice, device: tv.AndroidTv, profile: Profile) -> None:
     """
     Create entities for given Android TV device and register them as available entities.
 
     :param device: Android TV configuration
     """
-    # Simple mapping at the moment: one entity per device (with the same id)
-    entity_id = device.id
-    features = profile.features
-    options = {}
-    if profile.simple_commands:
-        options[media_player.Options.SIMPLE_COMMANDS] = profile.simple_commands
-
-    entity = media_player.MediaPlayer(
-        entity_id,
-        device.name,
-        features,
-        {
-            media_player.Attributes.STATE: media_player.States.UNKNOWN,
-            media_player.Attributes.VOLUME: 0,
-            media_player.Attributes.MUTED: False,
-            media_player.Attributes.MEDIA_TITLE: "",
-            media_player.Attributes.MEDIA_ALBUM: "",
-            media_player.Attributes.MEDIA_ARTIST: "",
-            media_player.Attributes.MEDIA_POSITION: 0,
-            media_player.Attributes.MEDIA_DURATION: 0,
-            media_player.Attributes.MEDIA_IMAGE_URL: "",
-        },
-        device_class=media_player.DeviceClasses.TV,
-        options=options,
-        cmd_handler=media_player_cmd_handler,
-    )
-
-    if api.available_entities.contains(entity.id):
-        api.available_entities.remove(entity.id)
-    api.available_entities.add(entity)
+    entities = [
+        media_player.AndroidTVMediaPlayer(device_config, device, profile),
+        remote.AndroidTVRemote(device_config, device, profile),
+    ]
+    for entity in entities:
+        if api.available_entities.contains(entity.id):
+            api.available_entities.remove(entity.id)
+        api.available_entities.add(entity)
 
 
 def on_device_added(device: config.AtvDevice) -> None:
@@ -387,10 +435,9 @@ def on_device_removed(device: config.AtvDevice | None) -> None:
             atv = _configured_android_tvs.pop(device.id)
             atv.disconnect()
             atv.events.remove_all_listeners()
-            # Simple mapping at the moment: one entity per device (with the same id)
-            entity_id = atv.identifier
-            api.configured_entities.remove(entity_id)
-            api.available_entities.remove(entity_id)
+            for entity_id in _entities_from_device_id(device.id):
+                api.configured_entities.remove(entity_id)
+                api.available_entities.remove(entity_id)
 
 
 async def main():
@@ -407,6 +454,8 @@ async def main():
     logging.getLogger("discover").setLevel(level)
     logging.getLogger("profiles").setLevel(level)
     logging.getLogger("setup_flow").setLevel(level)
+    logging.getLogger("media_player").setLevel(level)
+    logging.getLogger("remote").setLevel(level)
     logging.getLogger("androidtvremote2").setLevel(level)
     logging.getLogger("external_metadata").setLevel(level)
     # logging.getLogger("pychromecast").setLevel(level)
