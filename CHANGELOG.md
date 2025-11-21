@@ -10,6 +10,17 @@ _Changes in the next release_
 
 ---
 
+## v0.7.6 - 2025-11-21
+### Fixed
+- Potential reconnection failures in some scenarios. Contributed by @albaintor, thanks! ([#83](https://github.com/unfoldedcircle/integration-androidtv/pull/83)).
+- Crash when Chromecast publishes an artwork. Contributed by @albaintor, thanks! ([#99](https://github.com/unfoldedcircle/integration-androidtv/pull/99)).
+
+### Changed
+- Update androidtvremote2 library to 0.3.0 ([#107](https://github.com/unfoldedcircle/integration-androidtv/pull/107)).
+- Update pychromecast library to 14.0.9 ([#101](https://github.com/unfoldedcircle/integration-androidtv/pull/101)).
+- Update ucapi to 0.3.2 ([#100](https://github.com/unfoldedcircle/integration-androidtv/pull/100)).
+- CI: bump GitHub Actions to newer major versions: actions/checkout v6, actions/setup-node v6, actions/download-artifact v6, actions/upload-artifact v5 ([#110](https://github.com/unfoldedcircle/integration-androidtv/pull/110), [#103](https://github.com/unfoldedcircle/integration-androidtv/pull/103), [#105](https://github.com/unfoldedcircle/integration-androidtv/pull/105), [#106](https://github.com/unfoldedcircle/integration-androidtv/pull/106)).
+
 ## v0.7.5 - 2025-09-18
 ### Added
 - Identify Projectivity launcher as a home screen app ([#89](https://github.com/unfoldedcircle/integration-androidtv/pull/89)).
