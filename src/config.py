@@ -380,4 +380,4 @@ class Devices:
         return True
 
 
-devices: Devices | None = None
+devices: Devices | None = None  # pylint: disable=C0103

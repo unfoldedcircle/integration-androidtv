@@ -19,6 +19,7 @@ def is_standby_app(app_id: str) -> bool:
 
 
 # Application launch links
+# pylint: disable=C0103
 Apps = {
     "Youtube": {"url": "https://www.youtube.com"},
     "Prime Video": {"url": "https://app.primevideo.com"},
@@ -55,6 +56,7 @@ Apps = {
 
 # Direct application-id mappings to friendly names
 # Used to show which app is currently in the foreground (currently playing)
+# pylint: disable=C0103
 IdMappings = {
     "com.google.android.backdrop": "Backdrop Daydream",
     "com.google.android.apps.tv.dreamx": "Backdrop Daydream",
@@ -106,6 +108,7 @@ IdMappings = {
 
 # Application-ID substring mappings to friendly names
 # Used to show which app is currently in the foreground (currently playing)
+# pylint: disable=C0103
 NameMatching = {
     "youtube": "YouTube",
     "videomanager": "YouTube",

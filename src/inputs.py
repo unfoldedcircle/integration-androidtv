@@ -4,6 +4,7 @@ Input keycode mappings.
 See https://github.com/tronikos/androidtvremote2/blob/v0.0.14/src/androidtvremote2/remotemessage.proto#L681-L731
 """
 
+# pylint: disable=C0103
 KeyCode = {
     "HDMI 1": "KEYCODE_TV_INPUT_HDMI_1",
     "HDMI 2": "KEYCODE_TV_INPUT_HDMI_2",
