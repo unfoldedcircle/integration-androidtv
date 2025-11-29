@@ -15,7 +15,7 @@ import time
 from asyncio import AbstractEventLoop, Lock, timeout
 from enum import IntEnum
 from functools import wraps
-from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
+from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar, cast
 
 import pychromecast
 import ucapi
@@ -460,7 +460,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     async with timeout(CONNECTION_TIMEOUT):
                         await self._atv.async_connect()
                 except CannotConnect as ex:
-                    if isinstance(ex.__cause__, OSError):
+                    # OSError(101, 'Network is unreachable') then wait ERROR_OS_WAIT and try again
+                    if isinstance(ex.__cause__, OSError) and cast(OSError, ex).errno == 101:
                         _LOG.warning(
                             "[%s] Network may not be ready yet %s : retry (%s)", self.log_id, self._identifier, ex
                         )
