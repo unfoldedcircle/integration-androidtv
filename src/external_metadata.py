@@ -145,10 +145,11 @@ async def encode_image_to_data_uri(icon_name: str) -> str:
                 img = Image.open(img_bytes)
                 size = max(img.size[0], img.size[1])
                 if size > IMAGE_SIZE_MAX:
-                    percent = (IMAGE_SIZE_MAX / float(size))
-                    img = img.resize((int((float(img.size[0]) * float(percent))),
-                                      int((float(img.size[1]) * float(percent)))),
-                                     Image.Resampling.LANCZOS)
+                    percent = IMAGE_SIZE_MAX / float(size)
+                    img = img.resize(
+                        (int((float(img.size[0]) * float(percent))), int((float(img.size[1]) * float(percent)))),
+                        Image.Resampling.LANCZOS,
+                    )
                 img = img.convert("RGBA")
                 buffer = BytesIO()
                 img.save(buffer, format="PNG")
