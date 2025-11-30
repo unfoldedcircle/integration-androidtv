@@ -50,7 +50,7 @@ import apps
 import discover
 import inputs
 from config import AtvDevice
-from external_metadata import encode_icon_to_data_uri, get_app_metadata
+from external_metadata import encode_image_to_data_uri, get_app_metadata
 from profiles import KeyPress, Profile
 from util import filter_data_img_properties
 
@@ -611,7 +611,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         # one-time initialization
         if HOMESCREEN_IMAGE is None:
             HOMESCREEN_IMAGE = ""
-            HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://androidtv.png")
+            HOMESCREEN_IMAGE = await encode_image_to_data_uri("config://androidtv.png")
 
         # Special handling for homescreen & Android TV system apps: show pre-defined icon
         homescreen_app = apps.is_homescreen_app(current_app)
@@ -916,16 +916,21 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO)
             update[MediaAttr.MEDIA_TYPE] = self._media_type
 
-        if status.images and len(status.images) > 0 and status.images[0].url != self._media_image_url:
-            self._media_image_url = status.images[0].url
-            update[MediaAttr.MEDIA_IMAGE_URL] = self._media_image_url
+        if status.images and len(status.images) > 0:
+            if status.images[0].url != self._media_image_url:
+                self._media_image_url = status.images[0].url
+                # The remote does not support https URL images, encode them
+                if self._media_image_url.lower().startswith("https"):
+                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_image_to_data_uri(self._media_image_url)
+                else:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = self._media_image_url
             self._use_app_url = False
         else:
             self._media_image_url = None
             if self._device_config.use_external_metadata:
                 self._use_app_url = True
                 if self._app_image_url:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_icon_to_data_uri(self._app_image_url)
+                    update[MediaAttr.MEDIA_IMAGE_URL] = await encode_image_to_data_uri(self._app_image_url)
 
         if update:
             if _LOG.isEnabledFor(logging.DEBUG):

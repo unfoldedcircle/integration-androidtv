@@ -119,7 +119,7 @@ async def _download_and_resize_icon(url: str, package_id: str) -> str | None:
         return None
 
 
-async def encode_icon_to_data_uri(icon_name: str) -> str:
+async def encode_image_to_data_uri(icon_name: str) -> str:
     """
     Encode an image from a local file path or remote URL.
 
@@ -135,7 +135,7 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
     _LOG.debug("Encoding icon to data URI: %s", icon_name)
     try:
         if _is_url(icon_name):
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(verify=False) as client:
                 response = await client.get(icon_name, timeout=10)
                 response.raise_for_status()
                 img_bytes = BytesIO(response.content)
@@ -215,7 +215,7 @@ async def get_app_metadata(package_id: str) -> Dict[str, str]:
     if package_id in cache:
         _LOG.debug("Cache hit for %s", package_id)
         icon_name = cache[package_id].get("icon")
-        icon_data_uri = await encode_icon_to_data_uri(icon_name) if icon_name else ""
+        icon_data_uri = await encode_image_to_data_uri(icon_name) if icon_name else ""
         return {"name": cache[package_id]["name"], "icon": icon_data_uri}
 
     _LOG.debug("Cache miss for %s", package_id)
@@ -224,7 +224,7 @@ async def get_app_metadata(package_id: str) -> Dict[str, str]:
     if metadata:
         cache[package_id] = metadata
         _save_cache(cache)
-        icon_data_uri = await encode_icon_to_data_uri(metadata["icon"]) if metadata["icon"] else ""
+        icon_data_uri = await encode_image_to_data_uri(metadata["icon"]) if metadata["icon"] else ""
         return {"name": metadata["name"], "icon": icon_data_uri}
 
     _LOG.debug("Falling back to default metadata for %s", package_id)
