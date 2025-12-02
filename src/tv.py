@@ -916,9 +916,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO)
             update[MediaAttr.MEDIA_TYPE] = self._media_type
 
-        if status.images and len(status.images) > 0 and status.images[0].url != self._media_image_url:
-            self._media_image_url = status.images[0].url
-            update[MediaAttr.MEDIA_IMAGE_URL] = self._media_image_url
+        if status.images and len(status.images) > 0:
+            if status.images[0].url != self._media_image_url:
+                self._media_image_url = status.images[0].url
+                update[MediaAttr.MEDIA_IMAGE_URL] = self._media_image_url
             self._use_app_url = False
         else:
             self._media_image_url = None
