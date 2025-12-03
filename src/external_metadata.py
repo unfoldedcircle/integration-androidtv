@@ -10,6 +10,7 @@ import base64
 import json
 import logging
 import os
+import re
 from io import BytesIO
 from pathlib import Path
 from typing import Dict
@@ -127,7 +128,7 @@ async def encode_image_to_data_uri(icon_name: str) -> str:
     Returns a base64-encoded PNG data URI.
     """
     if isinstance(icon_name, MediaImage):
-        icon_name = icon_name.url
+        icon_name: str = icon_name.url
 
     if isinstance(icon_name, str) and icon_name.startswith("data:image"):
         _LOG.debug("Icon is already a data URI")
@@ -237,3 +238,25 @@ async def get_app_metadata(package_id: str) -> Dict[str, str]:
 
     _LOG.debug("Falling back to default metadata for %s", package_id)
     return {"name": package_id, "icon": ""}
+
+
+def reformat_media_image_url(url: str) -> str:
+    """
+    Reformat media image URL for well known services to correspond to remote capabilities.
+
+    :param url: The media image URL.
+    :type url: str
+    :return: Reformatted image URL.
+    :rtype: str
+    """
+    # Plex URL format : https://xxx/photo/:/transcode?...height=xxx...width=yyy
+    if re.search(r"/photo/:/transcode\?", url, re.IGNORECASE):
+        for argument in ["width", "height"]:
+            if value := re.search(rf"{argument}=(\d+)", url, re.IGNORECASE):
+                try:
+                    if value and int(value.group(1)) > IMAGE_SIZE_MAX:
+                        new_size = IMAGE_SIZE_MAX
+                        url = re.sub(rf"{argument}=(\d+)", f"{argument}={new_size}", url, re.IGNORECASE)
+                except ValueError:
+                    pass
+    return url
