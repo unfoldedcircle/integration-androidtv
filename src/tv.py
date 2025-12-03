@@ -919,7 +919,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if status.images and len(status.images) > 0:
             if status.images[0].url != self._media_image_url:
                 self._media_image_url = status.images[0].url
-                # The remote does not support https URL images, encode them
+                # The remote does not support self-signed https URL images, encode https url in case
                 if self._media_image_url.lower().startswith("https"):
                     update[MediaAttr.MEDIA_IMAGE_URL] = await encode_image_to_data_uri(self._media_image_url)
                 else:
