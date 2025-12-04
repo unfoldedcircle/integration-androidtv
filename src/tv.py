@@ -15,7 +15,7 @@ import time
 from asyncio import AbstractEventLoop, Lock, timeout
 from enum import IntEnum
 from functools import wraps
-from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
+from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar, cast
 
 import pychromecast
 import ucapi
@@ -57,6 +57,7 @@ from util import filter_data_img_properties
 _LOG = logging.getLogger(__name__)
 
 CONNECTION_TIMEOUT: float = 10.0
+ERROR_OS_WAIT: float = 0.5
 """Android TV device connection timeout in seconds."""
 BACKOFF_MAX: int = 30
 """Maximum backoff duration in seconds."""
@@ -455,8 +456,20 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 )
                 self.events.emit(Events.CONNECTING, self._identifier)
                 request_start = time.time()
-                async with timeout(CONNECTION_TIMEOUT):
-                    await self._atv.async_connect()
+                try:
+                    async with timeout(CONNECTION_TIMEOUT):
+                        await self._atv.async_connect()
+                except CannotConnect as ex:
+                    # OSError(101, 'Network is unreachable') then wait ERROR_OS_WAIT and try again
+                    if isinstance(ex.__cause__, OSError) and cast(OSError, ex).errno == 101:
+                        _LOG.warning(
+                            "[%s] Network may not be ready yet %s : retry (%s)", self.log_id, self._identifier, ex
+                        )
+                        await asyncio.sleep(ERROR_OS_WAIT)
+                        async with timeout(CONNECTION_TIMEOUT):
+                            await self._atv.async_connect()
+                    else:
+                        raise ex
                 success = True
                 self._connection_attempts = 0
                 self._reconnect_delay = MIN_RECONNECT_DELAY
