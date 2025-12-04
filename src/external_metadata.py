@@ -10,6 +10,7 @@ import base64
 import json
 import logging
 import os
+import re
 from io import BytesIO
 from pathlib import Path
 from typing import Dict
@@ -27,6 +28,7 @@ _LOG = logging.getLogger(__name__)
 CACHE_ROOT = "external_cache"
 ICON_SUBDIR = "icons"
 ICON_SIZE = (240, 240)
+IMAGE_SIZE_MAX = 900
 
 
 # Paths
@@ -119,14 +121,14 @@ async def _download_and_resize_icon(url: str, package_id: str) -> str | None:
         return None
 
 
-async def encode_icon_to_data_uri(icon_name: str) -> str:
+async def encode_image_to_data_uri(icon_name: str) -> str:
     """
     Encode an image from a local file path or remote URL.
 
     Returns a base64-encoded PNG data URI.
     """
     if isinstance(icon_name, MediaImage):
-        icon_name = icon_name.url
+        icon_name: str = icon_name.url
 
     if isinstance(icon_name, str) and icon_name.startswith("data:image"):
         _LOG.debug("Icon is already a data URI")
@@ -135,13 +137,20 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
     _LOG.debug("Encoding icon to data URI: %s", icon_name)
     try:
         if _is_url(icon_name):
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(verify=False) as client:
                 response = await client.get(icon_name, timeout=10)
                 response.raise_for_status()
                 img_bytes = BytesIO(response.content)
 
             def encode_image() -> str:
                 img = Image.open(img_bytes)
+                size = max(img.size[0], img.size[1])
+                if size > IMAGE_SIZE_MAX:
+                    percent = IMAGE_SIZE_MAX / float(size)
+                    img = img.resize(
+                        (int((float(img.size[0]) * float(percent))), int((float(img.size[1]) * float(percent)))),
+                        Image.Resampling.LANCZOS,
+                    )
                 img = img.convert("RGBA")
                 buffer = BytesIO()
                 img.save(buffer, format="PNG")
@@ -215,7 +224,7 @@ async def get_app_metadata(package_id: str) -> Dict[str, str]:
     if package_id in cache:
         _LOG.debug("Cache hit for %s", package_id)
         icon_name = cache[package_id].get("icon")
-        icon_data_uri = await encode_icon_to_data_uri(icon_name) if icon_name else ""
+        icon_data_uri = await encode_image_to_data_uri(icon_name) if icon_name else ""
         return {"name": cache[package_id]["name"], "icon": icon_data_uri}
 
     _LOG.debug("Cache miss for %s", package_id)
@@ -224,8 +233,30 @@ async def get_app_metadata(package_id: str) -> Dict[str, str]:
     if metadata:
         cache[package_id] = metadata
         _save_cache(cache)
-        icon_data_uri = await encode_icon_to_data_uri(metadata["icon"]) if metadata["icon"] else ""
+        icon_data_uri = await encode_image_to_data_uri(metadata["icon"]) if metadata["icon"] else ""
         return {"name": metadata["name"], "icon": icon_data_uri}
 
     _LOG.debug("Falling back to default metadata for %s", package_id)
     return {"name": package_id, "icon": ""}
+
+
+def reformat_media_image_url(url: str) -> str:
+    """
+    Reformat media image URL for well known services to correspond to remote capabilities.
+
+    :param url: The media image URL.
+    :type url: str
+    :return: Reformatted image URL.
+    :rtype: str
+    """
+    # Plex URL format : https://xxx/photo/:/transcode?...height=xxx...width=yyy
+    if re.search(r"/photo/:/transcode\?", url, re.IGNORECASE):
+        for argument in ["width", "height"]:
+            if value := re.search(rf"{argument}=(\d+)", url, re.IGNORECASE):
+                try:
+                    if value and int(value.group(1)) > IMAGE_SIZE_MAX:
+                        new_size = IMAGE_SIZE_MAX
+                        url = re.sub(rf"{argument}=(\d+)", f"{argument}={new_size}", url, re.IGNORECASE)
+                except ValueError:
+                    pass
+    return url
