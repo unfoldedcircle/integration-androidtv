@@ -10,6 +10,13 @@ _Changes in the next release_
 
 ---
 
+## v0.7.7 - 2025-12-04
+### Fixed
+- Fixed infinite update of media image url update using chromecast. Contributed by @albaintor, thanks! ([#115](https://github.com/unfoldedcircle/integration-androidtv/pull/115)).
+
+### Changed
+- If a client disconnects, the connections to the Android TV devices are no longer closed ([#111](https://github.com/unfoldedcircle/integration-androidtv/pull/111)).
+
 ## v0.7.6 - 2025-11-21
 ### Fixed
 - Potential reconnection failures in some scenarios. Contributed by @albaintor, thanks! ([#83](https://github.com/unfoldedcircle/integration-androidtv/pull/83)).
