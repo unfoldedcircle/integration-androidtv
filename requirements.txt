@@ -1,8 +1,10 @@
 androidtvremote2==0.3.0
-ucapi==0.4.0
+#ucapi==0.4.0
+# for development only until released
+git+https://github.com/unfoldedcircle/integration-python-library.git@feat/voice#egg=ucapi
 pyee~=13.0.0
 google_play_scraper==1.2.7
-pillow>=11.2.1
+pillow>=11.3
 requests>=2.32
 pychromecast~=14.0.9
 httpx~=0.28.1

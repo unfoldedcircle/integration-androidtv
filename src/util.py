@@ -9,6 +9,7 @@ from copy import deepcopy
 from typing import Any
 
 from ucapi.media_player import Attributes as MediaAttr
+from ucapi.media_player import States as MediaState
 
 
 def filter_data_img_properties(data: dict[str, Any] | None) -> dict[str, Any]:
@@ -52,3 +53,31 @@ def filter_data_img_properties(data: dict[str, Any] | None) -> dict[str, Any]:
                     item["attributes"][MediaAttr.MEDIA_IMAGE_URL] = "data:***"
 
     return log_upd
+
+
+def key_update_helper(key: str, value: str | None, attributes: dict, original_attributes: dict[str, Any]):
+    """Update the attributes dictionary with the given key and value."""
+    if value is None:
+        return attributes
+
+    if key in original_attributes:
+        if original_attributes[key] != value:
+            attributes[key] = value
+    else:
+        attributes[key] = value
+
+    return attributes
+
+
+def handle_entity_state_after_update(attributes: dict, original_attributes: dict[str, Any]) -> dict[str, Any]:
+    """Make sure the entity state is not in an incorrect state after a device update.
+
+    - If a device update is received, the entity state cannot be unavailable.
+    - The UNKNOWN state is only set if `attributes` does not already contain a state!
+    """
+    old_state = original_attributes[MediaAttr.STATE] if MediaAttr.STATE in original_attributes else MediaState.UNKNOWN
+
+    if MediaAttr.STATE not in attributes and old_state == MediaState.UNAVAILABLE:
+        attributes[MediaAttr.STATE] = MediaState.UNKNOWN
+
+    return attributes

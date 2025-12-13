@@ -24,6 +24,7 @@ from androidtvremote2 import (
     CannotConnect,
     ConnectionClosed,
     InvalidAuth,
+    VoiceStream,
 )
 from pychromecast import CastStatus, CastStatusListener, Chromecast, RequestTimeout
 from pychromecast.controllers.media import (
@@ -207,6 +208,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             keyfile=keyfile,
             host=device_config.address,
             loop=self._loop,
+            enable_voice=True,
         )
         self._identifier: str | None = device_config.id
         self._profile: Profile | None = profile
@@ -353,6 +355,16 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         return self._device_config
 
     @property
+    def is_voice_enabled(self) -> bool | None:
+        """Whether voice commands are enabled on the Android TV.
+
+        Depends on the requested feature at AndroidTVRemote initialization and the supported
+        features of the device.
+        :return: True if voice commands are enabled, False otherwise. None if not connected.
+        """
+        return self._atv.is_voice_enabled
+
+    @property
     def media_title(self) -> str | None:
         """Return media title."""
         if self._media_title and self._media_title != "":
@@ -360,6 +372,38 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._media_app in apps.IdMappings:
             return apps.IdMappings[self._media_app]
         return self._media_app
+
+    @property
+    def volume_level(self) -> float | None:
+        """Returns the volume level if supported and enabled."""
+        if not self.device_config.use_chromecast_volume:
+            return None
+        if self._chromecast:
+            return self._chromecast.status.volume_level
+        return 0
+
+    @property
+    def player_state(self) -> media_player.States:
+        """Return the media player state."""
+        return self._player_state
+
+    @property
+    def attributes(self) -> dict[str, Any]:
+        """Return the device attributes."""
+        attributes = {
+            MediaAttr.STATE: self._player_state,
+            MediaAttr.MUTED: self._muted,
+            MediaAttr.MEDIA_TYPE: self._media_type,
+            MediaAttr.MEDIA_IMAGE_URL: self._media_image_url if self._media_image_url else "",
+            MediaAttr.MEDIA_TITLE: self.media_title if self.media_title else "",
+            MediaAttr.MEDIA_ALBUM: self._media_album if self._media_album else "",
+            MediaAttr.MEDIA_ARTIST: self._media_artist if self._media_artist else "",
+            MediaAttr.MEDIA_POSITION: self._media_position,
+            MediaAttr.MEDIA_DURATION: self._media_duration,
+        }
+        if self.device_config.use_chromecast_volume:
+            attributes[MediaAttr.VOLUME] = self.volume_level
+        return attributes
 
     def _backoff(self) -> float:
         delay = self._reconnect_delay * BACKOFF_FACTOR
@@ -1035,3 +1079,16 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         except PyChromecastError as ex:
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
         return ucapi.StatusCodes.SERVER_ERROR
+
+    async def start_voice(self) -> VoiceStream:
+        """Start a streaming voice session.
+
+        A ``VoiceStream`` session wrapper is returned if the voice session can be established
+        within the given timeout. The session needs to be closed with ``end()`` (or through the
+        asynchronous context manager) before a new session is started.
+
+        :raises ConnectionClosed: if Android TV device is disconnected.
+        :raises asyncio.TimeoutError: if the device does not begin voice in time, or a voice
+                                      session is already in progress.
+        """
+        return await self._atv.start_voice()
