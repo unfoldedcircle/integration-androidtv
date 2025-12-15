@@ -7,6 +7,7 @@ This module implements a voice-assistant entity for Android TV voice commands.
 
 import asyncio
 import logging
+from collections import defaultdict
 from typing import Any
 
 from androidtvremote2 import VoiceStream
@@ -31,7 +32,7 @@ from ucapi.voice_assistant import (
 from ucapi.voice_stream import VoiceEndReason, VoiceSession, VoiceSessionClosed
 
 import tv
-from config import AtvDevice, create_entity_id
+from config import create_entity_id
 from util import handle_entity_state_after_update, key_update_helper
 
 # Only supported audio format for now.
@@ -42,10 +43,10 @@ AUDIO_SAMPLE_FORMAT = SampleFormat.I16
 
 _LOG = logging.getLogger(__name__)
 
-# FIXME(voice) HACK until core is fixed
-tmp_session_id = 0
-# FIXME(voice) HACK quick and dirty PoC, requires a map: device_id -> voice_stream
-tmp_voice_stream: VoiceStream | None = None
+# Attention: very simple voice stream session management, only works reliably for a single Remote client!
+# This is no issue when running on the device, since there will be only one client.
+# But this doesn't work when this integration is run as an external integration for multiple Remotes!
+voice_stream_sessions = defaultdict[int, VoiceStream]()
 
 
 def va_state_from_atv(device: tv.AndroidTv) -> States:
@@ -69,13 +70,12 @@ def va_state_from_media_state(state: MediaStates) -> States:
 class VoiceCommand(VoiceAssistant):
     """Representation of an Android TV voice-assistant entity."""
 
-    def __init__(self, device_config: AtvDevice, device: tv.AndroidTv, *, api):
+    def __init__(self, device: tv.AndroidTv, *, api):
         """Initialize the class."""
         self._device = device
-        self._device_config = device_config
         self._api = api
 
-        entity_id = create_entity_id(device_config.id, EntityTypes.VOICE_ASSISTANT)
+        entity_id = create_entity_id(device.device_config.id, EntityTypes.VOICE_ASSISTANT)
         features = []  # fire and forget voice command only
         super().__init__(
             entity_id,
@@ -97,18 +97,15 @@ class VoiceCommand(VoiceAssistant):
 
         Called by the integration-API if a command is sent to a configured voice-assistant entity.
 
-        :param cmd_id: command
+        :param cmd_id: the entity command
         :param params: optional command parameters
         :return: status code of the command request
         """
-        # FIXME(voice) HACK until core is fixed
-        global tmp_session_id
-
         if params is None:
             return StatusCodes.BAD_REQUEST
 
-        tmp_session_id = params.get("session_id", 0)
-        if tmp_session_id <= 0:
+        session_id = params.get("session_id", 0)
+        if session_id <= 0:
             return StatusCodes.BAD_REQUEST
 
         if cmd_id == Commands.VOICE_START:
@@ -116,7 +113,7 @@ class VoiceCommand(VoiceAssistant):
             if self._device.is_on is None:
                 return StatusCodes.SERVICE_UNAVAILABLE
             # set up Android TV voice stream as async task to not block the voice_start command
-            asyncio.create_task(self._start_voice(tmp_session_id))
+            asyncio.create_task(self._start_voice(session_id))
             return StatusCodes.OK
 
         return StatusCodes.BAD_REQUEST
@@ -138,10 +135,9 @@ class VoiceCommand(VoiceAssistant):
         return attributes
 
     async def _start_voice(self, session_id: int) -> None:
-        global tmp_voice_stream
-
         try:
-            tmp_voice_stream = await self._device.start_voice()
+            voice_stream = await self._device.start_voice()
+            voice_stream_sessions[session_id] = voice_stream
             # Acknowledge start; binary audio will arrive on the WS binary channel
             event = AssistantEvent(
                 type=AssistantEventType.READY,
@@ -176,22 +172,13 @@ class VoiceCommand(VoiceAssistant):
 
 async def on_voice_stream(session: VoiceSession):
     """Voice stream event handler from Integration API."""
-    # FIXME(voice) HACK until core is fixed
-    global tmp_voice_stream
-
-    _LOG.info(
-        "Voice stream started: session=%d, %dch @ %d Hz %s",
-        session.session_id,
-        session.config.channels,
-        session.config.sample_rate,
-        session.config.sample_format.value,
-    )
-
-    if tmp_voice_stream is None:
+    voice_stream = voice_stream_sessions.pop(session.session_id)
+    if voice_stream is None:
+        _LOG.warning("No voice stream available for session %d", session.session_id)
         event = AssistantEvent(
             type=AssistantEventType.ERROR,
             entity_id=session.entity_id,
-            session_id=tmp_session_id,
+            session_id=session.session_id,
             data=AssistantError(
                 code=AssistantErrorCode.SERVICE_UNAVAILABLE,
                 message="No voice stream to Android TV available",
@@ -200,6 +187,14 @@ async def on_voice_stream(session: VoiceSession):
         await session.send_event(event)
         return
 
+    _LOG.info(
+        "Voice stream started: session=%d, %dch @ %d Hz %s",
+        session.session_id,
+        session.config.channels,
+        session.config.sample_rate,
+        session.config.sample_format,
+    )
+
     # Note: firmware 2.8.1 returns a wrong format!
     if (
         session.config.channels != AUDIO_CHANNELS
@@ -207,11 +202,11 @@ async def on_voice_stream(session: VoiceSession):
         or session.config.sample_format != AUDIO_SAMPLE_FORMAT
     ):
         _LOG.error("Unsupported voice stream configuration: %s", session.config)
-        tmp_voice_stream.end()
+        voice_stream.end()
         event = AssistantEvent(
             type=AssistantEventType.ERROR,
             entity_id=session.entity_id,
-            session_id=tmp_session_id,
+            session_id=session.session_id,
             data=AssistantError(
                 code=AssistantErrorCode.INVALID_AUDIO,
                 message="Received unsupported voice stream configuration",
@@ -221,11 +216,44 @@ async def on_voice_stream(session: VoiceSession):
         return
 
     total = 0
+    buffer = bytearray()
+    # wav_buffer = bytearray()
     try:
-        async for frame in session:  # frame is bytes
-            total += len(frame)
-            _LOG.debug("Got %d bytes of audio data", len(frame))
-            tmp_voice_stream.send_chunk(frame)
+        first = True
+        async for chunk in session:
+            if first:
+                first = False
+                continue
+            total += len(chunk)
+            # --- Option A) stream directly to Android.
+            # ATTENTION: requires patching androidtvremote2 library. VOICE_CHUNK_MIN_SIZE padding needs to be disabled
+            # voice_stream.send_chunk(chunk)
+            # wav_buffer += chunk
+
+            # --- Option B) accumulate chunks until we have at least 8KB
+            # Doesn't work reliably: say "mute the volume", Google understands "set an alarm"
+            # buffer += chunk
+            # if len(buffer) >= androidtvremote2.remote.VOICE_CHUNK_MIN_SIZE:
+            #     _LOG.debug("Sending %d bytes of audio data to ATV", len(buffer))
+            #
+            #     voice_stream.send_chunk(bytes(buffer), 2.0)
+            #     wav_buffer += bytes(buffer)
+            #     buffer.clear()
+
+            # --- Option C) accumulate all chunks, then send it at once. Works best so far...
+            buffer += chunk
+            # wav_buffer += chunk
+
+        # An empty chunk at the end _seems_ to improve the text recognition. No idea why, but without, the last word
+        # is often not recognized or missing. If Google only publishes their API!!!!
+        buffer += b"\x00" * 4096
+
+        # flush any remaining bytes when the session iterator ends
+        if buffer:
+            _LOG.debug("Sending final %d bytes of audio data to ATV", len(buffer))
+            voice_stream.send_chunk(bytes(buffer))
+            # wav_buffer += bytes(buffer)
+            # _write_stream_to_wav([wav_buffer])
         _LOG.info("Voice stream ended: session=%d, bytes=%d", session.session_id, total)
     except VoiceSessionClosed as ex:
         _LOG.warning(
@@ -236,7 +264,7 @@ async def on_voice_stream(session: VoiceSession):
         event = AssistantEvent(
             type=AssistantEventType.ERROR,
             entity_id=session.entity_id,
-            session_id=tmp_session_id,
+            session_id=session.session_id,
             data=AssistantError(
                 code=(
                     AssistantErrorCode.TIMEOUT
@@ -248,13 +276,12 @@ async def on_voice_stream(session: VoiceSession):
         )
         await session.send_event(event)
     finally:
-        tmp_voice_stream.end()
-        tmp_voice_stream = None
+        voice_stream.end()
 
     # final event
     event = AssistantEvent(
         type=AssistantEventType.FINISHED,
         entity_id=session.entity_id,
-        session_id=tmp_session_id,
+        session_id=session.session_id,
     )
     await session.send_event(event)

@@ -327,7 +327,7 @@ def _register_available_entities(device_config: config.AtvDevice, device: tv.And
     #             and enhance setup process to check for voice capabilities.
     # At startup, the device is not connected and is_voice_enabled is always None.
     if device.is_voice_enabled is not False:
-        entities.append(voice_command.VoiceCommand(device_config, device, api=api))
+        entities.append(voice_command.VoiceCommand(device, api=api))
 
     for entity in entities:
         if api.available_entities.contains(entity.id):
