@@ -4,8 +4,7 @@ from copy import deepcopy
 from ucapi.media_player import Attributes as MediaAttr
 from ucapi.media_player import States as MediaState
 
-from src.util import filter_data_img_properties, key_update_helper
-from util import handle_entity_state_after_update
+from src.util import filter_data_img_properties, key_update_helper, handle_entity_state_after_update
 
 
 class TestFilterDataImgProperties(unittest.TestCase):

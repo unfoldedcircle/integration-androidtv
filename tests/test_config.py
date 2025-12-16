@@ -1,6 +1,6 @@
 import unittest
 
-from config import device_from_entity_id
+from src.config import device_from_entity_id
 
 
 class TestConfig(unittest.TestCase):
