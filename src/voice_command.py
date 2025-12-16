@@ -29,7 +29,12 @@ from ucapi.voice_assistant import (
     States,
     VoiceAssistantEntityOptions,
 )
-from ucapi.voice_stream import VoiceEndReason, VoiceSession, VoiceSessionClosed
+from ucapi.voice_stream import (
+    VoiceEndReason,
+    VoiceSession,
+    VoiceSessionClosed,
+    VoiceSessionKey,
+)
 
 import tv
 from config import create_entity_id
@@ -43,10 +48,7 @@ AUDIO_SAMPLE_FORMAT = SampleFormat.I16
 
 _LOG = logging.getLogger(__name__)
 
-# Attention: very simple voice stream session management, only works reliably for a single Remote client!
-# This is no issue when running on the device, since there will be only one client.
-# But this doesn't work when this integration is run as an external integration for multiple Remotes!
-voice_stream_sessions = defaultdict[int, VoiceStream]()
+_voice_stream_sessions = defaultdict[VoiceSessionKey, VoiceStream]()
 
 
 def va_state_from_atv(device: tv.AndroidTv) -> States:
@@ -91,14 +93,16 @@ class VoiceCommand(VoiceAssistant):
             ),
         )
 
-    async def command(self, cmd_id: str, params: dict[str, Any] | None = None) -> StatusCodes:
+    async def command(self, cmd_id: str, params: dict[str, Any] | None = None, *, websocket: Any) -> StatusCodes:
         """
         Voice Assistant entity command handler.
 
         Called by the integration-API if a command is sent to a configured voice-assistant entity.
 
+        :param websocket:
         :param cmd_id: the entity command
         :param params: optional command parameters
+        :param websocket: websocket connection for sending voice-events back to caller.
         :return: status code of the command request
         """
         if params is None:
@@ -113,7 +117,7 @@ class VoiceCommand(VoiceAssistant):
             if self._device.is_on is None:
                 return StatusCodes.SERVICE_UNAVAILABLE
             # set up Android TV voice stream as async task to not block the voice_start command
-            asyncio.create_task(self._start_voice(session_id))
+            asyncio.create_task(self._start_voice(websocket, session_id))
             return StatusCodes.OK
 
         return StatusCodes.BAD_REQUEST
@@ -134,10 +138,10 @@ class VoiceCommand(VoiceAssistant):
         attributes = handle_entity_state_after_update(attributes, self.attributes)
         return attributes
 
-    async def _start_voice(self, session_id: int) -> None:
+    async def _start_voice(self, websocket: Any, session_id: int) -> None:
         try:
             voice_stream = await self._device.start_voice()
-            voice_stream_sessions[session_id] = voice_stream
+            _voice_stream_sessions[websocket, session_id] = voice_stream
             # Acknowledge start; binary audio will arrive on the WS binary channel
             event = AssistantEvent(
                 type=AssistantEventType.READY,
@@ -167,12 +171,12 @@ class VoiceCommand(VoiceAssistant):
                 ),
             )
 
-        await self._api.broadcast_assistant_event(event)
+        await self._api.send_assistant_event(websocket, event)
 
 
 async def on_voice_stream(session: VoiceSession):
     """Voice stream event handler from Integration API."""
-    voice_stream = voice_stream_sessions.pop(session.session_id)
+    voice_stream = _voice_stream_sessions.pop(session.key)
     if voice_stream is None:
         _LOG.warning("No voice stream available for session %d", session.session_id)
         event = AssistantEvent(

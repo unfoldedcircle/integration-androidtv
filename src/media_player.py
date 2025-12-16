@@ -40,13 +40,14 @@ class AndroidTVMediaPlayer(MediaPlayer):  # pylint: disable=too-few-public-metho
         )
 
     # pylint: disable=too-many-return-statements
-    async def command(self, cmd_id: str, params: dict[str, Any] | None = None) -> StatusCodes:
+    async def command(self, cmd_id: str, params: dict[str, Any] | None = None, *, websocket: Any) -> StatusCodes:
         """Media-player entity command handler.
 
         Called by the integration-API if a command is sent to a configured media-player entity.
 
         :param cmd_id: command
         :param params: optional command parameters
+        :param websocket: websocket connection
         :return: status code of the command request
         """
         if self._device is None:
