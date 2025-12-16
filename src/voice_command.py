@@ -113,7 +113,6 @@ class VoiceCommand(VoiceAssistant):
             return StatusCodes.BAD_REQUEST
 
         if cmd_id == Commands.VOICE_START:
-            # TODO(voice) check self._voice_task and cancel it if running?
             if self._device.is_on is None:
                 return StatusCodes.SERVICE_UNAVAILABLE
             # set up Android TV voice stream as async task to not block the voice_start command
@@ -140,6 +139,9 @@ class VoiceCommand(VoiceAssistant):
 
     async def _start_voice(self, websocket: Any, session_id: int) -> None:
         try:
+            old_session = _voice_stream_sessions.pop((websocket, session_id), None)
+            if old_session is not None:
+                old_session.end()
             voice_stream = await self._device.start_voice()
             _voice_stream_sessions[websocket, session_id] = voice_stream
             # Acknowledge start; binary audio will arrive on the WS binary channel
@@ -176,7 +178,7 @@ class VoiceCommand(VoiceAssistant):
 
 async def on_voice_stream(session: VoiceSession):
     """Voice stream event handler from Integration API."""
-    voice_stream = _voice_stream_sessions.pop(session.key)
+    voice_stream = _voice_stream_sessions.pop(session.key, None)
     if voice_stream is None:
         _LOG.warning("No voice stream available for session %d", session.session_id)
         event = AssistantEvent(
@@ -223,11 +225,7 @@ async def on_voice_stream(session: VoiceSession):
     buffer = bytearray()
     # wav_buffer = bytearray()
     try:
-        first = True
         async for chunk in session:
-            if first:
-                first = False
-                continue
             total += len(chunk)
             # --- Option A) stream directly to Android.
             # ATTENTION: requires patching androidtvremote2 library. VOICE_CHUNK_MIN_SIZE padding needs to be disabled
@@ -256,7 +254,6 @@ async def on_voice_stream(session: VoiceSession):
         if buffer:
             _LOG.debug("Sending final %d bytes of audio data to ATV", len(buffer))
             voice_stream.send_chunk(bytes(buffer))
-            # wav_buffer += bytes(buffer)
             # _write_stream_to_wav([wav_buffer])
         _LOG.info("Voice stream ended: session=%d, bytes=%d", session.session_id, total)
     except VoiceSessionClosed as ex:

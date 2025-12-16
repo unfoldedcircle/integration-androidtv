@@ -69,6 +69,8 @@ class AtvDevice:
     """Enable volume driven by Chromecast protocol."""
     volume_step: int = 10
     """Volume step (1 to 100)."""
+    use_voice: bool = False
+    """Enable voice commands."""
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -166,6 +168,7 @@ class Devices:
                 item.use_chromecast = atv.use_chromecast
                 item.use_chromecast_volume = atv.use_chromecast_volume
                 item.volume_step = atv.volume_step if atv.volume_step else 10
+                item.use_voice = atv.use_voice if atv.use_voice else False
                 return self.store()
         return False
 
@@ -271,6 +274,7 @@ class Devices:
                     item.get("use_chromecast", False),
                     item.get("use_chromecast_volume", False),
                     item.get("volume_step", 10),
+                    item.get("use_voice", False),
                 )
                 self._config.append(atv)
             return True

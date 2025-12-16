@@ -27,6 +27,7 @@ Preview features:
 - Optional external metadata lookup using the Google Play Store for friendly application name and icon.
 - Google Cast support to retrieve media-playing information.
 - Google Cast volume control with configurable volume step.
+- Google voice commands. Requires a voice-capable device.
 
 The preview features are not enabled by default. They can be enabled in the device configuration of the setup flow.
 
@@ -69,7 +70,7 @@ After some tests, turns out Python stuff on embedded is a nightmare. So we're be
 that has everything in it, including the Python runtime and all required modules and native libraries.
 
 To do that, we use [PyInstaller](https://pyinstaller.org/), but it needs to run on the target architecture as
-`PyInstaller` does not support cross compilation.
+`PyInstaller` does not support cross-compilation.
 
 The `--onefile` option to create a one-file bundled executable should be avoided:
 - Higher startup cost, since the wrapper binary must first extract the archive.

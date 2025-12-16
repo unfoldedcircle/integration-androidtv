@@ -323,11 +323,11 @@ def _register_available_entities(device_config: config.AtvDevice, device: tv.And
         # remote.AndroidTVRemote(device_config, device, profile),
     ]
 
-    # TODO(voice) replace naive implementation with new device configuration property,
-    #             and enhance setup process to check for voice capabilities.
     # At startup, the device is not connected and is_voice_enabled is always None.
-    if device.is_voice_enabled is not False:
+    if device.is_voice_enabled is not False and device_config.use_voice:
         entities.append(voice_command.VoiceCommand(device, api=api))
+    else:
+        _LOG.info("Voice command not enabled for device: %s", device_config.name)
 
     for entity in entities:
         if api.available_entities.contains(entity.id):
@@ -354,9 +354,10 @@ def on_device_removed(device: config.AtvDevice | None) -> None:
     else:
         if device.id in _configured_android_tvs:
             _LOG.debug("Disconnecting from removed Android TV %s", device.id)
-            atv = _configured_android_tvs.pop(device.id)
-            atv.disconnect()
-            atv.events.remove_all_listeners()
+            atv = _configured_android_tvs.pop(device.id, None)
+            if atv is not None:
+                atv.disconnect()
+                atv.events.remove_all_listeners()
             for entity_id in _entities_from_device_id(device.id):
                 api.configured_entities.remove(entity_id)
                 api.available_entities.remove(entity_id)
