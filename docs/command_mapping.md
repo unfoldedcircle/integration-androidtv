@@ -1,7 +1,7 @@
 # Command Mapping
 
 The following feature set is defined for the exposed
-[Remote Two media-player entity](https://github.com/unfoldedcircle/core-api/blob/main/doc/entities/entity_media_player.md)
+[Remote Two/3 media-player entity](https://github.com/unfoldedcircle/core-api/blob/main/doc/entities/entity_media_player.md)
 in the default device profile: 
 
 | Feature          | Command(s)                                                            | Android remote keycode(s)                                    | Comments                                                                                                                                                                                                        |
@@ -46,7 +46,7 @@ in the default device profile:
 
 ## Device Profiles
 
-Unfortunately the keycode support of Android TV devices is very limited and device- (and probably even app-) specific.
+Unfortunately, the keycode support of Android TV devices is very limited and device- (and probably even app-) specific.
 
 Device profiles allow better support of the available features and different key-mappings:
 
@@ -66,18 +66,18 @@ Pull requests for additional devices are greatly appreciated.
 
 ### Device Profile Matching
 
-Profiles are matched based on manufacturer name and device model, which is returned in the
+Profiles are matched based on the manufacturer name and device model, which is returned in the
 [device information](https://github.com/tronikos/androidtvremote2/blob/v0.0.14/src/androidtvremote2/androidtv_remote.py#L101)
 from the androidtvremote2 library.
 
-Each device profile is defined in a separate json file in [config/profiles](../config/profiles). All profiles are read
+Each device profile is defined in a separate JSON file in [config/profiles](../config/profiles). All profiles are read
 during driver startup and sorted alphabetically.
 
 - Manufacturer and model fields in the profile file are treated as prefixes.
 - Matching against the returned information from the device is performed case-insensitive.
 - Manufacturer is mandatory, model is optional (empty field).
 
-For example: profile `manufacturer = "foo"`, `model = "bar"` will match the following device information:
+For example, profile `manufacturer = "foo"`, `model = "bar"` will match the following device information:
 
 - foo / bar
 - FOO / Bart
@@ -87,7 +87,7 @@ For example: profile `manufacturer = "foo"`, `model = "bar"` will match the foll
 ## Testing Keycodes
 
 To simplify testing and identifying working keycodes, the [available keycodes](https://github.com/tronikos/androidtvremote2/blob/v0.0.14/src/androidtvremote2/remotemessage.proto#L90)
-can be sent directly with the Core-API to the Remote Two or Core Simulator.
+can be sent directly with the Core-API to the Remote Two/3 or Core Simulator.
 Either as name (including the `KEYCODE_` prefix), or as numeric value string.
 
 Example:

@@ -112,14 +112,4 @@ class AndroidTVMediaPlayer(MediaPlayer):  # pylint: disable=too-few-public-metho
 
         attributes = handle_entity_state_after_update(attributes, self.attributes)
 
-        # TODO check non-playing state logic
-        # if Attributes.STATE in attributes:
-        #     if attributes[Attributes.STATE] == States.OFF:
-        #         attributes[Attributes.MEDIA_IMAGE_URL] = ""
-        #         attributes[Attributes.MEDIA_ALBUM] = ""
-        #         attributes[Attributes.MEDIA_ARTIST] = ""
-        #         attributes[Attributes.MEDIA_TITLE] = ""
-        #         attributes[Attributes.MEDIA_TYPE] = ""
-        #         attributes[Attributes.SOURCE] = ""
-
         return attributes

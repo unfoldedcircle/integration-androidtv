@@ -18,8 +18,11 @@ development.
 
 - [Requirements and setting](docs/settings.md).
 - Multiple Android TV devices are supported with version 0.5.0 and newer.
-- A [media player entity](https://github.com/unfoldedcircle/core-api/blob/main/doc/entities/entity_media_player.md)
+- A [media-player entity](https://unfoldedcircle.github.io/core-api/entities/entity_media_player.html)
   is exposed per Android TV device to the Remote.
+- A [voice-assistant entity](https://unfoldedcircle.github.io/core-api/entities/entity_voice_assistant.html)
+  is exposed per Android TV device to the Remote if the voice-command feature is enabled in the device configuration and
+  the Android TV device supports voice commands.
 - Device profiles allow device-specific support and custom key bindings, for example, double-click or long-press actions.  
   See [command mappings](docs/command_mapping.md) for more information.
 
