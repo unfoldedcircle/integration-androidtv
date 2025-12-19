@@ -229,10 +229,8 @@ def _entities_from_device_id(device_id: str) -> list[str]:
     :param device_id: the device identifier
     :return: list of entity identifiers
     """
-    # dead simple for now: one media_player entity per device!
-    # TODO #21 support multiple zones: one media-player per zone
     return [
-        f"{device_id}",
+        f"{device_id}",  # media-player entity: keep the old identifier for backwards compatibility
         # , f"remote.{device_id}"
         f"voice_assistant.{device_id}",
     ]
