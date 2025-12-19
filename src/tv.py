@@ -228,7 +228,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._media_position = 0
         self._media_duration = 0
         self._last_update_position_time: float = 0
-        self._media_type = METADATA_TYPE_MOVIE
+        self._media_type: MediaType | None = None
         self._media_image_url: str | None = None
         self._app_image_url: str = ""
         self._use_app_url = not device_config.use_chromecast
@@ -393,7 +393,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         attributes = {
             MediaAttr.STATE: self._player_state,
             MediaAttr.MUTED: self._muted,
-            MediaAttr.MEDIA_TYPE: self._media_type,
+            MediaAttr.MEDIA_TYPE: self._media_type if self._media_type else "",
             MediaAttr.MEDIA_IMAGE_URL: self._media_image_url if self._media_image_url else "",
             MediaAttr.MEDIA_TITLE: self.media_title if self.media_title else "",
             MediaAttr.MEDIA_ALBUM: self._media_album if self._media_album else "",
