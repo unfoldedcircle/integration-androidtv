@@ -223,14 +223,12 @@ async def on_voice_stream(session: VoiceSession):
 
     total = 0
     buffer = bytearray()
-    # wav_buffer = bytearray()
     try:
         async for chunk in session:
             total += len(chunk)
             # --- Option A) stream directly to Android.
             # ATTENTION: requires patching androidtvremote2 library. VOICE_CHUNK_MIN_SIZE padding needs to be disabled
             # voice_stream.send_chunk(chunk)
-            # wav_buffer += chunk
 
             # --- Option B) accumulate chunks until we have at least 8KB
             # Doesn't work reliably: say "mute the volume", Google understands "set an alarm"
@@ -239,12 +237,10 @@ async def on_voice_stream(session: VoiceSession):
             #     _LOG.debug("Sending %d bytes of audio data to ATV", len(buffer))
             #
             #     voice_stream.send_chunk(bytes(buffer), 2.0)
-            #     wav_buffer += bytes(buffer)
             #     buffer.clear()
 
             # --- Option C) accumulate all chunks, then send it at once. Works best so far...
             buffer += chunk
-            # wav_buffer += chunk
 
         # An empty chunk at the end _seems_ to improve the text recognition. No idea why, but without, the last word
         # is often not recognized or missing. If Google only publishes their API!!!!
@@ -254,7 +250,6 @@ async def on_voice_stream(session: VoiceSession):
         if buffer:
             _LOG.debug("Sending final %d bytes of audio data to ATV", len(buffer))
             voice_stream.send_chunk(bytes(buffer))
-            # _write_stream_to_wav([wav_buffer])
         _LOG.info("Voice stream ended: session=%d, bytes=%d", session.session_id, total)
     except VoiceSessionClosed as ex:
         _LOG.warning(
