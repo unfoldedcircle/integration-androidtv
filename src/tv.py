@@ -921,16 +921,16 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             update[MediaAttr.STATE] = self._player_state
 
         if status.album_name != self._media_album:
-            self._media_album = status.album_name or ""
+            self._media_album = status.album_name
             update[MediaAttr.MEDIA_ALBUM] = self._media_album
 
         if status.artist != self._media_artist:
-            self._media_artist = status.artist or ""
+            self._media_artist = status.artist
             update[MediaAttr.MEDIA_ARTIST] = self._media_artist
 
         if status.title != self._media_title:
             current_title = self.media_title
-            self._media_title = status.title or ""
+            self._media_title = status.title
             if current_title != self.media_title:
                 _LOG.debug("[%s] Chromecast Media info updated : %s", self.log_id, status)
                 update[MediaAttr.MEDIA_TITLE] = self.media_title
