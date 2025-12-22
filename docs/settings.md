@@ -17,7 +17,7 @@
 
 ## Limitations and Known Issues
 
-- During the setup process, you have to enter a PIN code that is shown on your Android TV.
+- During the setup process, you have to enter a PIN code shown on your Android TV.
   - Please make sure that your Android TV is powered on and that no old pairing request is shown.
   - If pairing continuously fails, reboot your Android TV device and try again.
   - If sending commands doesn't work after pairing or the integration is repeatedly disconnected, try rebooting the
@@ -30,6 +30,10 @@
   - The shown apps in the input selection list are a pre-defined list of common applications.
 - Some devices, like TCL, become unavailable after they are turned off, unless you activate the `Screenless service`.  
   - Activate it under: Settings, System, Power and energy: Screenless service
+- Voice commands are a recently reverse-engineered feature and may not work on all devices.
+  - Streaming voice while speaking is currently disabled, since the detection becomes much more unreliable.
+  - The full voice command is buffered in the integration and sent after the voice stream stops (when releasing the
+    microphone button.
 
 See also the known issues of [Home Assistant's Android TV Remote Integration](https://www.home-assistant.io/integrations/androidtv_remote/#limitations-and-known-issues),
 since it is using the same communication library.

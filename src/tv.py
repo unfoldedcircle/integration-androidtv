@@ -24,6 +24,7 @@ from androidtvremote2 import (
     CannotConnect,
     ConnectionClosed,
     InvalidAuth,
+    VoiceStream,
 )
 from pychromecast import CastStatus, CastStatusListener, Chromecast, RequestTimeout
 from pychromecast.controllers.media import (
@@ -108,7 +109,7 @@ GOOGLE_CAST_MEDIA_TYPES_MAP = {
 
 GOOGLE_CAST_MEDIA_STATES_MAP = {
     MEDIA_PLAYER_STATE_UNKNOWN: media_player.States.ON,
-    MEDIA_PLAYER_STATE_IDLE: media_player.States.PLAYING,
+    MEDIA_PLAYER_STATE_IDLE: media_player.States.ON,
     MEDIA_PLAYER_STATE_BUFFERING: media_player.States.BUFFERING,
     MEDIA_PLAYER_STATE_PAUSED: media_player.States.PAUSED,
     MEDIA_PLAYER_STATE_PLAYING: media_player.States.PLAYING,
@@ -207,6 +208,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             keyfile=keyfile,
             host=device_config.address,
             loop=self._loop,
+            enable_voice=True,
         )
         self._identifier: str | None = device_config.id
         self._profile: Profile | None = profile
@@ -226,7 +228,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._media_position = 0
         self._media_duration = 0
         self._last_update_position_time: float = 0
-        self._media_type = METADATA_TYPE_MOVIE
+        self._media_type: MediaType | None = None
         self._media_image_url: str | None = None
         self._app_image_url: str = ""
         self._use_app_url = not device_config.use_chromecast
@@ -353,6 +355,16 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         return self._device_config
 
     @property
+    def is_voice_enabled(self) -> bool | None:
+        """Whether voice commands are enabled on the Android TV.
+
+        Depends on the requested feature at AndroidTVRemote initialization and the supported
+        features of the device.
+        :return: True if voice commands are enabled, False otherwise. None if not connected.
+        """
+        return self._atv.is_voice_enabled
+
+    @property
     def media_title(self) -> str | None:
         """Return media title."""
         if self._media_title and self._media_title != "":
@@ -360,6 +372,38 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         if self._media_app in apps.IdMappings:
             return apps.IdMappings[self._media_app]
         return self._media_app
+
+    @property
+    def volume_level(self) -> float | None:
+        """Returns the volume level if supported and enabled."""
+        if not self.device_config.use_chromecast_volume:
+            return None
+        if self._chromecast:
+            return self._chromecast.status.volume_level
+        return 0
+
+    @property
+    def player_state(self) -> media_player.States:
+        """Return the media player state."""
+        return self._player_state
+
+    @property
+    def attributes(self) -> dict[str, Any]:
+        """Return the device attributes."""
+        attributes = {
+            MediaAttr.STATE: self._player_state,
+            MediaAttr.MUTED: self._muted,
+            MediaAttr.MEDIA_TYPE: self._media_type if self._media_type else "",
+            MediaAttr.MEDIA_IMAGE_URL: self._media_image_url if self._media_image_url else "",
+            MediaAttr.MEDIA_TITLE: self.media_title if self.media_title else "",
+            MediaAttr.MEDIA_ALBUM: self._media_album if self._media_album else "",
+            MediaAttr.MEDIA_ARTIST: self._media_artist if self._media_artist else "",
+            MediaAttr.MEDIA_POSITION: self._media_position,
+            MediaAttr.MEDIA_DURATION: self._media_duration,
+        }
+        if self.device_config.use_chromecast_volume:
+            attributes[MediaAttr.VOLUME] = self.volume_level
+        return attributes
 
     def _backoff(self) -> float:
         delay = self._reconnect_delay * BACKOFF_FACTOR
@@ -613,12 +657,17 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             HOMESCREEN_IMAGE = ""
             HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://androidtv.png")
 
-        # Special handling for homescreen & Android TV system apps: show pre-defined icon
+        # Special handling for homescreen & Android TV system apps: show pre-defined icon & clear media information
         homescreen_app = apps.is_homescreen_app(current_app)
         if homescreen_app or apps.is_standby_app(current_app):
+            self._clear_media_information()
             update[MediaAttr.SOURCE] = apps.IdMappings[current_app]
             update[MediaAttr.MEDIA_TITLE] = ""
+            update[MediaAttr.MEDIA_ALBUM] = ""
+            update[MediaAttr.MEDIA_ARTIST] = ""
             update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
+            update[MediaAttr.MEDIA_POSITION] = 0
+            update[MediaAttr.MEDIA_DURATION] = 0
             update[MediaAttr.STATE] = (
                 media_player.States.ON.value if homescreen_app else media_player.States.STANDBY.value
             )
@@ -850,11 +899,11 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         return ucapi.StatusCodes.BAD_REQUEST
 
     def new_connection_status(self, status: ConnectionStatus) -> None:
-        """Receive new connection status event from Google cast."""
+        """Receive new connection status event from Google cast (ConnectionStatusListener)."""
         _LOG.info("[%s] Received Chromecast connection status : %s", self.log_id, status)
 
     def new_media_status(self, status: MediaStatus) -> None:
-        """Receive new media status event from Google cast."""
+        """Receive new media status event from Google cast (MediaStatusListener)."""
         if not self._loop or not self._loop.is_running():
             _LOG.warning("[%s] No running event loop for handling new media status", self.log_id)
             return
@@ -875,8 +924,13 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self._player_state = GOOGLE_CAST_MEDIA_STATES_MAP.get(status.player_state, media_player.States.PLAYING)
             self._last_update_position_time = 0
             update[MediaAttr.STATE] = self._player_state
+            # clear media info if stop playing
+            if self._player_state == media_player.States.ON:
+                self._clear_media_information()
 
         if status.album_name != self._media_album:
+            # an empty string is required to clear the information in the integration-API!
+            # None translates to null in JSON, which means "no update" in the UI.
             self._media_album = status.album_name or ""
             update[MediaAttr.MEDIA_ALBUM] = self._media_album
 
@@ -937,10 +991,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             self.events.emit(Events.UPDATE, self._identifier, update)
 
     def load_media_failed(self, queue_item_id: int, error_code: int) -> None:
-        """Receive new media failed event from Google cast."""
+        """Receive new media failed event from Google cast (MediaStatusListener)."""
 
     def new_cast_status(self, status: CastStatus) -> None:
-        """Receive new cast event from Google cast."""
+        """Receive new cast event from Google cast (CastStatusListener)."""
         _LOG.debug("[%s] Received Chromecast cast status : %s", self.log_id, status)
 
         if not self._loop or not self._loop.is_running():
@@ -961,6 +1015,16 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             update = {MediaAttr.MEDIA_TITLE: self.media_title}
             _LOG.debug("[%s] Update remote with Chromecast info : %s", self.log_id, update)
             self.events.emit(Events.UPDATE, self._identifier, update)
+
+    def _clear_media_information(self):
+        self._media_title = ""
+        self._media_album = ""
+        self._media_artist = ""
+        self._media_position = 0
+        self._media_duration = 0
+        self._last_update_position_time = 0
+        self._media_type = None
+        self._media_image_url = ""
 
     async def media_seek(self, position: float) -> ucapi.StatusCodes:
         """Seek the media at the given position using Google Cast."""
@@ -1035,3 +1099,16 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         except PyChromecastError as ex:
             _LOG.error("[%s] Chromecast error sending command : %s", self.log_id, ex)
         return ucapi.StatusCodes.SERVER_ERROR
+
+    async def start_voice(self) -> VoiceStream:
+        """Start a streaming voice session.
+
+        A ``VoiceStream`` session wrapper is returned if the voice session can be established
+        within the given timeout. The session needs to be closed with ``end()`` (or through the
+        asynchronous context manager) before a new session is started.
+
+        :raises ConnectionClosed: if Android TV device is disconnected.
+        :raises asyncio.TimeoutError: if the device does not begin voice in time, or a voice
+                                      session is already in progress.
+        """
+        return await self._atv.start_voice()

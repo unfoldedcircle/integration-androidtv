@@ -13,9 +13,34 @@ import os
 from dataclasses import dataclass
 from typing import Iterator
 
+from ucapi import EntityTypes
+
 _LOG = logging.getLogger(__name__)
 
 _CFG_FILENAME = "config.json"
+
+
+def create_entity_id(device_id: str, entity_type: EntityTypes) -> str:
+    """Create a unique entity identifier for the given device and entity type."""
+    # backwards compatibility for the initial media-player entity
+    if entity_type == EntityTypes.MEDIA_PLAYER:
+        return f"{device_id}"
+    return f"{entity_type.value}.{device_id}"
+
+
+def device_from_entity_id(entity_id: str) -> str | None:
+    """
+    Return the device_id suffix of an entity_id.
+
+    The prefix is the part before the first dot in the name and refers to the entity type (media-player or remote),
+    the suffix is the device identifier.
+
+    :param entity_id: the entity identifier
+    :return: the device suffix, the original entity_id if it doesn't contain a dot, or None if the entity_id is invalid
+    """
+    parts = entity_id.split(".", 1)
+    device = parts[1] if len(parts) == 2 else parts[0]
+    return None if len(device) == 0 else device
 
 
 @dataclass
@@ -42,6 +67,8 @@ class AtvDevice:
     """Enable volume driven by Chromecast protocol."""
     volume_step: int = 10
     """Volume step (1 to 100)."""
+    use_voice: bool = False
+    """Enable voice commands."""
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):
@@ -139,6 +166,7 @@ class Devices:
                 item.use_chromecast = atv.use_chromecast
                 item.use_chromecast_volume = atv.use_chromecast_volume
                 item.volume_step = atv.volume_step if atv.volume_step else 10
+                item.use_voice = atv.use_voice if atv.use_voice else False
                 return self.store()
         return False
 
@@ -244,6 +272,7 @@ class Devices:
                     item.get("use_chromecast", False),
                     item.get("use_chromecast_volume", False),
                     item.get("volume_step", 10),
+                    item.get("use_voice", False),
                 )
                 self._config.append(atv)
             return True

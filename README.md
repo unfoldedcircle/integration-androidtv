@@ -18,8 +18,11 @@ development.
 
 - [Requirements and setting](docs/settings.md).
 - Multiple Android TV devices are supported with version 0.5.0 and newer.
-- A [media player entity](https://github.com/unfoldedcircle/core-api/blob/main/doc/entities/entity_media_player.md)
+- A [media-player entity](https://unfoldedcircle.github.io/core-api/entities/entity_media_player.html)
   is exposed per Android TV device to the Remote.
+- A [voice-assistant entity](https://unfoldedcircle.github.io/core-api/entities/entity_voice_assistant.html)
+  is exposed per Android TV device to the Remote if the voice-command feature is enabled in the device configuration and
+  the Android TV device supports voice commands.
 - Device profiles allow device-specific support and custom key bindings, for example, double-click or long-press actions.  
   See [command mappings](docs/command_mapping.md) for more information.
 
@@ -27,6 +30,7 @@ Preview features:
 - Optional external metadata lookup using the Google Play Store for friendly application name and icon.
 - Google Cast support to retrieve media-playing information.
 - Google Cast volume control with configurable volume step.
+- Google voice commands. Requires a voice-capable device.
 
 The preview features are not enabled by default. They can be enabled in the device configuration of the setup flow.
 
@@ -69,7 +73,7 @@ After some tests, turns out Python stuff on embedded is a nightmare. So we're be
 that has everything in it, including the Python runtime and all required modules and native libraries.
 
 To do that, we use [PyInstaller](https://pyinstaller.org/), but it needs to run on the target architecture as
-`PyInstaller` does not support cross compilation.
+`PyInstaller` does not support cross-compilation.
 
 The `--onefile` option to create a one-file bundled executable should be avoided:
 - Higher startup cost, since the wrapper binary must first extract the archive.

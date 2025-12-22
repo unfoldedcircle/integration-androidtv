@@ -50,6 +50,7 @@ _reconfigured_device: AtvDevice | None = None
 _use_chromecast: bool = False
 _use_chromecast_volume: bool = False
 _volume_step: int = 10
+_use_voice: bool = False
 
 # TODO #9 externalize language texts
 _user_input_discovery = RequestUserInput(
@@ -309,6 +310,7 @@ async def handle_configuration_mode(
                 selected_device.use_external_metadata if selected_device.use_external_metadata else False
             )
             volume_step = selected_device.volume_step if selected_device.volume_step else 10
+            use_voice = selected_device.use_voice if selected_device.use_voice else False
 
             return RequestUserInput(
                 {
@@ -321,6 +323,7 @@ async def handle_configuration_mode(
                     __cfg_chromecast_volume(use_chromecast_volume),
                     __cfg_volume_step(volume_step),
                     __cfg_external_metadata(use_external_metadata),
+                    __cfg_use_voice(use_voice),
                 ],
             )
         case "reset":
@@ -428,6 +431,7 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
             __cfg_chromecast_volume(False),
             __cfg_volume_step(10),
             __cfg_external_metadata(False),
+            __cfg_use_voice(False),
         ],
     )
 
@@ -447,12 +451,14 @@ async def handle_device_choice(msg: UserDataResponse) -> RequestUserInput | Setu
     global _setup_step
     global _use_external_metadata
     global _volume_step
+    global _use_voice
 
     choice = msg.input_values["choice"]
     _use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
     _use_chromecast = msg.input_values.get("chromecast", "false") == "true"
     _use_chromecast_volume = msg.input_values.get("chromecast_volume", "false") == "true"
     _volume_step = int(msg.input_values.get("volume_step", 10))
+    _use_voice = msg.input_values.get("use_voice", "false") == "true"
     name = ""
 
     for discovered_tv in _discovered_android_tvs:
@@ -525,6 +531,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
     _pairing_android_tv.disconnect()
 
     device_info = None
+    is_voice_enabled = False
 
     # Connect again to retrieve device identifier (with init()) and additional device information (with connect())
     if res == ucapi.StatusCodes.OK:
@@ -536,6 +543,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         timeout = int(tv.CONNECTION_TIMEOUT)
         if await _pairing_android_tv.init(timeout) and await _pairing_android_tv.connect(timeout):
             device_info = _pairing_android_tv.device_info or {}
+            is_voice_enabled = _pairing_android_tv.is_voice_enabled
             if config.devices.assign_default_certs_to_device(_pairing_android_tv.identifier, True):
                 res = ucapi.StatusCodes.OK
         _pairing_android_tv.disconnect()
@@ -556,6 +564,7 @@ async def handle_user_data_pin(msg: UserDataResponse) -> SetupComplete | SetupEr
         manufacturer=device_info.get("manufacturer", ""),
         model=device_info.get("model", ""),
         volume_step=_volume_step,
+        use_voice=_use_voice and (is_voice_enabled is True),
     )
 
     config.devices.add_or_update(device)  # triggers AndroidTv instance creation
@@ -588,21 +597,24 @@ async def _handle_device_reconfigure(
     use_chromecast_volume = msg.input_values.get("chromecast_volume", "false") == "true"
     use_external_metadata = msg.input_values.get("external_metadata", "false") == "true"
     volume_step = int(msg.input_values.get("volume_step", 10))
+    use_voice = msg.input_values.get("use_voice", "false") == "true"
 
     _LOG.debug("User has changed configuration")
     _reconfigured_device.use_chromecast = use_chromecast
     _reconfigured_device.use_chromecast_volume = use_chromecast_volume
     _reconfigured_device.use_external_metadata = use_external_metadata
     _reconfigured_device.volume_step = volume_step
+    _reconfigured_device.use_voice = use_voice
 
     config.devices.add_or_update(_reconfigured_device)  # triggers ATV instance update
     await asyncio.sleep(1)
     _LOG.info(
-        "Setup successfully completed for %s (chromecast %s, external metadata %s, volume step %s)",
+        "Setup successfully completed for %s (chromecast %s, external metadata %s, volume step %s, voice %s)",
         _reconfigured_device.name,
         _reconfigured_device.use_chromecast,
         _reconfigured_device.use_external_metadata,
         _reconfigured_device.volume_step,
+        _reconfigured_device.use_voice,
     )
 
     return SetupComplete()
@@ -663,6 +675,18 @@ def __cfg_external_metadata(enabled: bool):
             "en": "Preview feature: Enable external Google Play metadata",
             "de": "Vorschaufunktion: Aktiviere externe Google Play Metadaten",
             "fr": "Fonctionnalité en aperçu: Activer les métadonnées externes de Google Play",
+        },
+        "field": {"checkbox": {"value": enabled}},
+    }
+
+
+def __cfg_use_voice(enabled: bool):
+    return {
+        "id": "use_voice",
+        "label": {
+            "en": "Preview feature: Enable Google voice commands",
+            "de": "Vorschaufunktion: Aktiviere Google Sprachbefehle",
+            "fr": "Fonctionnalité en aperçu: Activer Google vocal",
         },
         "field": {"checkbox": {"value": enabled}},
     }
