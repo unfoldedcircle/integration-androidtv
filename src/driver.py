@@ -207,7 +207,6 @@ async def handle_android_tv_update(atv_id: str, update: dict[str, Any]) -> None:
         )
 
     for configured_entity in _configured_entities_from_device(atv_id):
-        _LOG.info("[%s] update configured entity %s", atv_id, configured_entity.id)
         if isinstance(
             configured_entity,
             (

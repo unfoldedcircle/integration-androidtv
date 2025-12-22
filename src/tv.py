@@ -933,21 +933,21 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 self._clear_media_information()
 
         if status.album_name != self._media_album:
+            self._media_album = status.album_name
             # an empty string is required to clear the information in the integration-API!
             # None translates to null in JSON, which means "no update" in the UI.
-            self._media_album = status.album_name or ""
-            update[MediaAttr.MEDIA_ALBUM] = self._media_album
+            update[MediaAttr.MEDIA_ALBUM] = self._media_album or ""
 
         if status.artist != self._media_artist:
-            self._media_artist = status.artist or ""
-            update[MediaAttr.MEDIA_ARTIST] = self._media_artist
+            self._media_artist = status.artist
+            update[MediaAttr.MEDIA_ARTIST] = self._media_artist or ""
 
         if status.title != self._media_title:
             current_title = self.media_title
-            self._media_title = status.title or ""
+            self._media_title = status.title
             if current_title != self.media_title:
                 _LOG.debug("[%s] Chromecast Media info updated : %s", self.log_id, status)
-                update[MediaAttr.MEDIA_TITLE] = self.media_title
+                update[MediaAttr.MEDIA_TITLE] = self.media_title or ""
 
         current_time = int(status.current_time) if status.current_time else 0
         duration = int(status.duration) if status.duration else 0
