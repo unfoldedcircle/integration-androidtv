@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+### Fixed
+- Improve media information handling if Chromecast is enabled.
+
+### Added
+- Google voice commands ([#120](https://github.com/unfoldedcircle/integration-androidtv/pull/120)).
+
+### Changed
+- Optimize Plex artwork image loading ([#80](https://github.com/unfoldedcircle/integration-androidtv/issues/80), [#113](https://github.com/unfoldedcircle/integration-androidtv/issues/113)).
+
 ---
 
 ## v0.7.7 - 2025-12-04
