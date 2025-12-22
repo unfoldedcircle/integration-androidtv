@@ -12,8 +12,8 @@ import logging
 import os
 from io import BytesIO
 from pathlib import Path
-from typing import Dict
-from urllib.parse import urlparse
+from typing import Dict, Literal
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import google_play_scraper
 import httpx
@@ -27,6 +27,7 @@ _LOG = logging.getLogger(__name__)
 CACHE_ROOT = "external_cache"
 ICON_SUBDIR = "icons"
 ICON_SIZE = (240, 240)
+IMAGE_SIZE_MAX = 480
 
 
 # Paths
@@ -171,8 +172,12 @@ async def encode_icon_to_data_uri(icon_name: str) -> str:
 
 
 def _is_url(path: str) -> bool:
-    parsed = urlparse(path)
-    return parsed.scheme in ("http", "https")
+    """Check if the provided string is a valid http/https URL."""
+    try:
+        parsed = urlparse(path)
+        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+    except (ValueError, AttributeError):
+        return False
 
 
 async def _fetch_google_play_metadata(package_id: str) -> Dict[str, str] | None:
@@ -229,3 +234,72 @@ async def get_app_metadata(package_id: str) -> Dict[str, str]:
 
     _LOG.debug("Falling back to default metadata for %s", package_id)
     return {"name": package_id, "icon": ""}
+
+
+def get_resized_image_url(url: str, max_size: int = IMAGE_SIZE_MAX) -> str | Literal[b""]:
+    """
+    Adjust width and height query parameters while maintaining aspect ratio.
+
+    Only performs the rewrite if the URL path contains '/photo/:/transcode' (Plex transcode URL).
+    - If parameters are missing: returns original URL.
+    - If parameters are invalid (non-numeric/<=0): returns original URL.
+    - If one parameter exists: sets it to max_size.
+    - If both exist: resizes proportionally to fit within max_size.
+    """
+    if not url or not _is_url(url):
+        _LOG.warning("Invalid URL provided for resizing: %s", url)
+        return url
+
+    parsed_url = urlparse(url)
+
+    # Only rewrite Plex transcode URLs
+    # Other services can be added later
+    if "/photo/:/transcode" not in parsed_url.path:
+        return url
+
+    query_dict = parse_qs(parsed_url.query, keep_blank_values=True)
+
+    width_str = query_dict.get("width", [None])[0]
+    height_str = query_dict.get("height", [None])[0]
+
+    # Helper to validate and convert numeric strings
+    def _safe_int(val):
+        try:
+            res = int(val)
+            return res if res > 0 else None
+        except (TypeError, ValueError):
+            return None
+
+    w = _safe_int(width_str)
+    h = _safe_int(height_str)
+
+    # both parameters present
+    if w is not None and h is not None:
+        if w > max_size or h > max_size:
+            if w > h:
+                new_w = max_size
+                new_h = max(1, int(h * (max_size / w)))
+            else:
+                new_h = max_size
+                new_w = max(1, int(w * (max_size / h)))
+
+            query_dict["width"] = [str(new_w)]
+            query_dict["height"] = [str(new_h)]
+        else:
+            return url  # No resizing needed
+
+    # only width present
+    elif w is not None:
+        query_dict["width"] = [str(max_size)]
+
+    # only height present
+    elif h is not None:
+        query_dict["height"] = [str(max_size)]
+
+    # If neither are valid/present, return original
+    else:
+        return url
+
+    # Reconstruct the URL safely
+    new_query = urlencode(query_dict, doseq=True)
+    return urlunparse(parsed_url._replace(query=new_query))

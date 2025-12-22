@@ -51,7 +51,11 @@ import apps
 import discover
 import inputs
 from config import AtvDevice
-from external_metadata import encode_icon_to_data_uri, get_app_metadata
+from external_metadata import (
+    encode_icon_to_data_uri,
+    get_app_metadata,
+    get_resized_image_url,
+)
 from profiles import KeyPress, Profile
 from util import filter_data_img_properties
 
@@ -974,6 +978,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             if status.images[0].url != self._media_image_url:
                 self._media_image_url = status.images[0].url
                 update[MediaAttr.MEDIA_IMAGE_URL] = self._media_image_url
+                # Reformat the media image URL if necessary (image size parameters)
+                update[MediaAttr.MEDIA_IMAGE_URL] = get_resized_image_url(self._media_image_url)
             self._use_app_url = False
         else:
             self._media_image_url = None
