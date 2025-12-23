@@ -38,7 +38,7 @@
     "search"
   ],
   "simple_commands": [
-    "FULL_SCREEM",
+    "FULL_SCREEN",
     "CURSOR_ENTER_LONG",
     "HOME_LONG",
     "MENU_LONG",
@@ -50,7 +50,7 @@
     "DISNEY"
   ],
   "command_map": {
-    "FULL_SCREEM": {
+    "FULL_SCREEN": {
       "keycode": "BACK",
       "action": "LONG"
     },
