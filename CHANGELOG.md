@@ -10,6 +10,13 @@ _Changes in the next release_
 
 ---
 
+## v0.8.1 - 2025-12-24
+### Added
+- New FULL_SCREEN command in Dune HD Homatic Profile ([#125](https://github.com/unfoldedcircle/integration-androidtv/pull/125)).
+
+### Changed
+- Use journald log levels if running as a systemd service ([#126](https://github.com/unfoldedcircle/integration-androidtv/pull/126)).
+
 ## v0.8.0 - 2025-12-22
 ### Added
 - Google voice commands ([#120](https://github.com/unfoldedcircle/integration-androidtv/pull/120)).
