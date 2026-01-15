@@ -8,10 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
-### Changed
-- Adapt journald log levels until the Remote supports native debug levels.
-
 ---
+
+## v0.8.2 - 2026-01-15
+### Changed
+- Adapt journald log levels until the Remote supports native debug levels ([#127](https://github.com/unfoldedcircle/integration-androidtv/pull/127)).
 
 ## v0.8.1 - 2025-12-24
 ### Added
