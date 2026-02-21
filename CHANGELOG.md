@@ -10,6 +10,13 @@ _Changes in the next release_
 
 ---
 
+## v0.8.3 - 2026-02-21
+### Changed
+- Update ucapi to 0.5.2 ([#129](https://github.com/unfoldedcircle/integration-androidtv/pull/129)).
+- Update pyee to 13.0.1  ([#130](https://github.com/unfoldedcircle/integration-androidtv/pull/130)).
+- Update Docker build image ([#131](https://github.com/unfoldedcircle/integration-androidtv/pull/131)).
+- Update pillow to 12.1.1 ([#132](https://github.com/unfoldedcircle/integration-androidtv/pull/132)).
+
 ## v0.8.2 - 2026-01-15
 ### Changed
 - Adapt journald log levels until the Remote supports native debug levels ([#127](https://github.com/unfoldedcircle/integration-androidtv/pull/127)).
