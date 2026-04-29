@@ -700,7 +700,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
             # Try external metadata
             metadata = (
-                await get_app_metadata(current_app) if current_app and self._device_config.use_external_metadata else None
+                await get_app_metadata(current_app)
+                if current_app and self._device_config.use_external_metadata
+                else None
             )
             if metadata:
                 if _LOG.isEnabledFor(logging.DEBUG):

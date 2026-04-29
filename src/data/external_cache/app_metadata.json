@@ -1,0 +1,22 @@
+{
+  "com.google.android.tv.remote.service": {
+    "name": "Android TV Remote Service",
+    "icon": "com.google.android.tv.remote.service.png"
+  },
+  "org.xbmc.kodi": {
+    "name": "Kodi",
+    "icon": "org.xbmc.kodi.png"
+  },
+  "com.disney.disneyplus": {
+    "name": "Disney+",
+    "icon": "com.disney.disneyplus.png"
+  },
+  "com.codingbuffalo.aerialdream": {
+    "name": "Aerial Dream",
+    "icon": "com.codingbuffalo.aerialdream.png"
+  },
+  "com.wbd.stream": {
+    "name": "HBO Max: Stream TV & Movies",
+    "icon": "com.wbd.stream.png"
+  }
+}
