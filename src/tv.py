@@ -656,86 +656,90 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         global HOMESCREEN_IMAGE
 
         update = {}
-        # one-time initialization
-        if HOMESCREEN_IMAGE is None:
-            HOMESCREEN_IMAGE = ""
-            HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://androidtv.png")
 
-        # Special handling for homescreen & Android TV system apps: show pre-defined icon & clear media information
-        homescreen_app = apps.is_homescreen_app(current_app)
-        if homescreen_app or apps.is_standby_app(current_app):
-            self._clear_media_information()
-            update[MediaAttr.SOURCE] = apps.IdMappings[current_app]
-            update[MediaAttr.MEDIA_TITLE] = ""
-            update[MediaAttr.MEDIA_ALBUM] = ""
-            update[MediaAttr.MEDIA_ARTIST] = ""
-            update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
-            update[MediaAttr.MEDIA_POSITION] = 0
-            update[MediaAttr.MEDIA_DURATION] = 0
-            update[MediaAttr.STATE] = (
-                media_player.States.ON.value if homescreen_app else media_player.States.STANDBY.value
-            )
-            return update
+        try:
+            # one-time initialization
+            if HOMESCREEN_IMAGE is None:
+                HOMESCREEN_IMAGE = ""
+                HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://androidtv.png")
 
-        # Track state of data sources
-        offline_name = None
-        offline_match = None
-        external_name = None
-        external_icon = None
-
-        # Try offline ID mapping first
-        if current_app in apps.IdMappings:
-            offline_name = apps.IdMappings[current_app]
-            self._media_app = offline_name
-
-        # Try fuzzy offline name matching if ID mapping failed
-        if not offline_name:
-            for query, name in apps.NameMatching.items():
-                if query in current_app:
-                    offline_match = name
-                    self._media_app = name
-                    break
-
-        # Try external metadata
-        metadata = (
-            await get_app_metadata(current_app) if current_app and self._device_config.use_external_metadata else None
-        )
-        if metadata:
-            if _LOG.isEnabledFor(logging.DEBUG):
-                _LOG.debug("App metadata: %s", filter_data_img_properties(metadata))
-            external_name = metadata.get("name")
-            external_icon = metadata.get("icon")
-            if external_name:
-                self._media_app = external_name
-            if external_icon:
-                self._app_image_url = external_icon
-
-        # Determine final name/title to use
-        name_to_use = offline_name or offline_match or external_name or current_app
-        # TODO why set name to both source & media title fields?
-        update[MediaAttr.SOURCE] = name_to_use
-        if not self._media_title and not self._media_image_url:
-            update[MediaAttr.MEDIA_TITLE] = name_to_use
-
-        # Determine which icon to use
-        icon_to_use = None
-        if self._device_config.use_external_metadata or self._use_app_url:
-            if external_icon:
-                icon_to_use = external_icon
-            else:
-                icon_to_use = ""
-        elif self._media_image_url:
-            # TODO what's the intended logic?
-            # `icon_to_use` is never used because of the inverse `if not self._media_image_url:` check below!
-            icon_to_use = self._media_image_url
-
-        update[MediaAttr.STATE] = media_player.States.PLAYING.value
-        # Skip applying app icon if media image from cast is present
-        if not self._media_image_url:
-            if not icon_to_use:
+            # Special handling for homescreen & Android TV system apps: show pre-defined icon & clear media information
+            homescreen_app = apps.is_homescreen_app(current_app)
+            if homescreen_app or apps.is_standby_app(current_app):
+                self._clear_media_information()
+                update[MediaAttr.SOURCE] = apps.IdMappings.get(current_app, current_app)
+                update[MediaAttr.MEDIA_TITLE] = ""
+                update[MediaAttr.MEDIA_ALBUM] = ""
+                update[MediaAttr.MEDIA_ARTIST] = ""
                 update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
-            else:
-                update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
+                update[MediaAttr.MEDIA_POSITION] = 0
+                update[MediaAttr.MEDIA_DURATION] = 0
+                update[MediaAttr.STATE] = (
+                    media_player.States.ON.value if homescreen_app else media_player.States.STANDBY.value
+                )
+                return update
+
+            # Track state of data sources
+            offline_name = None
+            offline_match = None
+            external_name = None
+            external_icon = None
+
+            # Try offline ID mapping first
+            if current_app in apps.IdMappings:
+                offline_name = apps.IdMappings[current_app]
+                self._media_app = offline_name
+
+            # Try fuzzy offline name matching if ID mapping failed
+            if not offline_name:
+                for query, name in apps.NameMatching.items():
+                    if query in current_app:
+                        offline_match = name
+                        self._media_app = name
+                        break
+
+            # Try external metadata
+            metadata = (
+                await get_app_metadata(current_app) if current_app and self._device_config.use_external_metadata else None
+            )
+            if metadata:
+                if _LOG.isEnabledFor(logging.DEBUG):
+                    _LOG.debug("App metadata: %s", filter_data_img_properties(metadata))
+                external_name = metadata.get("name")
+                external_icon = metadata.get("icon")
+                if external_name:
+                    self._media_app = external_name
+                if external_icon:
+                    self._app_image_url = external_icon
+
+            # Determine final name/title to use
+            name_to_use = offline_name or offline_match or external_name or current_app
+            # TODO why set name to both source & media title fields?
+            update[MediaAttr.SOURCE] = name_to_use
+            if not self._media_title and not self._media_image_url:
+                update[MediaAttr.MEDIA_TITLE] = name_to_use
+
+            # Determine which icon to use
+            icon_to_use = None
+            if self._device_config.use_external_metadata or self._use_app_url:
+                if external_icon:
+                    icon_to_use = external_icon
+                else:
+                    icon_to_use = ""
+            elif self._media_image_url:
+                # TODO what's the intended logic?
+                # `icon_to_use` is never used because of the inverse `if not self._media_image_url:` check below!
+                icon_to_use = self._media_image_url
+
+            update[MediaAttr.STATE] = media_player.States.PLAYING.value
+            # Skip applying app icon if media image from cast is present
+            if not self._media_image_url:
+                if not icon_to_use:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
+                else:
+                    update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
+        except Exception as ex:
+            _LOG.exception("[%s] Error during app metadata analysis : %s", self._identifier, ex)
 
         return update
 
