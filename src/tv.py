@@ -45,7 +45,7 @@ from pychromecast.socket_client import ConnectionStatus, ConnectionStatusListene
 from pyee.asyncio import AsyncIOEventEmitter
 from ucapi import media_player
 from ucapi.media_player import Attributes as MediaAttr
-from ucapi.media_player import MediaType
+from ucapi.media_player import MediaContentType
 
 import apps
 import discover
@@ -105,10 +105,10 @@ class DeviceState(IntEnum):
 
 
 GOOGLE_CAST_MEDIA_TYPES_MAP = {
-    METADATA_TYPE_GENERIC: MediaType.VIDEO,
-    METADATA_TYPE_MOVIE: MediaType.MOVIE,
-    METADATA_TYPE_MUSICTRACK: MediaType.MUSIC,
-    METADATA_TYPE_TVSHOW: MediaType.TVSHOW,
+    METADATA_TYPE_GENERIC: MediaContentType.VIDEO,
+    METADATA_TYPE_MOVIE: MediaContentType.MOVIE,
+    METADATA_TYPE_MUSICTRACK: MediaContentType.MUSIC,
+    METADATA_TYPE_TVSHOW: MediaContentType.TV_SHOW,
 }
 
 GOOGLE_CAST_MEDIA_STATES_MAP = {
@@ -232,7 +232,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._media_position = 0
         self._media_duration = 0
         self._last_update_position_time: float = 0
-        self._media_type: MediaType | None = None
+        self._media_type: MediaContentType | None = None
         self._media_image_url: str | None = None
         self._app_image_url: str = ""
         self._use_app_url = not device_config.use_chromecast
@@ -969,9 +969,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         if (
             status.metadata_type
-            and GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO) != self._media_type
+            and GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaContentType.VIDEO) != self._media_type
         ):
-            self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaType.VIDEO)
+            self._media_type = GOOGLE_CAST_MEDIA_TYPES_MAP.get(status.metadata_type, MediaContentType.VIDEO)
             update[MediaAttr.MEDIA_TYPE] = self._media_type
 
         if status.images and len(status.images) > 0:

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+### Changed
+- Update ucapi to 0.6.0 ([#143](https://github.com/unfoldedcircle/integration-androidtv/pull/143)).
+
 ---
 
 ## v0.8.4 - 2026-04-27
