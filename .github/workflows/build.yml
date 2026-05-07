@@ -104,7 +104,8 @@ jobs:
           mv dist/intg-androidtv artifacts/
           mv artifacts/intg-androidtv artifacts/bin
           mv artifacts/bin/intg-androidtv artifacts/bin/driver
-          cp driver.json artifacts/
+          # patch metadata to not conflict with pre-installed driver
+          jq '.driver_id = "androidtv_custom" | .name.en = "Android TV custom"' driver.json > artifacts/driver.json          
           cp -r config artifacts/
           cp LICENSE artifacts/
           echo "ARTIFACT_NAME=uc-intg-${{ env.INTG_NAME }}-${{ env.VERSION }}-aarch64" >> $GITHUB_ENV
