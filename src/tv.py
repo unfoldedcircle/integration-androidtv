@@ -740,8 +740,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                     update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
                 else:
                     update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
-        except Exception as ex:
-            _LOG.exception("[%s] Error during app metadata analysis : %s", self._identifier, ex)
+        except Exception:
+            _LOG.exception("[%s] Error during app metadata analysis", self.log_id)
 
         return update
 
