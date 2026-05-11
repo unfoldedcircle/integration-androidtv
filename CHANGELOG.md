@@ -8,10 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+---
+
+## v0.8.5 - 2026-05-11
+### Fixed
+- App icon extraction error handling. Contributed by @albaintor, thanks! ([#142](https://github.com/unfoldedcircle/integration-androidtv/pull/142)).
+
 ### Changed
 - Update ucapi to 0.6.0 ([#143](https://github.com/unfoldedcircle/integration-androidtv/pull/143)).
-
----
+- Custom driver_id and name for non-release artifacts ([#144](https://github.com/unfoldedcircle/integration-androidtv/pull/144)).
 
 ## v0.8.4 - 2026-04-27
 ### Changed
