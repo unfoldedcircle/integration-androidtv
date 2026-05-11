@@ -70,8 +70,6 @@ BACKOFF_FACTOR: float = 1.5
 
 LONG_PRESS_DELAY: float = 0.8
 
-HOMESCREEN_IMAGE = None
-
 
 class Events(IntEnum):
     """Internal driver events."""
@@ -181,6 +179,8 @@ def async_handle_atvlib_errors(
 class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListener):
     """Representing an Android TV device."""
 
+    _homescreen_image = None
+
     # pylint: disable=R0917
     def __init__(
         self,
@@ -253,6 +253,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         :param max_timeout: optional maximum timeout in seconds to try connecting to the device. Default: no timeout.
         :return: True if connected or connecting, False if timeout occurred.
         """
+        # one-time initialization
+        if self._homescreen_image is None:
+            self._homescreen_image = await encode_icon_to_data_uri("config://androidtv.png")
+
         if self._state in (DeviceState.INITIALIZING, DeviceState.CONNECTING):
             _LOG.debug("[%s] Skipping init task: connection task already running", self.log_id)
             return True
@@ -653,16 +657,9 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     # Callbacks
     async def _apply_current_app_metadata(self, current_app: str) -> dict:
-        global HOMESCREEN_IMAGE
-
         update = {}
 
         try:
-            # one-time initialization
-            if HOMESCREEN_IMAGE is None:
-                HOMESCREEN_IMAGE = ""
-                HOMESCREEN_IMAGE = await encode_icon_to_data_uri("config://androidtv.png")
-
             # Special handling for homescreen & Android TV system apps: show pre-defined icon & clear media information
             homescreen_app = apps.is_homescreen_app(current_app)
             if homescreen_app or apps.is_standby_app(current_app):
@@ -671,7 +668,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
                 update[MediaAttr.MEDIA_TITLE] = ""
                 update[MediaAttr.MEDIA_ALBUM] = ""
                 update[MediaAttr.MEDIA_ARTIST] = ""
-                update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
+                update[MediaAttr.MEDIA_IMAGE_URL] = self._homescreen_image
                 update[MediaAttr.MEDIA_POSITION] = 0
                 update[MediaAttr.MEDIA_DURATION] = 0
                 update[MediaAttr.STATE] = (
@@ -737,7 +734,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             # Skip applying app icon if media image from cast is present
             if not self._media_image_url:
                 if not icon_to_use:
-                    update[MediaAttr.MEDIA_IMAGE_URL] = HOMESCREEN_IMAGE
+                    update[MediaAttr.MEDIA_IMAGE_URL] = self._homescreen_image
                 else:
                     update[MediaAttr.MEDIA_IMAGE_URL] = icon_to_use
         except Exception:
