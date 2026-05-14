@@ -3,7 +3,7 @@ ucapi==0.6.0
 pyee~=13.0.1
 google_play_scraper==1.2.7
 pillow>=12.2.0
-requests>=2.33.1
+requests>=2.34.1
 pychromecast~=14.0.10
 httpx~=0.28.1
 sanitize-filename~=1.2.0
