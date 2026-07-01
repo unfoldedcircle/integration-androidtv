@@ -11,6 +11,7 @@ _Changes in the next release_
 ### Changed
 - Use pinned GitHub Actions dependencies ([#151](https://github.com/unfoldedcircle/integration-androidtv/pull/151)).
 - Update dependencies.
+- Update PyInstaller Docker image to 3.11.13-0.7.0
 
 ---
 
