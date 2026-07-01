@@ -8,12 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+---
+
+## v0.9.0 - 2026-07-01
 ### Changed
 - Use pinned GitHub Actions dependencies ([#151](https://github.com/unfoldedcircle/integration-androidtv/pull/151)).
 - Update dependencies.
 - Update PyInstaller Docker image to 3.11.13-0.7.0
-
----
 
 ## v0.8.5 - 2026-05-11
 ### Fixed
