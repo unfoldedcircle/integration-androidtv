@@ -11,6 +11,17 @@ _Changes in the next release_
 ### Added
 - Pure connection lifecycle state machine `src/connection_fsm.py` with full unit-test coverage
   ([spec 001](docs/specs/001-connection-lifecycle-state-machine.md), Phase 1). Not yet wired into the driver.
+- New internal `RECONNECTING` event, emitted while a lost connection is being re-established
+  ([spec 001](docs/specs/001-connection-lifecycle-state-machine.md), Phase 2). Driver-side wiring follows in Phase 3.
+
+### Changed
+- The runtime connection lifecycle of a device is now driven by the connection state machine
+  ([spec 001](docs/specs/001-connection-lifecycle-state-machine.md), Phase 2):
+  - Short connection losses that recover within a grace period no longer flicker the entities to unavailable.
+  - Authentication errors and unreachable devices are terminal until an explicit user action, with no competing
+    automatic reconnects.
+  - The library reconnect task is supervised: if it dies unexpectedly, the connection is re-established.
+
 ### Fixed
 - Reconnection is now owned by the androidtvremote2 library alone: the command path no longer spawns competing reconnect tasks.
 - Connected-check is based on the live transport instead of the stale `is_on` attribute.
