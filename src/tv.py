@@ -68,6 +68,9 @@ BACKOFF_MAX: int = 30
 MIN_RECONNECT_DELAY: float = 0.5
 BACKOFF_FACTOR: float = 1.5
 
+RECONNECT_DISCOVERY_DELAY = 30  # seconds before starting IP rediscovery (don't fight fast transient blips)
+RECONNECT_DISCOVERY_INTERVAL = 30  # seconds between IP rediscovery attempts
+
 LONG_PRESS_DELAY: float = 0.8
 
 
@@ -146,24 +149,19 @@ def async_handle_atvlib_errors(
                 raise CannotConnect(f"Device connection not active (state={state})")
 
             # workaround for "swallowed commands" since _atv.send_key_command doesn't provide a result
-            # pylint: disable=W0212
-            if (
-                not (self._atv and self._atv._remote_message_protocol and self._atv._remote_message_protocol.transport)
-                or self._atv._remote_message_protocol.transport.is_closing()
-            ):
+            # pylint: disable=protected-access
+            if not self._has_live_connection():
                 _LOG.warning(
-                    "[%s] Cannot send command, remote protocol is no longer active. Resetting connection.",
+                    "[%s] Command dropped, remote protocol not active; reconnection is in progress.",
                     self.log_id,
                 )
-                self.disconnect()
-                self._loop.create_task(self.connect())
+                # Reconnection is owned by androidtvremote2.keep_reconnecting(); do not spawn a competing connect.
                 return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
             return await func(self, *args, **kwargs)
         except (CannotConnect, ConnectionClosed) as ex:
-            _LOG.error("[%s] Cannot send command: %s", self.log_id, ex)
-            # pylint: disable=W0212
-            self._loop.create_task(self.connect())
+            _LOG.warning("[%s] Command failed, connection down: %s", self.log_id, ex)
+            # Reconnection is owned by androidtvremote2.keep_reconnecting(); do not spawn a competing connect.
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
         except InvalidAuth as ex:
             _LOG.error("[%s] Cannot send command: %s", self.log_id, ex)
@@ -239,6 +237,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._player_state = media_player.States.ON
         self._muted = False
         self._connect_lock = Lock()
+        self._tasks: set[asyncio.Task] = set()
+        self._ip_rediscovery_task: asyncio.Task | None = None
 
     def __del__(self):
         """Destructs instance, disconnect AndroidTVRemote."""
@@ -466,6 +466,26 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             _LOG.error("[%s] Initialize pair again. Error: %s", self.log_id, ex)
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
+    def _track(self, coro) -> asyncio.Task:
+        """Create a background task, keep a reference to it and surface its exception if it fails."""
+        task = self._loop.create_task(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        task.add_done_callback(self._log_task_exception)
+        return task
+
+    @staticmethod
+    def _log_task_exception(task: asyncio.Task) -> None:
+        """Log the exception of a finished background task, if any."""
+        if not task.cancelled() and task.exception() is not None:
+            _LOG.error("[androidtv] Background task failed: %s", task.exception())
+
+    def _has_live_connection(self) -> bool:
+        """Return True only if the underlying transport is actually open."""
+        # pylint: disable=protected-access
+        proto = self._atv._remote_message_protocol
+        return bool(proto and proto.transport and not proto.transport.is_closing())
+
     # pylint: disable=too-many-statements,too-many-return-statements,too-many-branches
     async def connect(self, max_timeout: int | None = None) -> bool:
         """
@@ -481,7 +501,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         await self._connect_lock.acquire()
 
-        if isinstance(self._atv.is_on, bool) and self._atv.is_on:
+        if self._has_live_connection():
             _LOG.debug("[%s] Android TV is already connected", self.log_id)
             # just to make sure the state is up-to-date
             self.events.emit(Events.CONNECTED, self._identifier)
@@ -654,8 +674,33 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         else:
             await asyncio.sleep(backoff)
 
+    async def _rediscover_ip_while_disconnected(self) -> None:
+        """While disconnected, periodically look for a changed IP so keep_reconnecting can pick it up."""
+        try:
+            await asyncio.sleep(RECONNECT_DISCOVERY_DELAY)
+            while not self._has_live_connection():
+                for item in await discover.android_tvs():
+                    if item["name"] == self._name and item["address"] != self._atv.host:
+                        _LOG.info(
+                            "[%s] IP address changed: %s -> %s",
+                            self.log_id,
+                            self._atv.host,
+                            item["address"],
+                        )
+                        self._atv.host = item["address"]
+                        self.events.emit(Events.IP_ADDRESS_CHANGED, self._identifier, self._atv.host)
+                        break
+                await asyncio.sleep(RECONNECT_DISCOVERY_INTERVAL)
+        except asyncio.CancelledError:  # pylint: disable=try-except-raise
+            raise
+        except Exception as e:  # pylint: disable=broad-except  # watcher must never kill the task tree
+            _LOG.error("[%s] IP rediscovery failed: %s", self.log_id, e)
+
     def disconnect(self) -> None:
         """Disconnect from Android TV."""
+        for task in list(self._tasks):
+            task.cancel()
+        self._ip_rediscovery_task = None
         self._reconnect_delay = MIN_RECONNECT_DELAY
         self._atv.disconnect()
         if self._chromecast and self._chromecast.socket_client.is_alive():
@@ -755,7 +800,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def _is_on_updated(self, is_on: bool) -> None:
         """Notify that the Android TV power state is updated."""
-        asyncio.create_task(self._handle_is_on_updated(is_on))
+        self._track(self._handle_is_on_updated(is_on))
 
     async def _handle_is_on_updated(self, is_on: bool):
         _LOG.info("[%s] is on: %s", self.log_id, is_on)
@@ -772,7 +817,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def _current_app_updated(self, current_app: str) -> None:
         """Notify that the current app on Android TV is updated."""
-        asyncio.create_task(self._handle_current_app_updated(current_app))
+        self._track(self._handle_current_app_updated(current_app))
 
     async def _handle_current_app_updated(self, current_app: str):
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
@@ -790,7 +835,14 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         """Notify that the Android TV is ready to receive commands or is unavailable."""
         _LOG.info("[%s] is_available: %s", self.log_id, is_available)
         self._state = DeviceState.CONNECTED if is_available else DeviceState.CONNECTING
-        self.events.emit(Events.CONNECTED if is_available else Events.DISCONNECTED, self.identifier)
+        if is_available:
+            if self._ip_rediscovery_task is not None:
+                self._ip_rediscovery_task.cancel()
+                self._ip_rediscovery_task = None
+        elif self._ip_rediscovery_task is None or self._ip_rediscovery_task.done():
+            # keep_reconnecting() cannot detect a changed IP address on its own: watch for it while disconnected
+            self._ip_rediscovery_task = self._track(self._rediscover_ip_while_disconnected())
+        self.events.emit(Events.CONNECTED if is_available else Events.DISCONNECTED, self._identifier)
 
     def _update_app_list(self) -> None:
         update = {}
