@@ -320,6 +320,8 @@ retiring pairing/init from `DeviceState` into `SetupSteps` is a **follow-up spec
 | F7 | IP watcher keeps running after reconnect/auth-error | `CANCEL_IP_WATCHER` on `→CONNECTED` and `→AUTH_ERROR`; `CANCEL_TASKS` on disconnect (INV-7). |
 | F8 | Executor raises while performing an intent | `_execute` must be defensive: a failing emit/task-start must be logged and must not corrupt `self._conn.state` (state is already committed by `apply()` before intents run). |
 | F9 | Library internals change (`_remote_message_protocol`, `keep_reconnecting`) | Liveness is centralised in `_has_live_connection()` (Stage 1); pin `androidtvremote2==0.3.1` and re-verify on bump (Decision 5). |
+| F10 | Transient SSL error misclassified as auth failure: the library maps **any** `ssl.SSLError` during connect to `InvalidAuth` (`androidtv_remote.py:243`, `:256` in 0.3.1) — e.g. `SSLEOFError` from a link drop mid-TLS-handshake terminates `keep_reconnecting()` with a spurious auth error | Lands in terminal `AUTH_ERROR` (INV-6); recovery is the next `CONNECT_REQUESTED` (exit-standby / entity subscribe). Same behaviour as pre-FSM code — not a regression. Watch field logs; if it occurs in practice, harden by retrying once in the auth callback before dispatching `RECONNECT_AUTH_FAILED` (would be a spec update). |
+| F11 | The library reconnect task dies silently on an unexpected exception (e.g. `PermissionError` reading cert files escapes `_create_ssl_context`, which only catches `FileNotFoundError`); historic precedent: in 0.0.14 an escaping `ConnectionClosed` killed the loop (fixed upstream in `d976bb1`, included in 0.3.1) | **Phase 2 supervises the owner:** after `keep_reconnecting()`, attach a done-callback to `_atv._reconnect_task` (internals pin per Decision 5). If the task terminates without cancellation and without the auth callback having fired, log an error and re-establish ownership via the existing table: dispatch `DISCONNECT_REQUESTED` then `CONNECT_REQUESTED` (no new triggers/rows needed). |
 
 ---
 
@@ -370,6 +372,10 @@ settable `_remote_message_protocol` whose `transport.is_closing()` is controllab
    emitted, no further reconnect; watcher/grace cancelled.
 8. **Single-writer audit (INV-1)** — `grep` assertion in the test (or a lint step):
    no `self._conn_state = ` outside `connection_fsm.py`.
+9. **Reconnect-owner supervision (F11)** — make the fake's `_reconnect_task` complete
+   with an exception (no cancellation, no auth callback): an error is logged and
+   `DISCONNECT_REQUESTED` + `CONNECT_REQUESTED` are dispatched (a fresh
+   `keep_reconnecting` is started); a *cancelled* task triggers nothing.
 
 ---
 
@@ -395,8 +401,9 @@ and could even begin before the Stage-1 branches merge. Phases 2–3 touch `tv.p
 * **Work:** add `self._conn`, `connection_state`, `_dispatch`, `_execute`; convert the
   runtime `self._state` writes (`connect`, `disconnect`, `_is_available_updated`,
   `keep_reconnecting` auth cb) to trigger dispatches; point the command decorator at
-  `self._conn.state`; wire the Stage-1 IP watcher + grace timer through intents; add the
-  fake-library integration tests.
+  `self._conn.state`; wire the Stage-1 IP watcher + grace timer through intents;
+  supervise the library reconnect owner (done-callback on `_atv._reconnect_task`, F11);
+  add the fake-library integration tests.
 * **Dependencies:** Phase 1; **Stage-1 `fix/reconnection-single-owner` merged**
   (reuses `_has_live_connection`, `_track`, `_rediscover_ip_while_disconnected`).
   Because it is a single-file core refactor it is a **serial dependency** for Phase 3
@@ -490,5 +497,22 @@ Resolved during review (2026-07-16); recorded here for traceability.
    `_remote_message_protocol` attribute is accepted, funnelled through the single
    `_has_live_connection()` chokepoint. Add a comment at the requirements pin and a
    checklist item to re-verify these internals on any `androidtvremote2` bump.
+6. **Library reconnection verified (2026-07-16).** Source review of the pinned 0.3.1
+   confirmed `_async_reconnect` retries **indefinitely** (backoff 0.1s → 30s cap) and
+   exits only on `InvalidAuth`, `disconnect()`, or cancellation; a 16s idle watchdog
+   (`remote.py:332`, server pings every 5s) detects silent drops (Wi-Fi loss, half-open
+   TCP, device sleep) and bounds any hang inside `async_connect()`. The integration's
+   historical second reconnect loop (PR #36 / issue #40, April 2024) compensated for
+   androidtvremote2 **0.0.14**, whose loop caught only `CannotConnect` — an escaping
+   `ConnectionClosed` silently killed it; fixed upstream in `d976bb1` (2024-04-28),
+   included in 0.3.1. The single-owner model (INV-2) is therefore safe. Residual risks
+   are recorded as F10/F11.
+7. **No reconnect nudge from the command path (deliberate).** `CONNECT_REQUESTED` while
+   `RECONNECTING` stays an unlisted no-op: the library owns retries (INV-2). Worst-case
+   recovery after a silent drop is ~16s idle detection + ≤30s backoff; a command sent
+   during a backoff wait returns `SERVICE_UNAVAILABLE` instead of forcing an immediate
+   (race-prone) reconnect as the pre-FSM code did. If field testing shows this latency
+   matters, add a race-free nudge transition (`RECONNECTING + CONNECT_REQUESTED →
+   CONNECTING`) in a follow-up spec update.
 
-_No open questions remain; the spec is ready to move from `Draft` to `Approved`._
+_No open questions remain._
