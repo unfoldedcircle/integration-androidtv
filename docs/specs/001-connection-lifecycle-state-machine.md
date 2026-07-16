@@ -282,7 +282,18 @@ The table is a module-level `dict[tuple[ConnectionState, Trigger], tuple[Connect
   * `connect()` — on entry `_dispatch(CONNECT_REQUESTED)`; the bounded initial-connect
     loop (kept from Stage 1) dispatches `CONNECT_SUCCEEDED` / `CONNECT_FAILED_AUTH` /
     `CONNECT_ABORTED`. The `START_INITIAL_CONNECT` intent is what launches that loop
-    (guard against re-entry with the existing `_connect_lock`).
+    (guard against re-entry with the existing `_connect_lock`). Two implementation
+    clarifications (Phase 2):
+    * The pre-existing already-connected fast path (live transport and state `CONNECTED`)
+      keeps its safety re-emit of `CONNECTED`, routed through the executor's emit helper
+      so the event and the (already committed) state cannot disagree (INV-3/AC-3).
+    * `connect()` no longer writes `DeviceState.AUTH_ERROR`/`TIMEOUT`/`ERROR` on failure.
+      The setup flow reads `.state` once more *after* `connect(timeout)` (`setup_flow.py:552`),
+      but on current `main` that read was always masked to `DISCONNECTED` by the preceding
+      `disconnect()` call anyway; with Phase 2 the init/pairing `DeviceState` values now
+      survive `disconnect()`, so auth/timeout classification via `init()`/pairing is
+      preserved or improved (AC-11). Connect-phase failures classify as before
+      (CONNECTION_REFUSED).
   * `disconnect()` — `_dispatch(DISCONNECT_REQUESTED)`. The `CANCEL_TASKS` intent
     subsumes the Stage-1 task cancellation; keep the Chromecast teardown as-is.
   * `_is_available_updated(is_available)` — becomes exactly:
