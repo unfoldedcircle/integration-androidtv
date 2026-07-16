@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+### Fixed
+- Chromecast connection no longer blocks the asyncio event loop (all devices could stall up to 10s per connect).
+
 ---
 
 ## v0.9.0 - 2026-07-01
