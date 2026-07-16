@@ -13,6 +13,7 @@ _Changes in the next release_
 - Connected-check is based on the live transport instead of the stale `is_on` attribute.
 - A changed device IP address is rediscovered while reconnecting, so the library can reconnect after a DHCP address change.
 - Background tasks are tracked, cancelled on disconnect and their exceptions are logged instead of being swallowed.
+- Chromecast connection no longer blocks the asyncio event loop (all devices could stall up to 10s per connect).
 
 ---
 

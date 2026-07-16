@@ -586,36 +586,47 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self.events.emit(Events.CONNECTED, self._identifier)
 
         # Connect to Chromecast if supported
-        self._chromecast_connect()
+        await self._chromecast_connect()
         return True
 
-    def _chromecast_connect(self):
-        if self._device_config.use_chromecast:
-            try:
-                if self._chromecast:
-                    self._chromecast.disconnect(timeout=0)
-                    self._chromecast = None
-            except Exception:
-                pass
-            self._chromecast = pychromecast.get_chromecast_from_host(
+    async def _chromecast_connect(self) -> None:
+        if not self._device_config.use_chromecast:
+            return
+        # tear down any previous instance off-loop
+        if self._chromecast is not None:
+            old, self._chromecast = self._chromecast, None
+            await self._loop.run_in_executor(None, self._safe_cast_disconnect, old)
+
+        def _blocking_connect():
+            cast = pychromecast.get_chromecast_from_host(
                 host=(self._atv.host, None, None, None, None),
-                tries=10,
+                tries=1,  # do NOT retry on-thread; reconnection is handled elsewhere
                 timeout=CONNECTION_TIMEOUT,
                 retry_wait=CONNECTION_TIMEOUT,
             )
-
+            cast.register_status_listener(self)
+            cast.socket_client.media_controller.register_status_listener(self)
+            cast.register_connection_listener(self)
+            _LOG.info("[%s] Chromecast connecting", self.log_id)
             try:
-                self._chromecast.register_status_listener(self)
-                self._chromecast.socket_client.media_controller.register_status_listener(self)
-                self._chromecast.register_connection_listener(self)
-                _LOG.info("[%s] Chromecast connecting", self.log_id)
-                self._chromecast.wait(timeout=CONNECTION_TIMEOUT)
+                cast.wait(timeout=CONNECTION_TIMEOUT)
                 _LOG.info("[%s] Chromecast connected", self.log_id)
             except (RequestTimeout, RuntimeError):
                 _LOG.info(
                     "[%s] Device is not active or Chromecast is not supported on this devices",
                     self.log_id,
                 )
+            return cast
+
+        self._chromecast = await self._loop.run_in_executor(None, _blocking_connect)
+
+    @staticmethod
+    def _safe_cast_disconnect(cast) -> None:
+        try:
+            if cast.socket_client and cast.socket_client.is_alive():
+                cast.disconnect(timeout=0)
+        except Exception:  # pylint: disable=broad-except
+            pass
 
     async def _handle_connection_failure(self, connect_duration: float, ex):
         self._connection_attempts += 1
@@ -795,7 +806,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         _LOG.info("[%s] is on: %s", self.log_id, is_on)
         current_app = self._atv.current_app or ""
         if is_on:
-            self._chromecast_connect()
+            await self._chromecast_connect()
             update = await self._apply_current_app_metadata(current_app)
             update[MediaAttr.STATE] = media_player.States.ON.value
         else:
