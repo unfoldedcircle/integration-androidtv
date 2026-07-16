@@ -68,6 +68,9 @@ BACKOFF_MAX: int = 30
 MIN_RECONNECT_DELAY: float = 0.5
 BACKOFF_FACTOR: float = 1.5
 
+RECONNECT_DISCOVERY_DELAY = 30  # seconds before starting IP rediscovery (don't fight fast transient blips)
+RECONNECT_DISCOVERY_INTERVAL = 30  # seconds between IP rediscovery attempts
+
 LONG_PRESS_DELAY: float = 0.8
 
 
@@ -146,6 +149,7 @@ def async_handle_atvlib_errors(
                 raise CannotConnect(f"Device connection not active (state={state})")
 
             # workaround for "swallowed commands" since _atv.send_key_command doesn't provide a result
+            # pylint: disable=protected-access
             if not self._has_live_connection():
                 _LOG.warning(
                     "[%s] Command dropped, remote protocol not active; reconnection is in progress.",
@@ -234,6 +238,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._muted = False
         self._connect_lock = Lock()
         self._tasks: set[asyncio.Task] = set()
+        self._ip_rediscovery_task: asyncio.Task | None = None
 
     def __del__(self):
         """Destructs instance, disconnect AndroidTVRemote."""
@@ -658,10 +663,33 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         else:
             await asyncio.sleep(backoff)
 
+    async def _rediscover_ip_while_disconnected(self) -> None:
+        """While disconnected, periodically look for a changed IP so keep_reconnecting can pick it up."""
+        try:
+            await asyncio.sleep(RECONNECT_DISCOVERY_DELAY)
+            while not self._has_live_connection():
+                for item in await discover.android_tvs():
+                    if item["name"] == self._name and item["address"] != self._atv.host:
+                        _LOG.info(
+                            "[%s] IP address changed: %s -> %s",
+                            self.log_id,
+                            self._atv.host,
+                            item["address"],
+                        )
+                        self._atv.host = item["address"]
+                        self.events.emit(Events.IP_ADDRESS_CHANGED, self._identifier, self._atv.host)
+                        break
+                await asyncio.sleep(RECONNECT_DISCOVERY_INTERVAL)
+        except asyncio.CancelledError:  # pylint: disable=try-except-raise
+            raise
+        except Exception as e:  # pylint: disable=broad-except  # watcher must never kill the task tree
+            _LOG.error("[%s] IP rediscovery failed: %s", self.log_id, e)
+
     def disconnect(self) -> None:
         """Disconnect from Android TV."""
         for task in list(self._tasks):
             task.cancel()
+        self._ip_rediscovery_task = None
         self._reconnect_delay = MIN_RECONNECT_DELAY
         self._atv.disconnect()
         if self._chromecast and self._chromecast.socket_client.is_alive():
@@ -796,7 +824,14 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         """Notify that the Android TV is ready to receive commands or is unavailable."""
         _LOG.info("[%s] is_available: %s", self.log_id, is_available)
         self._state = DeviceState.CONNECTED if is_available else DeviceState.CONNECTING
-        self.events.emit(Events.CONNECTED if is_available else Events.DISCONNECTED, self.identifier)
+        if is_available:
+            if self._ip_rediscovery_task is not None:
+                self._ip_rediscovery_task.cancel()
+                self._ip_rediscovery_task = None
+        elif self._ip_rediscovery_task is None or self._ip_rediscovery_task.done():
+            # keep_reconnecting() cannot detect a changed IP address on its own: watch for it while disconnected
+            self._ip_rediscovery_task = self._track(self._rediscover_ip_while_disconnected())
+        self.events.emit(Events.CONNECTED if is_available else Events.DISCONNECTED, self._identifier)
 
     def _update_app_list(self) -> None:
         update = {}
