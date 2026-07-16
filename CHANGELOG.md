@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+### Added
+- Pure connection lifecycle state machine `src/connection_fsm.py` with full unit-test coverage
+  ([spec 001](docs/specs/001-connection-lifecycle-state-machine.md), Phase 1). Not yet wired into the driver.
 ### Fixed
 - Reconnection is now owned by the androidtvremote2 library alone: the command path no longer spawns competing reconnect tasks.
 - Connected-check is based on the live transport instead of the stale `is_on` attribute.
