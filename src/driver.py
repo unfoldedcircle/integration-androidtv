@@ -37,6 +37,12 @@ _configured_android_tvs: dict[str, tv.AndroidTv] = {}
 device_profile = DeviceProfile()
 
 
+def _log_task_result(task: asyncio.Task) -> None:
+    """Log the exception of a finished background task, if any."""
+    if not task.cancelled() and task.exception() is not None:
+        _LOG.error("Background task failed: %s", task.exception())
+
+
 @api.listens_to(ucapi.Events.CONNECT)
 async def on_connect():
     """When the UCR2 connects, all configured Android TV devices are getting connected."""
@@ -44,7 +50,8 @@ async def on_connect():
     await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
     for atv in _configured_android_tvs.values():
         # start background task
-        _LOOP.create_task(atv.connect())
+        task = _LOOP.create_task(atv.connect())
+        task.add_done_callback(_log_task_result)
 
 
 @api.listens_to(ucapi.Events.DISCONNECT)
@@ -77,7 +84,8 @@ async def on_exit_standby():
     _LOG.debug("Exit standby event: connecting device(s)")
     for configured in _configured_android_tvs.values():
         # start background task
-        _LOOP.create_task(configured.connect())
+        task = _LOOP.create_task(configured.connect())
+        task.add_done_callback(_log_task_result)
 
 
 @api.listens_to(ucapi.Events.SUBSCRIBE_ENTITIES)
@@ -100,7 +108,8 @@ async def on_subscribe_entities(entity_ids) -> None:
             # Even though it's a MediaPlayer state enum, the states are valid for all our entity types
             api.configured_entities.update_attributes(entity_id, {MediaAttr.STATE: state})
 
-            _LOOP.create_task(atv.connect())
+            task = _LOOP.create_task(atv.connect())
+            task.add_done_callback(_log_task_result)
             continue
 
         device = config.devices.get(device_id)
@@ -302,7 +311,8 @@ def _add_configured_android_tv(device_config: config.AtvDevice, connect: bool = 
 
     if connect:
         # start background task
-        _LOOP.create_task(start_connection())
+        task = _LOOP.create_task(start_connection())
+        task.add_done_callback(_log_task_result)
 
     _register_available_entities(device_config, android_tv, profile)
 

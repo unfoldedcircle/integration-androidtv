@@ -233,6 +233,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._player_state = media_player.States.ON
         self._muted = False
         self._connect_lock = Lock()
+        self._tasks: set[asyncio.Task] = set()
 
     def __del__(self):
         """Destructs instance, disconnect AndroidTVRemote."""
@@ -460,6 +461,20 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             _LOG.error("[%s] Initialize pair again. Error: %s", self.log_id, ex)
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
+    def _track(self, coro) -> asyncio.Task:
+        """Create a background task, keep a reference to it and surface its exception if it fails."""
+        task = self._loop.create_task(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        task.add_done_callback(self._log_task_exception)
+        return task
+
+    @staticmethod
+    def _log_task_exception(task: asyncio.Task) -> None:
+        """Log the exception of a finished background task, if any."""
+        if not task.cancelled() and task.exception() is not None:
+            _LOG.error("[androidtv] Background task failed: %s", task.exception())
+
     def _has_live_connection(self) -> bool:
         """Return True only if the underlying transport is actually open."""
         # pylint: disable=protected-access
@@ -645,6 +660,8 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def disconnect(self) -> None:
         """Disconnect from Android TV."""
+        for task in list(self._tasks):
+            task.cancel()
         self._reconnect_delay = MIN_RECONNECT_DELAY
         self._atv.disconnect()
         if self._chromecast and self._chromecast.socket_client.is_alive():
@@ -744,7 +761,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def _is_on_updated(self, is_on: bool) -> None:
         """Notify that the Android TV power state is updated."""
-        asyncio.create_task(self._handle_is_on_updated(is_on))
+        self._track(self._handle_is_on_updated(is_on))
 
     async def _handle_is_on_updated(self, is_on: bool):
         _LOG.info("[%s] is on: %s", self.log_id, is_on)
@@ -761,7 +778,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def _current_app_updated(self, current_app: str) -> None:
         """Notify that the current app on Android TV is updated."""
-        asyncio.create_task(self._handle_current_app_updated(current_app))
+        self._track(self._handle_current_app_updated(current_app))
 
     async def _handle_current_app_updated(self, current_app: str):
         _LOG.debug("[%s] current_app: %s", self.log_id, current_app)
