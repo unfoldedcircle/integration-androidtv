@@ -11,6 +11,12 @@ _Changes in the next release_
 ### Added
 - Pure connection lifecycle state machine `src/connection_fsm.py` with full unit-test coverage
   ([spec 001](docs/specs/001-connection-lifecycle-state-machine.md), Phase 1). Not yet wired into the driver.
+### Fixed
+- Reconnection is now owned by the androidtvremote2 library alone: the command path no longer spawns competing reconnect tasks.
+- Connected-check is based on the live transport instead of the stale `is_on` attribute.
+- A changed device IP address is rediscovered while reconnecting, so the library can reconnect after a DHCP address change.
+- Background tasks are tracked, cancelled on disconnect and their exceptions are logged instead of being swallowed.
+- Chromecast connection no longer blocks the asyncio event loop (all devices could stall up to 10s per connect).
 
 ---
 
