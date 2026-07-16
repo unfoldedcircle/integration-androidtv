@@ -146,11 +146,7 @@ def async_handle_atvlib_errors(
                 raise CannotConnect(f"Device connection not active (state={state})")
 
             # workaround for "swallowed commands" since _atv.send_key_command doesn't provide a result
-            # pylint: disable=W0212
-            if (
-                not (self._atv and self._atv._remote_message_protocol and self._atv._remote_message_protocol.transport)
-                or self._atv._remote_message_protocol.transport.is_closing()
-            ):
+            if not self._has_live_connection():
                 _LOG.warning(
                     "[%s] Cannot send command, remote protocol is no longer active. Resetting connection.",
                     self.log_id,
@@ -466,6 +462,12 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             _LOG.error("[%s] Initialize pair again. Error: %s", self.log_id, ex)
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
+    def _has_live_connection(self) -> bool:
+        """Return True only if the underlying transport is actually open."""
+        # pylint: disable=protected-access
+        proto = self._atv._remote_message_protocol
+        return bool(proto and proto.transport and not proto.transport.is_closing())
+
     # pylint: disable=too-many-statements,too-many-return-statements,too-many-branches
     async def connect(self, max_timeout: int | None = None) -> bool:
         """
@@ -481,7 +483,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
         await self._connect_lock.acquire()
 
-        if isinstance(self._atv.is_on, bool) and self._atv.is_on:
+        if self._has_live_connection():
             _LOG.debug("[%s] Android TV is already connected", self.log_id)
             # just to make sure the state is up-to-date
             self.events.emit(Events.CONNECTED, self._identifier)
