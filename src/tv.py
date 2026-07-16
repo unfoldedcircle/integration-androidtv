@@ -148,18 +148,16 @@ def async_handle_atvlib_errors(
             # workaround for "swallowed commands" since _atv.send_key_command doesn't provide a result
             if not self._has_live_connection():
                 _LOG.warning(
-                    "[%s] Cannot send command, remote protocol is no longer active. Resetting connection.",
+                    "[%s] Command dropped, remote protocol not active; reconnection is in progress.",
                     self.log_id,
                 )
-                self.disconnect()
-                self._loop.create_task(self.connect())
+                # Reconnection is owned by androidtvremote2.keep_reconnecting(); do not spawn a competing connect.
                 return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
             return await func(self, *args, **kwargs)
         except (CannotConnect, ConnectionClosed) as ex:
-            _LOG.error("[%s] Cannot send command: %s", self.log_id, ex)
-            # pylint: disable=W0212
-            self._loop.create_task(self.connect())
+            _LOG.warning("[%s] Command failed, connection down: %s", self.log_id, ex)
+            # Reconnection is owned by androidtvremote2.keep_reconnecting(); do not spawn a competing connect.
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
         except InvalidAuth as ex:
             _LOG.error("[%s] Cannot send command: %s", self.log_id, ex)
