@@ -122,6 +122,16 @@ class TestProfileCommand(unittest.TestCase):
         cmd = self.profile.command("not_a_command")
         self.assertIsNone(cmd)
 
+    def test_send_text_is_a_simple_command(self):
+        # send_text must be advertised as a simple command so the remote offers it as a button.
+        self.assertIn("send_text", self.profile.simple_commands)
+
+    def test_send_text_not_resolved_as_keycode_command(self):
+        # send_text carries a text parameter and is handled directly in the media-player entity,
+        # so it must NOT resolve through the keycode command pipeline.
+        cmd = self.profile.command("send_text")
+        self.assertIsNone(cmd)
+
 
 if __name__ == "__main__":
     unittest.main()

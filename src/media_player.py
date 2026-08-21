@@ -19,6 +19,11 @@ from util import handle_entity_state_after_update, key_update_helper
 
 _LOG = logging.getLogger(__name__)
 
+# Simple command to insert a whole text string into the focused input field on the
+# device via androidtvremote2.send_text(). Takes a "text" parameter, e.g.:
+# {"cmd_id": "send_text", "params": {"text": "tagesschau"}}
+SEND_TEXT_CMD = "send_text"
+
 
 class AndroidTVMediaPlayer(MediaPlayer):  # pylint: disable=too-few-public-methods
     """Representation of a AndroidTV Media Player entity."""
@@ -79,6 +84,10 @@ class AndroidTVMediaPlayer(MediaPlayer):  # pylint: disable=too-few-public-metho
             return await self._device.volume_set(params.get("volume"))
         if cmd_id == Commands.SEEK:
             return await self._device.media_seek(params.get("media_position", 0))
+        if cmd_id == SEND_TEXT_CMD:
+            if params is None or not params.get("text"):
+                return StatusCodes.BAD_REQUEST
+            return await self._device.send_text(params["text"])
 
         return await self._device.send_media_player_command(cmd_id)
 

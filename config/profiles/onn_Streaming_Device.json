@@ -25,6 +25,7 @@
     "search"
   ],
   "simple_commands": [
+    "send_text"
   ],
   "command_map": {
     "context_menu": {

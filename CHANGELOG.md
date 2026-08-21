@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 _Changes in the next release_
 
 ### Added
+- `send_text` command to insert a whole text string into the focused input field on the device via the Android TV
+  input method, e.g. an app's own search box. Lets a search term be entered with one command instead of spelling it
+  out key by key ([#163](https://github.com/unfoldedcircle/integration-androidtv/issues/163)).
 - Pure connection lifecycle state machine `src/connection_fsm.py` with full unit-test coverage
   ([spec 001](docs/specs/001-connection-lifecycle-state-machine.md), Phase 1). Not yet wired into the driver.
 ### Fixed

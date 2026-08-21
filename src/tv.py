@@ -953,6 +953,26 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         return ucapi.StatusCodes.OK
 
     @async_handle_atvlib_errors
+    async def send_text(self, text: str) -> ucapi.StatusCodes:
+        """
+        Send a text string to the Android TV via its input method.
+
+        This inserts the text into whatever input field is currently focused on the
+        device (e.g. an app's own search box). It does not block; it buffers the data
+        and arranges for it to be sent out asynchronously.
+
+        Error handling is performed in the ``async_handle_atvlib_errors`` wrapper with the following return codes:
+
+         - SERVICE_UNAVAILABLE if there's no connection to the device,
+         - CONFLICT if the connection is not authenticated and requires re-pairing
+
+        :param text: the text to insert into the focused input field
+        :return: OK if scheduled to be sent, other error code in case of an error
+        """
+        self._atv.send_text(text)
+        return ucapi.StatusCodes.OK
+
+    @async_handle_atvlib_errors
     async def _launch_app(self, app: str) -> ucapi.StatusCodes:
         """Launch an app on Android TV."""
         self._atv.send_launch_app_command(app)

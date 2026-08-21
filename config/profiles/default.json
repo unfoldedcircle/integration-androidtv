@@ -91,7 +91,8 @@
     "KEYCODE_F9",
     "KEYCODE_F10",
     "KEYCODE_F11",
-    "KEYCODE_F12"
+    "KEYCODE_F12",
+    "send_text"
   ],
   "command_map": {
     "CURSOR_ENTER_LONG": {

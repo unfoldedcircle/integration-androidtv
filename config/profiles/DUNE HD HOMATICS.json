@@ -47,7 +47,8 @@
     "PRIMEVIDEO",
     "PLAYSTORE",
     "FACTORYTEST",
-    "DISNEY"
+    "DISNEY",
+    "send_text"
   ],
   "command_map": {
     "FULL_SCREEN": {

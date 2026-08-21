@@ -25,7 +25,8 @@
   ],
   "simple_commands": [
     "APPS",
-    "APP_SWITCHER"
+    "APP_SWITCHER",
+    "send_text"
   ],
   "command_map": {
     "context_menu": {

@@ -25,7 +25,8 @@
     "search"
   ],
   "simple_commands": [
-    "SCREENSAVER"
+    "SCREENSAVER",
+    "send_text"
   ],
   "command_map": {
     "context_menu": {

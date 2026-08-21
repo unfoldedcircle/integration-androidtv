@@ -42,7 +42,8 @@
     "HOME_LONG",
     "MENU_LONG",
     "ENTER",
-    "TELETEXT"
+    "TELETEXT",
+    "send_text"
   ],
   "command_map": {
     "CURSOR_ENTER_LONG": {
