@@ -37,6 +37,12 @@ _configured_android_tvs: dict[str, tv.AndroidTv] = {}
 device_profile = DeviceProfile()
 
 
+def _log_task_result(task: asyncio.Task) -> None:
+    """Log the exception of a finished background task, if any."""
+    if not task.cancelled() and task.exception() is not None:
+        _LOG.error("Background task failed: %s", task.exception())
+
+
 @api.listens_to(ucapi.Events.CONNECT)
 async def on_connect():
     """When the UCR2 connects, all configured Android TV devices are getting connected."""
@@ -44,7 +50,8 @@ async def on_connect():
     await api.set_device_state(ucapi.DeviceStates.CONNECTED)  # just to make sure the device state is set
     for atv in _configured_android_tvs.values():
         # start background task
-        _LOOP.create_task(atv.connect())
+        task = _LOOP.create_task(atv.connect())
+        task.add_done_callback(_log_task_result)
 
 
 @api.listens_to(ucapi.Events.DISCONNECT)
@@ -77,7 +84,8 @@ async def on_exit_standby():
     _LOG.debug("Exit standby event: connecting device(s)")
     for configured in _configured_android_tvs.values():
         # start background task
-        _LOOP.create_task(configured.connect())
+        task = _LOOP.create_task(configured.connect())
+        task.add_done_callback(_log_task_result)
 
 
 @api.listens_to(ucapi.Events.SUBSCRIBE_ENTITIES)
@@ -100,7 +108,8 @@ async def on_subscribe_entities(entity_ids) -> None:
             # Even though it's a MediaPlayer state enum, the states are valid for all our entity types
             api.configured_entities.update_attributes(entity_id, {MediaAttr.STATE: state})
 
-            _LOOP.create_task(atv.connect())
+            task = _LOOP.create_task(atv.connect())
+            task.add_done_callback(_log_task_result)
             continue
 
         device = config.devices.get(device_id)
@@ -302,7 +311,8 @@ def _add_configured_android_tv(device_config: config.AtvDevice, connect: bool = 
 
     if connect:
         # start background task
-        _LOOP.create_task(start_connection())
+        task = _LOOP.create_task(start_connection())
+        task.add_done_callback(_log_task_result)
 
     _register_available_entities(device_config, android_tv, profile)
 
@@ -360,13 +370,39 @@ def on_device_removed(device: config.AtvDevice | None) -> None:
                 api.available_entities.remove(entity_id)
 
 
+class JournaldFormatter(logging.Formatter):
+    """Formatter for journald. Prefixes messages with priority level."""
+
+    def format(self, record):
+        """Format the log record with journald priority prefix."""
+        # mapping of logging levels to journald priority levels
+        # https://www.freedesktop.org/software/systemd/man/latest/sd-daemon.html#syslog-compatible-log-levels
+        # Note: DEBUG app messages are logged with priority 6 (info) and INFO with priority 5 (notice)
+        # This is a workaround until the log subsystem on the Remote is updated to support debug levels.
+        priority = {
+            logging.DEBUG: "<6>",  # SD_INFO
+            logging.INFO: "<5>",  # SD_NOTICE
+            logging.WARNING: "<4>",
+            logging.ERROR: "<3>",
+            logging.CRITICAL: "<2>",
+        }.get(record.levelno, "<6>")
+        return f"{priority}{record.name}: {record.getMessage()}"
+
+
 async def main():
-    """Start the Remote Two integration driver."""
-    logging.basicConfig()  # when running on the device: timestamps are added by the journal
-    # logging.basicConfig(
-    #     format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
-    #     datefmt="%Y-%m-%d %H:%M:%S",
-    # )
+    """Start the Remote Two/3 integration driver."""
+    if os.getenv("INVOCATION_ID"):
+        # when running under systemd: timestamps are added by the journal
+        # and we use a custom formatter for journald priority levels
+        handler = logging.StreamHandler()
+        handler.setFormatter(JournaldFormatter())
+        logging.basicConfig(handlers=[handler])
+    else:
+        logging.basicConfig(
+            format="%(asctime)s.%(msecs)03d %(levelname)-5s %(name)s.%(funcName)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+
     level = os.getenv("UC_LOG_LEVEL", "DEBUG").upper()
     logging.getLogger("tv").setLevel(level)
     logging.getLogger("driver").setLevel(level)

@@ -31,15 +31,20 @@ def filter_data_img_properties(data: dict[str, Any] | None) -> dict[str, Any]:
     if not log_upd:
         return {}
 
-    if "icon" in log_upd and log_upd["icon"].startswith("data:"):
+    if "icon" in log_upd and isinstance(log_upd["icon"], str) and log_upd["icon"].startswith("data:"):
         log_upd["icon"] = "data:***"
-    if MediaAttr.MEDIA_IMAGE_URL in log_upd and log_upd[MediaAttr.MEDIA_IMAGE_URL].startswith("data:"):
+    if (
+        MediaAttr.MEDIA_IMAGE_URL in log_upd
+        and isinstance(log_upd[MediaAttr.MEDIA_IMAGE_URL], str)
+        and log_upd[MediaAttr.MEDIA_IMAGE_URL].startswith("data:")
+    ):
         log_upd[MediaAttr.MEDIA_IMAGE_URL] = "data:***"
 
     if "msg_data" in log_upd:
         if (
             "attributes" in log_upd["msg_data"]
             and MediaAttr.MEDIA_IMAGE_URL in log_upd["msg_data"]["attributes"]
+            and isinstance(log_upd["msg_data"]["attributes"][MediaAttr.MEDIA_IMAGE_URL], str)
             and log_upd["msg_data"]["attributes"][MediaAttr.MEDIA_IMAGE_URL].startswith("data:")
         ):
             log_upd["msg_data"]["attributes"][MediaAttr.MEDIA_IMAGE_URL] = "data:***"
@@ -48,6 +53,7 @@ def filter_data_img_properties(data: dict[str, Any] | None) -> dict[str, Any]:
                 if (
                     "attributes" in item
                     and MediaAttr.MEDIA_IMAGE_URL in item["attributes"]
+                    and isinstance(item["attributes"][MediaAttr.MEDIA_IMAGE_URL], str)
                     and item["attributes"][MediaAttr.MEDIA_IMAGE_URL].startswith("data:")
                 ):
                     item["attributes"][MediaAttr.MEDIA_IMAGE_URL] = "data:***"

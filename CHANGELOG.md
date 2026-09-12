@@ -8,7 +8,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+### Added
+- Pure connection lifecycle state machine `src/connection_fsm.py` with full unit-test coverage
+  ([spec 001](docs/specs/001-connection-lifecycle-state-machine.md), Phase 1). Not yet wired into the driver.
+### Fixed
+- Reconnection is now owned by the androidtvremote2 library alone: the command path no longer spawns competing reconnect tasks.
+- Connected-check is based on the live transport instead of the stale `is_on` attribute.
+- A changed device IP address is rediscovered while reconnecting, so the library can reconnect after a DHCP address change.
+- Background tasks are tracked, cancelled on disconnect and their exceptions are logged instead of being swallowed.
+- Chromecast connection no longer blocks the asyncio event loop (all devices could stall up to 10s per connect).
+
 ---
+
+## v0.9.0 - 2026-07-01
+### Changed
+- Use pinned GitHub Actions dependencies ([#151](https://github.com/unfoldedcircle/integration-androidtv/pull/151)).
+- Update dependencies.
+- Update PyInstaller Docker image to 3.11.13-0.7.0
+
+## v0.8.5 - 2026-05-11
+### Fixed
+- App icon extraction error handling. Contributed by @albaintor, thanks! ([#142](https://github.com/unfoldedcircle/integration-androidtv/pull/142)).
+
+### Changed
+- Update ucapi to 0.6.0 ([#143](https://github.com/unfoldedcircle/integration-androidtv/pull/143)).
+- Custom driver_id and name for non-release artifacts ([#144](https://github.com/unfoldedcircle/integration-androidtv/pull/144)).
+
+## v0.8.4 - 2026-04-27
+### Changed
+- Update PyInstaller build image: PyInstaller 6.20.0 and updated dependencies.
+- Update dependencies and GitHub actions.
+
+## v0.8.3 - 2026-02-21
+### Changed
+- Update ucapi to 0.5.2 ([#129](https://github.com/unfoldedcircle/integration-androidtv/pull/129)).
+- Update pyee to 13.0.1  ([#130](https://github.com/unfoldedcircle/integration-androidtv/pull/130)).
+- Update Docker build image ([#131](https://github.com/unfoldedcircle/integration-androidtv/pull/131)).
+- Update pillow to 12.1.1 ([#132](https://github.com/unfoldedcircle/integration-androidtv/pull/132)).
+
+## v0.8.2 - 2026-01-15
+### Changed
+- Adapt journald log levels until the Remote supports native debug levels ([#127](https://github.com/unfoldedcircle/integration-androidtv/pull/127)).
+
+## v0.8.1 - 2025-12-24
+### Added
+- New FULL_SCREEN command in Dune HD Homatic Profile ([#125](https://github.com/unfoldedcircle/integration-androidtv/pull/125)).
+
+### Changed
+- Use journald log levels if running as a systemd service ([#126](https://github.com/unfoldedcircle/integration-androidtv/pull/126)).
 
 ## v0.8.0 - 2025-12-22
 ### Added

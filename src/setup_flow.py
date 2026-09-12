@@ -42,15 +42,15 @@ class SetupSteps(IntEnum):
 
 
 _setup_step = SetupSteps.INIT
-_cfg_add_device: bool = False
+_cfg_add_device: bool = False  # No idea why pylint is complaining this is a constant! pylint: disable=C0103
 _discovered_android_tvs: list[dict[str, str]] = []
-_pairing_android_tv: tv.AndroidTv | None = None
-_use_external_metadata: bool = False
-_reconfigured_device: AtvDevice | None = None
-_use_chromecast: bool = False
-_use_chromecast_volume: bool = False
-_volume_step: int = 10
-_use_voice: bool = False
+_pairing_android_tv: tv.AndroidTv | None = None  # pylint: disable=C0103
+_use_external_metadata: bool = False  # pylint: disable=C0103
+_reconfigured_device: AtvDevice | None = None  # pylint: disable=C0103
+_use_chromecast: bool = False  # pylint: disable=C0103
+_use_chromecast_volume: bool = False  # pylint: disable=C0103
+_volume_step: int = 10  # pylint: disable=C0103
+_use_voice: bool = False  # pylint: disable=C0103
 
 # TODO #9 externalize language texts
 _user_input_discovery = RequestUserInput(

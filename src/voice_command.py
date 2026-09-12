@@ -51,6 +51,12 @@ _LOG = logging.getLogger(__name__)
 _voice_stream_sessions = defaultdict[VoiceSessionKey, VoiceStream]()
 
 
+def _log_task_result(task: asyncio.Task) -> None:
+    """Log the exception of a finished background task, if any."""
+    if not task.cancelled() and task.exception() is not None:
+        _LOG.error("Background task failed: %s", task.exception())
+
+
 def va_state_from_atv(device: tv.AndroidTv) -> States:
     """Return the voice-assistant state from the given Android TV device."""
     return va_state_from_media_state(device.player_state)
@@ -116,7 +122,8 @@ class VoiceCommand(VoiceAssistant):
             if self._device.is_on is None:
                 return StatusCodes.SERVICE_UNAVAILABLE
             # set up Android TV voice stream as async task to not block the voice_start command
-            asyncio.create_task(self._start_voice(websocket, session_id))
+            task = asyncio.create_task(self._start_voice(websocket, session_id))
+            task.add_done_callback(_log_task_result)
             return StatusCodes.OK
 
         return StatusCodes.BAD_REQUEST
