@@ -14,7 +14,7 @@ import socket
 import time
 from asyncio import AbstractEventLoop, Lock, timeout
 from enum import IntEnum
-from functools import wraps
+from functools import partial, wraps
 from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
 
 import pychromecast
@@ -51,6 +51,13 @@ import apps
 import discover
 import inputs
 from config import AtvDevice
+from connection_fsm import (
+    RECONNECT_GRACE,
+    ConnectionFsm,
+    ConnectionState,
+    Intent,
+    Trigger,
+)
 from external_metadata import (
     encode_icon_to_data_uri,
     get_app_metadata,
@@ -84,6 +91,8 @@ class Events(IntEnum):
     AUTH_ERROR = 4
     UPDATE = 5
     IP_ADDRESS_CHANGED = 6
+    RECONNECTING = 7
+    """Was connected, transport lost, retrying — without marking the entity unavailable (spec 001)."""
 
 
 class DeviceState(IntEnum):
@@ -140,11 +149,14 @@ def async_handle_atvlib_errors(
     async def wrapper(self: _AndroidTvT, *args: _P.args, **kwargs: _P.kwargs) -> ucapi.StatusCodes:
         try:
             # use the same exceptions as the func is throwing (e.g. AndroidTVRemote.send_key_command)
-            state = self.state
-            if state != DeviceState.CONNECTED:
-                if state in (DeviceState.DISCONNECTED, DeviceState.CONNECTING) or self.is_on is None:
+            state = self.connection_state
+            if state != ConnectionState.CONNECTED:
+                if (
+                    state in (ConnectionState.DISCONNECTED, ConnectionState.CONNECTING, ConnectionState.RECONNECTING)
+                    or self.is_on is None
+                ):
                     raise ConnectionClosed("Disconnected from device")
-                if state in (DeviceState.AUTH_ERROR, DeviceState.PAIRING_ERROR):
+                if state == ConnectionState.AUTH_ERROR:
                     raise InvalidAuth("Invalid authentication, device requires to be paired again")
                 raise CannotConnect(f"Device connection not active (state={state})")
 
@@ -239,6 +251,29 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         self._connect_lock = Lock()
         self._tasks: set[asyncio.Task] = set()
         self._ip_rediscovery_task: asyncio.Task | None = None
+        # Runtime connection lifecycle FSM (spec 001): the single writer of the runtime connection
+        # state (INV-1). Pairing / one-time init state remains on the DeviceState enum.
+        self._conn: ConnectionFsm = ConnectionFsm()
+        self._connect_max_timeout: int | None = None
+        self._initial_connect_task: asyncio.Task[bool] | None = None
+        self._grace_timer_task: asyncio.Task[None] | None = None
+        self._reconnect_auth_failed: bool = False
+        # Intent -> concrete action mapping for the thin async executor (spec 001).
+        self._intent_handlers: dict[Intent, Callable[[], None]] = {
+            Intent.START_INITIAL_CONNECT: self._intent_start_initial_connect,
+            Intent.START_KEEP_RECONNECTING: self._intent_start_keep_reconnecting,
+            Intent.START_CAST: self._intent_start_cast,
+            Intent.START_IP_WATCHER: self._intent_start_ip_watcher,
+            Intent.START_GRACE_TIMER: self._intent_start_grace_timer,
+            Intent.CANCEL_IP_WATCHER: self._intent_cancel_ip_watcher,
+            Intent.CANCEL_GRACE_TIMER: self._intent_cancel_grace_timer,
+            Intent.CANCEL_TASKS: self._intent_cancel_tasks,
+            Intent.ATV_DISCONNECT: self._intent_atv_disconnect,
+            Intent.EMIT_CONNECTED: partial(self._emit_event, Events.CONNECTED),
+            Intent.EMIT_DISCONNECTED: partial(self._emit_event, Events.DISCONNECTED),
+            Intent.EMIT_AUTH_ERROR: partial(self._emit_event, Events.AUTH_ERROR),
+            Intent.EMIT_RECONNECTING: partial(self._emit_event, Events.RECONNECTING),
+        }
 
     def __del__(self):
         """Destructs instance, disconnect AndroidTVRemote."""
@@ -318,8 +353,13 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     @property
     def state(self) -> DeviceState:
-        """Return the device state."""
+        """Return the device state of the one-time init and pairing lifecycles."""
         return self._state
+
+    @property
+    def connection_state(self) -> ConnectionState:
+        """Return the runtime connection state (owned by the connection FSM, spec 001)."""
+        return self._conn.state
 
     @property
     def identifier(self) -> str:
@@ -466,7 +506,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             _LOG.error("[%s] Initialize pair again. Error: %s", self.log_id, ex)
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
 
-    def _track(self, coro) -> asyncio.Task:
+    def _track(self, coro: Coroutine[Any, Any, Any]) -> asyncio.Task:
         """Create a background task, keep a reference to it and surface its exception if it fails."""
         task = self._loop.create_task(coro)
         self._tasks.add(task)
@@ -486,7 +526,125 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         proto = self._atv._remote_message_protocol
         return bool(proto and proto.transport and not proto.transport.is_closing())
 
-    # pylint: disable=too-many-statements,too-many-return-statements,too-many-branches
+    def _dispatch(self, trigger: Trigger) -> None:
+        """Drive the connection FSM with a trigger and execute the returned intents.
+
+        This is the only place ``ConnectionFsm.apply()`` is called (INV-1) and — via
+        :meth:`_execute` — the only place connection events are emitted (INV-3).
+        Intents run after the state transition is committed by ``apply()``.
+        """
+        for intent in self._conn.apply(trigger):
+            self._execute(intent)
+
+    def _execute(self, intent: Intent) -> None:
+        """Perform a single FSM intent.
+
+        Defensive per spec F8: a failing emit or task-start is logged and must not corrupt
+        the connection state, which is already committed by ``apply()`` before intents run.
+        """
+        try:
+            self._intent_handlers[intent]()
+        except Exception as ex:
+            _LOG.error("[%s] Failed to execute intent %s: %s", self.log_id, intent.name, ex)
+
+    def _emit_event(self, event: Events) -> None:
+        """Emit a connection event. Only called by the FSM intent executor (INV-3)."""
+        self.events.emit(event, self._identifier)
+
+    def _intent_start_initial_connect(self) -> None:
+        """Spawn the bounded initial-connect coroutine."""
+        # consume-once max_timeout: only an explicit connect(max_timeout=...) call bounds the
+        # retry loop; an FSM-internal restart (e.g. reconnect-owner supervision) retries unbounded.
+        max_timeout = self._connect_max_timeout
+        self._connect_max_timeout = None
+        self._initial_connect_task = self._track(self._initial_connect(max_timeout))
+
+    def _intent_start_keep_reconnecting(self) -> None:
+        """Hand over reconnection ownership to the library and supervise the owner task."""
+        self._reconnect_auth_failed = False
+        self._atv.keep_reconnecting(self._handle_invalid_auth)
+        # Supervise the single reconnect owner (spec F11): if the library task dies silently,
+        # re-establish ownership. Accessing the private _reconnect_task attribute is accepted and
+        # pinned to androidtvremote2==0.3.1 (spec Decision 5); re-verify on any library bump.
+        # pylint: disable=protected-access
+        reconnect_task = self._atv._reconnect_task
+        if reconnect_task is None:
+            _LOG.warning("[%s] Cannot supervise reconnect owner: no reconnect task", self.log_id)
+            return
+        reconnect_task.add_done_callback(self._on_reconnect_owner_done)
+
+    def _intent_start_cast(self) -> None:
+        """(Re-)establish the Google Cast connection in a background task."""
+        self._track(self._chromecast_connect())
+
+    def _intent_start_ip_watcher(self) -> None:
+        """Start the Stage-1 IP-rediscovery watcher if it is not already running."""
+        if self._ip_rediscovery_task is None or self._ip_rediscovery_task.done():
+            # keep_reconnecting() cannot detect a changed IP address on its own: watch for it while disconnected
+            self._ip_rediscovery_task = self._track(self._rediscover_ip_while_disconnected())
+
+    def _intent_start_grace_timer(self) -> None:
+        """Arm the reconnect grace timer (INV-5)."""
+        self._grace_timer_task = self._track(self._reconnect_grace_timer())
+
+    def _intent_cancel_ip_watcher(self) -> None:
+        """Cancel the IP-rediscovery watcher task."""
+        if self._ip_rediscovery_task is not None:
+            self._ip_rediscovery_task.cancel()
+            self._ip_rediscovery_task = None
+
+    def _intent_cancel_grace_timer(self) -> None:
+        """Cancel the reconnect grace timer task."""
+        if self._grace_timer_task is not None:
+            self._grace_timer_task.cancel()
+            self._grace_timer_task = None
+
+    def _intent_cancel_tasks(self) -> None:
+        """Cancel all tracked background tasks the device owns (INV-7)."""
+        for task in list(self._tasks):
+            task.cancel()
+        self._ip_rediscovery_task = None
+        self._grace_timer_task = None
+        self._initial_connect_task = None
+
+    def _intent_atv_disconnect(self) -> None:
+        """Disconnect the androidtvremote2 library (also cancels its reconnect task)."""
+        self._atv.disconnect()
+
+    async def _reconnect_grace_timer(self) -> None:
+        """Dispatch GRACE_ELAPSED if the transport stays lost beyond RECONNECT_GRACE (INV-5)."""
+        # RECONNECT_GRACE is provisional, see comment in connection_fsm.py (spec Decision 4)
+        await asyncio.sleep(RECONNECT_GRACE)
+        self._dispatch(Trigger.GRACE_ELAPSED)
+
+    def _handle_invalid_auth(self) -> None:
+        """Handle the invalid-authentication callback from keep_reconnecting()."""
+        self._reconnect_auth_failed = True
+        _LOG.error(
+            "[%s] Invalid authentication for %s while reconnecting",
+            self.log_id,
+            self._identifier,
+        )
+        self._dispatch(Trigger.RECONNECT_AUTH_FAILED)
+
+    def _on_reconnect_owner_done(self, task: asyncio.Task) -> None:
+        """Supervise the library reconnect owner (spec F11).
+
+        If the keep_reconnecting() task terminates without cancellation and without the
+        invalid-auth callback having fired, it died silently on an unexpected exception:
+        log an error and re-establish ownership through the existing transition table.
+        """
+        if task.cancelled() or self._reconnect_auth_failed:
+            return
+        exception = task.exception()
+        _LOG.error(
+            "[%s] Reconnect owner terminated unexpectedly (%s), re-establishing ownership",
+            self.log_id,
+            exception if exception is not None else "no exception",
+        )
+        self._dispatch(Trigger.DISCONNECT_REQUESTED)
+        self._dispatch(Trigger.CONNECT_REQUESTED)
+
     async def connect(self, max_timeout: int | None = None) -> bool:
         """
         Connect to Android TV.
@@ -499,95 +657,100 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
             _LOG.debug("[%s] Connection task already running", self.log_id)
             return True
 
-        await self._connect_lock.acquire()
-
-        if self._has_live_connection():
+        if self._has_live_connection() and self._conn.state == ConnectionState.CONNECTED:
             _LOG.debug("[%s] Android TV is already connected", self.log_id)
-            # just to make sure the state is up-to-date
-            self.events.emit(Events.CONNECTED, self._identifier)
-            self._connect_lock.release()
+            # just to make sure the client state is up-to-date; the FSM state is already
+            # CONNECTED, so the emitted event and the state agree (INV-3)
+            self._execute(Intent.EMIT_CONNECTED)
             return True
 
-        self._state = DeviceState.CONNECTING
-        # disconnect first for a clean state if the connection is in limbo
-        self._atv.disconnect()
+        self._connect_max_timeout = max_timeout
+        self._initial_connect_task = None
+        self._dispatch(Trigger.CONNECT_REQUESTED)
 
-        request_start = None
-        success = False
-        start = time.time()
+        initial_connect_task = self._initial_connect_task
+        if initial_connect_task is None:
+            # no-op transition: initial connect already running or library reconnect in progress
+            _LOG.debug(
+                "[%s] Connect request ignored in state %s: connection attempt already in progress",
+                self.log_id,
+                self._conn.state.name,
+            )
+            return True
 
-        while not success:
-            try:
-                _LOG.debug(
-                    "[%s] Connecting Android TV %s on %s (timeout=%.1fs)",
-                    self.log_id,
-                    self._identifier,
-                    self._atv.host,
-                    CONNECTION_TIMEOUT,
-                )
-                self.events.emit(Events.CONNECTING, self._identifier)
-                request_start = time.time()
-                async with timeout(CONNECTION_TIMEOUT):
-                    await self._atv.async_connect()
-                success = True
-                self._connection_attempts = 0
-                self._reconnect_delay = MIN_RECONNECT_DELAY
-            except InvalidAuth:
-                self._state = DeviceState.AUTH_ERROR
-                _LOG.error("[%s] Invalid authentication for %s", self.log_id, self._identifier)
-                self.events.emit(Events.AUTH_ERROR, self._identifier)
-                break
-            except (CannotConnect, ConnectionClosed, asyncio.TimeoutError) as ex:
-                if max_timeout and time.time() - start > max_timeout:
-                    self._state = DeviceState.TIMEOUT
-                    _LOG.error(
-                        "[%s] Abort connecting after %ds: device %s not reachable on %s. %s",
+        try:
+            return await initial_connect_task
+        except asyncio.CancelledError:
+            # initial connect was aborted by disconnect() (spec F5)
+            return False
+
+    async def _initial_connect(self, max_timeout: int | None) -> bool:
+        """Bounded initial-connect loop, started by the START_INITIAL_CONNECT intent.
+
+        Dispatches CONNECT_SUCCEEDED / CONNECT_FAILED_AUTH / CONNECT_ABORTED. Cancellation
+        (disconnect() while connecting) propagates without dispatching success (spec F5).
+
+        :param max_timeout: optional maximum time in seconds to try connecting. Default: no timeout.
+        :return: True if connected, False if timeout or authentication error occurred.
+        """
+        async with self._connect_lock:
+            # disconnect first for a clean state if the connection is in limbo
+            self._atv.disconnect()
+
+            request_start = None
+            start = time.time()
+
+            while True:
+                try:
+                    _LOG.debug(
+                        "[%s] Connecting Android TV %s on %s (timeout=%.1fs)",
                         self.log_id,
-                        max_timeout,
+                        self._identifier,
+                        self._atv.host,
+                        CONNECTION_TIMEOUT,
+                    )
+                    self.events.emit(Events.CONNECTING, self._identifier)
+                    request_start = time.time()
+                    async with timeout(CONNECTION_TIMEOUT):
+                        await self._atv.async_connect()
+                    break
+                except InvalidAuth:
+                    _LOG.error("[%s] Invalid authentication for %s", self.log_id, self._identifier)
+                    self._dispatch(Trigger.CONNECT_FAILED_AUTH)
+                    return False
+                except (CannotConnect, ConnectionClosed, asyncio.TimeoutError) as ex:
+                    if max_timeout and time.time() - start > max_timeout:
+                        _LOG.error(
+                            "[%s] Abort connecting after %ds: device %s not reachable on %s. %s",
+                            self.log_id,
+                            max_timeout,
+                            self._identifier,
+                            self._atv.host,
+                            ex,
+                        )
+                        self._dispatch(Trigger.CONNECT_ABORTED)
+                        return False
+                    await self._handle_connection_failure(time.time() - request_start, ex)
+                except Exception as ex:
+                    _LOG.error(
+                        "[%s] Fatal error connecting Android TV %s on %s: %s",
+                        self.log_id,
                         self._identifier,
                         self._atv.host,
                         ex,
                     )
-                    break
-                await self._handle_connection_failure(time.time() - request_start, ex)
-            except Exception as ex:
-                self._state = DeviceState.ERROR
-                _LOG.error(
-                    "[%s] Fatal error connecting Android TV %s on %s: %s",
-                    self.log_id,
-                    self._identifier,
-                    self._atv.host,
-                    ex,
-                )
-                break
+                    self._dispatch(Trigger.CONNECT_ABORTED)
+                    return False
 
-        self._connect_lock.release()
-        if not success:
-            if self._state == DeviceState.CONNECTING:
-                self._state = DeviceState.ERROR
-            return False
+            self._connection_attempts = 0
+            self._reconnect_delay = MIN_RECONNECT_DELAY
 
-        def _handle_invalid_auth() -> None:
-            self._state = DeviceState.AUTH_ERROR
-            _LOG.error(
-                "[%s] Invalid authentication for %s while reconnecting",
-                self.log_id,
-                self._identifier,
-            )
-            self.events.emit(Events.AUTH_ERROR, self._identifier)
+            _LOG.info("[%s] Device information: %s", self.log_id, self._atv.device_info)
+            self._update_app_list()
 
-        self._atv.keep_reconnecting(_handle_invalid_auth)
-
-        device_info = self._atv.device_info
-        _LOG.info("[%s] Device information: %s", self.log_id, device_info)
-
-        self._update_app_list()
-        self._state = DeviceState.CONNECTED
-        self.events.emit(Events.CONNECTED, self._identifier)
-
-        # Connect to Chromecast if supported
-        await self._chromecast_connect()
-        return True
+            # commits CONNECTED and performs START_KEEP_RECONNECTING, START_CAST, EMIT_CONNECTED
+            self._dispatch(Trigger.CONNECT_SUCCEEDED)
+            return True
 
     async def _chromecast_connect(self) -> None:
         if not self._device_config.use_chromecast:
@@ -698,20 +861,18 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
 
     def disconnect(self) -> None:
         """Disconnect from Android TV."""
-        for task in list(self._tasks):
-            task.cancel()
-        self._ip_rediscovery_task = None
         self._reconnect_delay = MIN_RECONNECT_DELAY
-        self._atv.disconnect()
+        # performs CANCEL_TASKS (INV-7), ATV_DISCONNECT and EMIT_DISCONNECTED; no-op if already disconnected
+        self._dispatch(Trigger.DISCONNECT_REQUESTED)
+        # Google Cast teardown is kept outside the FSM (out of scope for spec 001)
         if self._chromecast and self._chromecast.socket_client.is_alive():
             try:
                 self._chromecast.disconnect(timeout=0)
             except Exception:
                 pass
-        self._state = DeviceState.DISCONNECTED
-        self.events.emit(Events.DISCONNECTED, self._identifier)
 
     # Callbacks
+    # pylint: disable-next=too-many-branches,too-many-statements
     async def _apply_current_app_metadata(self, current_app: str) -> dict:
         update = {}
 
@@ -831,18 +992,10 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         update = {MediaAttr.VOLUME: volume_info["level"], MediaAttr.MUTED: self._muted}
         self.events.emit(Events.UPDATE, self._identifier, update)
 
-    def _is_available_updated(self, is_available: bool):
+    def _is_available_updated(self, is_available: bool) -> None:
         """Notify that the Android TV is ready to receive commands or is unavailable."""
         _LOG.info("[%s] is_available: %s", self.log_id, is_available)
-        self._state = DeviceState.CONNECTED if is_available else DeviceState.CONNECTING
-        if is_available:
-            if self._ip_rediscovery_task is not None:
-                self._ip_rediscovery_task.cancel()
-                self._ip_rediscovery_task = None
-        elif self._ip_rediscovery_task is None or self._ip_rediscovery_task.done():
-            # keep_reconnecting() cannot detect a changed IP address on its own: watch for it while disconnected
-            self._ip_rediscovery_task = self._track(self._rediscover_ip_while_disconnected())
-        self.events.emit(Events.CONNECTED if is_available else Events.DISCONNECTED, self._identifier)
+        self._dispatch(Trigger.TRANSPORT_AVAILABLE if is_available else Trigger.TRANSPORT_LOST)
 
     def _update_app_list(self) -> None:
         update = {}
@@ -983,6 +1136,7 @@ class AndroidTv(CastStatusListener, MediaStatusListener, ConnectionStatusListene
         except Exception as e:
             _LOG.error("[%s] Failed to schedule media status handler: %s", self.log_id, e)
 
+    # pylint: disable-next=too-many-branches,too-many-statements
     async def _handle_new_media_status(self, status: MediaStatus):
         update = {}
 
