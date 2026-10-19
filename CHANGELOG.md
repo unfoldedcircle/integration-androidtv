@@ -8,17 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 _Changes in the next release_
 
+---
+
+## v0.10.0 - 2026-10-19
+### Changed
+- Update pyinstaller, websockets and zeroconf packages ([#174](https://github.com/unfoldedcircle/integration-androidtv/pull/174)).
+- Update androidtvremote2 to 0.3.2 ([#170](https://github.com/unfoldedcircle/integration-androidtv/pull/170)).
+- Update GitHub Actions dependencies and CI configuration ([#156](https://github.com/unfoldedcircle/integration-androidtv/pull/156), [#157](https://github.com/unfoldedcircle/integration-androidtv/pull/157), [#158](https://github.com/unfoldedcircle/integration-androidtv/pull/158), [#159](https://github.com/unfoldedcircle/integration-androidtv/pull/159), [#160](https://github.com/unfoldedcircle/integration-androidtv/pull/160), [#161](https://github.com/unfoldedcircle/integration-androidtv/pull/161), [#169](https://github.com/unfoldedcircle/integration-androidtv/pull/169), [#173](https://github.com/unfoldedcircle/integration-androidtv/pull/173)).
+
 ### Added
 - Pure connection lifecycle state machine `src/connection_fsm.py` with full unit-test coverage
   ([spec 001](docs/specs/001-connection-lifecycle-state-machine.md), Phase 1). Not yet wired into the driver.
+- Seek commands (fast-forward and rewind) for NVIDIA Shield TV profile ([#168](https://github.com/unfoldedcircle/integration-androidtv/pull/168)).
+
 ### Fixed
 - Reconnection is now owned by the androidtvremote2 library alone: the command path no longer spawns competing reconnect tasks.
 - Connected-check is based on the live transport instead of the stale `is_on` attribute.
 - A changed device IP address is rediscovered while reconnecting, so the library can reconnect after a DHCP address change.
 - Background tasks are tracked, cancelled on disconnect and their exceptions are logged instead of being swallowed.
-- Chromecast connection no longer blocks the asyncio event loop (all devices could stall up to 10s per connect).
-
----
+- Chromecast connection no longer blocks the asyncio event loop (all devices could stall up to 10s per connect) ([#152](https://github.com/unfoldedcircle/integration-androidtv/pull/152)).
+- Added type checks for icon and MEDIA_IMAGE_URL to prevent errors with unexpected data types.
 
 ## v0.9.0 - 2026-07-01
 ### Changed
