@@ -6,4 +6,4 @@ pillow>=13.0.0
 requests>=2.34.2
 pychromecast~=14.1.0
 httpx~=0.28.1
-sanitize-filename~=1.2.0
+sanitize-filename~=1.2.1
